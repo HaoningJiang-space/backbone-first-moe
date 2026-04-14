@@ -29,6 +29,7 @@ class RuntimeEvalConfig:
     max_new_tokens: int = 64
     min_new_tokens: int = 1
     store_capacity: int = 1000
+    batch_prefetch: bool = False
     tag: str = "runtime_eval"
 
 
@@ -66,6 +67,13 @@ def build_model(runtime_cfg):
     )
     if runtime_cfg.store_prefix and runtime_cfg.prefetch_distance > 0:
         model.engine.expert_tracer.expert_map_store.import_store_data(runtime_cfg.store_prefix)
+
+    # Enable batch-aware prefetch mode on all MoE layers
+    # 在所有 MoE 层上启用 batch-aware 预取模式
+    if runtime_cfg.batch_prefetch:
+        for moe_layer in model.engine.moe_layers:
+            moe_layer.batch_prefetch_mode = True
+
     return model
 
 

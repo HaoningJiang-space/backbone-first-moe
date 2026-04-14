@@ -844,10 +844,13 @@ class SyncQwen2MoeSparseMoeBlock(nn.Module):
         batch_size, sequence_length, hidden_dim = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_dim)
         matcher = getattr(self, "expert_map_matcher", None)
+        prefetch_distance = getattr(matcher, "prefetch_distance", 0) if matcher else 0
+        batch_prefetch_mode = getattr(self, "batch_prefetch_mode", False)
         prefetch_enabled = (
-            getattr(self, "expert_tracer", None) is not None
+            not batch_prefetch_mode
+            and getattr(self, "expert_tracer", None) is not None
             and matcher is not None
-            and getattr(matcher, "prefetch_distance", 0) > 0
+            and prefetch_distance > 0
         )
         # router_logits: (batch * sequence_length, n_experts)
         router_logits = self.gate(hidden_states)
@@ -864,8 +867,21 @@ class SyncQwen2MoeSparseMoeBlock(nn.Module):
         expert_index = selected_experts.reshape(
             batch_size, sequence_length, self.top_k)
 
+        # Batch-aware prefetch: one call for the entire batch per layer.
+        # Uses routing results directly, no per-sequence store matching.
+        # Batch-aware 预取：每层对整个 batch 做一次调用。
+        # 直接使用路由结果，不做逐序列的 store 匹配。
+        if batch_prefetch_mode and matcher is not None:
+            prefetcher = getattr(matcher, "expert_prefetcher", None)
+            if prefetcher is not None:
+                # Aggregate max probability per expert across all tokens in batch
+                # 聚合 batch 中所有 token 对每个 expert 的最大概率
+                batch_max_probs = expert_probs.max(dim=0).values  # [num_experts]
+                prefetcher.batch_prefetch_next_layer(self.layer_id, batch_max_probs)
+
         if prefetch_enabled:
-            # Skip tracing/prefetch bookkeeping entirely on demand-only runs.
+            # Legacy per-sequence prefetch path (kept for ablation).
+            # 旧的逐序列预取路径（保留用于消融实验）。
             for i, seq_id in enumerate(self.seq_id_list):
                 self.expert_tracer.update_entry(
                     seq_id=seq_id,

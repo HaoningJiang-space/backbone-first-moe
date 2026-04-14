@@ -107,3 +107,65 @@ class ExpertPrefetcher(object):
         for tid, p in zip(tids, probs):
             gpu_id = self.archer_engine.get_node_default_device([tid])
             self.archer_engine.enqueue_prefetch(tid, gpu_id, float(p))
+
+    @torch.inference_mode()
+    def batch_prefetch_next_layer(self, current_layer, batch_expert_probs):
+        """Batch-aware prefetch: one call for the entire batch.
+
+        Instead of per-sequence embed/traj matching (heavy CPU overhead),
+        this uses the batch-aggregated routing probabilities to prefetch
+        experts for the next layer in a single pass.
+
+        batch-aware 预取：一次调用覆盖整个 batch。
+        用 batch 聚合的路由概率为下一层预取 expert，
+        替代逐序列的 embed/traj 匹配（CPU 开销大）。
+
+        Args:
+            current_layer: index of the layer that just finished routing
+            batch_expert_probs: [num_experts] tensor, max probability
+                                across all tokens in the batch for each expert
+        """
+        if self.archer_engine is None:
+            return
+        if self._tensor_id_grid is None:
+            return
+
+        next_layer = current_layer + 1
+        if next_layer >= self.num_layers:
+            return
+
+        probs = batch_expert_probs.detach().to("cpu", dtype=torch.float32)
+
+        # Zero out resident experts (already on GPU)
+        # 常驻 expert 已在 GPU 上，跳过
+        for layer_id, expert_id in self.resident_expert_ids:
+            if layer_id == next_layer and 0 <= expert_id < probs.shape[0]:
+                probs[expert_id] = 0.0
+
+        # Select experts above threshold (top_k probability > 0)
+        # 选择概率大于 0 的 expert
+        mask = probs > 0
+        if not mask.any():
+            return
+
+        expert_ids = mask.nonzero(as_tuple=True)[0]
+        expert_probs = probs[expert_ids]
+        tids = self._tensor_id_grid[next_layer, expert_ids]
+
+        valid = tids >= 0
+        if not valid.any():
+            return
+
+        tids = tids[valid]
+        expert_probs = expert_probs[valid]
+
+        # Sort by probability descending, enqueue
+        # 按概率降序排列，入队
+        order = torch.argsort(expert_probs, descending=True)
+        tids = tids[order].tolist()
+        expert_probs = expert_probs[order].tolist()
+
+        self.archer_engine.replace_cache_candidates(tids)
+        for tid, p in zip(tids, expert_probs):
+            gpu_id = self.archer_engine.get_node_default_device([tid])
+            self.archer_engine.enqueue_prefetch(tid, gpu_id, float(p))
