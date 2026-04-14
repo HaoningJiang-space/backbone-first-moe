@@ -1,0 +1,1964 @@
+{
+  "analysis": "backbone_generalization",
+  "mode": "kfold_cv",
+  "train_fraction": 0.5,
+  "train_sequences": [
+    "2bd886d129484761a29a584d255b7b3e",
+    "5fca638a4f1142cdb3d441b55fd5881c",
+    "78f9065a18864453bf2b06711d75df28",
+    "8d9320d811bd4279bb4dea73f2668910",
+    "915d1f1beda9498982ecba54bd381a6e",
+    "3650a64bdc3f413ab4502107c2be9960",
+    "199dfbc419ab44ffbe9b3f59dff30658",
+    "14f1217a1d174a0e97077039b0db01d9",
+    "258b9909f2024754ae6ea5701227e115",
+    "6c44fdbd49054185b3994659a7d1c030",
+    "4d707824986343ed8d7b9a6f21c9e5f3",
+    "dc8eb53b27d24766929d8a28b03f756f",
+    "e059c041175a482c926db5b768e244ab",
+    "a44fa912b685457c96fac4f18b34ae35",
+    "f6495ce6983c405ebfe50c91611d12be",
+    "de855af231864c269383f31dfc99e9d6",
+    "ec87931901a9473d8e8036464f47d918",
+    "f70df9d957384b24813531c84f1f9dad",
+    "9f3e85d6464343ae91edef05d472b94b",
+    "78550a9a199240ddbf2b91bc5c68d0df",
+    "48a8d7ea84214e719a6fa5fbb1970b47",
+    "007575672f054076be51939aa53e3907",
+    "83d052efd05b49fab8aafcb48adefa44",
+    "9bfb7d2c131b40ab9f0de99cf77fa100",
+    "3ec9a7e2bca647d0a0219f850ffc45b1",
+    "bdfc5561b75740cc83f468b53755ddbb",
+    "17ed8489753b417ea8ab2eaf9c795578",
+    "97b0145feb984fd482986e705df25b72",
+    "79f162a9ae7e459492bbee7cf9622916",
+    "7818bcfdffd14620868aa777ba8b0c5d",
+    "dbe6f9bc02eb42d585ef88ae64ceb228",
+    "10ca66cbc4274c0d848fdf28976ac8b3"
+  ],
+  "test_sequences": [
+    "f5ef128f33aa4ef1ba73a23762f19d0f",
+    "cb7627a704934814a3718a3a6a01cc65",
+    "243c0477d34a4f649e663b5178aab052",
+    "6d4d805160f04cbbbecf7a61b687bc12",
+    "aa480e64baae4b4fb03b58ef8dbb00ee",
+    "9a472af930ea45c0a8d41e90da6a4013",
+    "915a7633da4c40c6a658c8ea3131d94a",
+    "65d7887c6534421c88b5f9347677bf3f",
+    "d5d5a64e1e3e49e3b55db548394dc269",
+    "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+    "fa778df92c4940b28df1b89069cca472",
+    "f583561a8daf48019ed4d9642ae856b4",
+    "cda3f3f9b5c148d5880f9708677c4010",
+    "13f323ef294a43bc81ad995fc300d367",
+    "17b50753381242ec8dd883870713b44a",
+    "80d460f7ca824900b1debef9fcde7eb4",
+    "e166794a2b6a46cab6b8a71ac1eca796",
+    "d2abafac1d814d399d96947ace8a3ad7",
+    "eec0b4ffb9c94328aaaf40d117ef7e2d",
+    "522d4a40f87040ed9f9b9ee7bfd776cb",
+    "f8e8667dde484c7aa2788dc92ade816c",
+    "c47242208e5d4e5bab71230ef53ddebb",
+    "03d124e19bac4612974a9950efca9c71",
+    "f7a33e3c8b2d42759fcc8816399532ee",
+    "556f3994912b468da3a0f850d1a0c2e5",
+    "02c26437f08d42a184800911e8998df8",
+    "2efa12eb208e4510aeae77a899a7b619",
+    "0275bb39cbe0454b9a99f8aa583253a3",
+    "5358f8099fb14ebb8965c2e81e3ede47",
+    "c7c90551d8474872ab606d425ca92557",
+    "b402a01535614d81b14606f8b0fa2219",
+    "124e035cf66a47f680dfa8d0d4df9ba4"
+  ],
+  "train_state_file": "experiments/results/backbone_generalization_profile_freq_cv8_n64/generalization_tmp/train_state.pkl",
+  "test_state_file": "experiments/results/backbone_generalization_profile_freq_cv8_n64/generalization_tmp/test_state.pkl",
+  "resident_policy": "profile_freq",
+  "resident_ratio": 0.9,
+  "resident_profile_ratio": 0.2,
+  "memory_ratios": [
+    0.05,
+    0.07,
+    0.1
+  ],
+  "prefetch_windows": [
+    0,
+    1,
+    4,
+    10
+  ],
+  "results": [
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.671875,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 301.5214275028113,
+        "avg_residual_stall_ms": 1.3165138818884137
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 259.10252638699626,
+        "avg_residual_stall_ms": 1.8594760689682817
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 98.46320547455265,
+        "avg_residual_stall_ms": 8.156078051495207
+      },
+      "native_gain_over_single": 160.63932091244362,
+      "transfer_gain_over_single": 203.05822202825868,
+      "transfer_regret_vs_native": -42.41890111581506,
+      "retained_gain_fraction": 1.2640630007327749
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.6853932584269663,
+      "best_transfer": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 406.0293430301374,
+        "avg_residual_stall_ms": 0.46287618657595275
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 407.4523319021691,
+        "avg_residual_stall_ms": 0.45427482358872884
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 167.4920838436601,
+        "avg_residual_stall_ms": 3.9704314201111113
+      },
+      "native_gain_over_single": 239.96024805850897,
+      "transfer_gain_over_single": 238.53725918647729,
+      "transfer_regret_vs_native": 1.4229888720316808,
+      "retained_gain_fraction": 0.994069897478666
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 394,
+      "train_test_jaccard": 0.7018633540372671,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 485.4694841963637,
+        "avg_residual_stall_ms": 0.059861706149193776
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 465.9265066887504,
+        "avg_residual_stall_ms": 0.14626123571909053
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 270.15068534436756,
+        "avg_residual_stall_ms": 1.701637842321784
+      },
+      "native_gain_over_single": 195.77582134438285,
+      "transfer_gain_over_single": 215.31879885199612,
+      "transfer_regret_vs_native": -19.542977507613273,
+      "retained_gain_fraction": 1.0998232436130908
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.6461538461538462,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 359.58959390788885,
+        "avg_residual_stall_ms": 0.7809481056787736
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 362.0130016692581,
+        "avg_residual_stall_ms": 0.7623317267305285
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 95.23111911214502,
+        "avg_residual_stall_ms": 8.50076917422696
+      },
+      "native_gain_over_single": 266.781882557113,
+      "transfer_gain_over_single": 264.35847479574386,
+      "transfer_regret_vs_native": 2.4234077613692193,
+      "retained_gain_fraction": 0.9909161456612393
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.7142857142857143,
+      "best_transfer": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 436.5796856949116,
+        "avg_residual_stall_ms": 0.29053259408604726
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 418.46447240716174,
+        "avg_residual_stall_ms": 0.38968912760417596
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 168.5697033608183,
+        "avg_residual_stall_ms": 3.932264102402811
+      },
+      "native_gain_over_single": 249.89476904634344,
+      "transfer_gain_over_single": 268.00998233409325,
+      "transfer_regret_vs_native": -18.11521328774984,
+      "retained_gain_fraction": 1.0724913664935112
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 403,
+      "train_test_jaccard": 0.7063655030800822,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 494.25498386884533,
+        "avg_residual_stall_ms": 0.023247175319220433
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 492.13564581762233,
+        "avg_residual_stall_ms": 0.03196010794689443
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 274.4512189630218,
+        "avg_residual_stall_ms": 1.6436347551242518
+      },
+      "native_gain_over_single": 217.68442685460053,
+      "transfer_gain_over_single": 219.80376490582353,
+      "transfer_regret_vs_native": -2.1193380512229965,
+      "retained_gain_fraction": 1.0097358276007433
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.5970149253731343,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 159.5256711081565,
+        "avg_residual_stall_ms": 4.268583564348496
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 293.24970929300144,
+        "avg_residual_stall_ms": 1.4100630565355867
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 90.68103617785937,
+        "avg_residual_stall_ms": 9.027664020497172
+      },
+      "native_gain_over_single": 202.56867311514208,
+      "transfer_gain_over_single": 68.84463493029713,
+      "transfer_regret_vs_native": 133.72403818484494,
+      "retained_gain_fraction": 0.33985825089136634
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.6085790884718498,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 379.32043997537346,
+        "avg_residual_stall_ms": 0.6362934727822603
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 425.2676845993951,
+        "avg_residual_stall_ms": 0.35146011844759084
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 155.21429121504602,
+        "avg_residual_stall_ms": 4.4427057081656205
+      },
+      "native_gain_over_single": 270.0533933843491,
+      "transfer_gain_over_single": 224.10614876032744,
+      "transfer_regret_vs_native": 45.947244624021664,
+      "retained_gain_fraction": 0.8298586659171212
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 428,
+      "train_test_jaccard": 0.6525096525096525,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 474.7544301652303,
+        "avg_residual_stall_ms": 0.10635211903561752
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 493.785679842003,
+        "avg_residual_stall_ms": 0.025170110887097003
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 251.61092805503947,
+        "avg_residual_stall_ms": 1.9743901734709968
+      },
+      "native_gain_over_single": 242.17475178696353,
+      "transfer_gain_over_single": 223.14350211019084,
+      "transfer_regret_vs_native": 19.03124967677269,
+      "retained_gain_fraction": 0.9214152196447212
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.6653696498054474,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 326.2591938332768,
+        "avg_residual_stall_ms": 1.0650477255544502
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 360.3628148803846,
+        "avg_residual_stall_ms": 0.7749810987903356
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 103.49355406712664,
+        "avg_residual_stall_ms": 7.662437521001184
+      },
+      "native_gain_over_single": 256.86926081325794,
+      "transfer_gain_over_single": 222.76563976615017,
+      "transfer_regret_vs_native": 34.103621047107765,
+      "retained_gain_fraction": 0.8672335454264384
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.7191977077363897,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 417.3688956479183,
+        "avg_residual_stall_ms": 0.39596196656587307
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 447.66316205122223,
+        "avg_residual_stall_ms": 0.23382240213374533
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 183.1303175219444,
+        "avg_residual_stall_ms": 3.460592290406752
+      },
+      "native_gain_over_single": 264.53284452927784,
+      "transfer_gain_over_single": 234.2385781259739,
+      "transfer_regret_vs_native": 30.294266403303936,
+      "retained_gain_fraction": 0.8854801321279746
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 405,
+      "train_test_jaccard": 0.7034764826175869,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 487.3785401597576,
+        "avg_residual_stall_ms": 0.05179325226814542
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 500.0000000000433,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 287.21980879305033,
+        "avg_residual_stall_ms": 1.4816540133567297
+      },
+      "native_gain_over_single": 212.78019120699298,
+      "transfer_gain_over_single": 200.1587313667073,
+      "transfer_regret_vs_native": 12.621459840285695,
+      "retained_gain_fraction": 0.9406831069720794
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.6784313725490196,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 304.5681869970062,
+        "avg_residual_stall_ms": 1.2833370085685298
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 313.45906981334133,
+        "avg_residual_stall_ms": 1.190209173387059
+      },
+      "best_single": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 91.05309542231682,
+        "avg_residual_stall_ms": 8.982603011592742
+      },
+      "native_gain_over_single": 222.40597439102453,
+      "transfer_gain_over_single": 213.5150915746894,
+      "transfer_regret_vs_native": 8.890882816335136,
+      "retained_gain_fraction": 0.9600240828031734
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.7142857142857143,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 405.46793297338644,
+        "avg_residual_stall_ms": 0.46628627982188814
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 445.4787638376117,
+        "avg_residual_stall_ms": 0.24477591565862156
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 172.26307146131347,
+        "avg_residual_stall_ms": 3.8050747122816886
+      },
+      "native_gain_over_single": 273.21569237629825,
+      "transfer_gain_over_single": 233.20486151207297,
+      "transfer_regret_vs_native": 40.010830864225284,
+      "retained_gain_fraction": 0.8535558828402923
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 420,
+      "train_test_jaccard": 0.7028112449799196,
+      "best_transfer": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 486.8515646418048,
+        "avg_residual_stall_ms": 0.05401414440524218
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 497.5174931350297,
+        "avg_residual_stall_ms": 0.009979576192873403
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 272.7926029870032,
+        "avg_residual_stall_ms": 1.6657885479670147
+      },
+      "native_gain_over_single": 224.72489014802653,
+      "transfer_gain_over_single": 214.05896165480164,
+      "transfer_regret_vs_native": 10.665928493224897,
+      "retained_gain_fraction": 0.9525378408853633
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.5910780669144982,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 276.0087817813862,
+        "avg_residual_stall_ms": 1.6230731266801002
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 359.23335862271296,
+        "avg_residual_stall_ms": 0.7837058446740771
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 106.09138116145961,
+        "avg_residual_stall_ms": 7.425836378528225
+      },
+      "native_gain_over_single": 253.14197746125336,
+      "transfer_gain_over_single": 169.91740061992658,
+      "transfer_regret_vs_native": 83.22457684132678,
+      "retained_gain_fraction": 0.6712335991210095
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.680672268907563,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 402.55655879070235,
+        "avg_residual_stall_ms": 0.4841229838709861
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 435.30474520432955,
+        "avg_residual_stall_ms": 0.2972412109374975
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 185.10970187332063,
+        "avg_residual_stall_ms": 3.4022019909274848
+      },
+      "native_gain_over_single": 250.19504333100892,
+      "transfer_gain_over_single": 217.44685691738172,
+      "transfer_regret_vs_native": 32.748186413627195,
+      "retained_gain_fraction": 0.86910937172204
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 428,
+      "train_test_jaccard": 0.7017892644135189,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 487.87541328364966,
+        "avg_residual_stall_ms": 0.04970361853158599
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 499.8205685517166,
+        "avg_residual_stall_ms": 0.0007179834509279482
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 279.91577425114997,
+        "avg_residual_stall_ms": 1.572503202704923
+      },
+      "native_gain_over_single": 219.9047943005666,
+      "transfer_gain_over_single": 207.9596390324997,
+      "transfer_regret_vs_native": 11.945155268066912,
+      "retained_gain_fraction": 0.9456803326818776
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.6653696498054474,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 346.971306152097,
+        "avg_residual_stall_ms": 0.8820827032930083
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 364.4400052810575,
+        "avg_residual_stall_ms": 0.7439358618951777
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 99.74344593118826,
+        "avg_residual_stall_ms": 8.025721396169283
+      },
+      "native_gain_over_single": 264.69655934986923,
+      "transfer_gain_over_single": 247.22786022090872,
+      "transfer_regret_vs_native": 17.46869912896051,
+      "retained_gain_fraction": 0.9340048122579833
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.7045454545454546,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 409.75046213205405,
+        "avg_residual_stall_ms": 0.44050975512436163
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 436.13257043413506,
+        "avg_residual_stall_ms": 0.2928808068716629
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 193.86719317580918,
+        "avg_residual_stall_ms": 3.158170310399928
+      },
+      "native_gain_over_single": 242.26537725832588,
+      "transfer_gain_over_single": 215.88326895624488,
+      "transfer_regret_vs_native": 26.382108302081008,
+      "retained_gain_fraction": 0.8911024406349656
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 400,
+      "train_test_jaccard": 0.7072164948453609,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 487.1538443831599,
+        "avg_residual_stall_ms": 0.05273962533602154
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 469.33527838325017,
+        "avg_residual_stall_ms": 0.13067298807122735
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 286.7995329026952,
+        "avg_residual_stall_ms": 1.4867560273857032
+      },
+      "native_gain_over_single": 182.53574548055497,
+      "transfer_gain_over_single": 200.35431148046467,
+      "transfer_regret_vs_native": -17.81856599990971,
+      "retained_gain_fraction": 1.0976168582926016
+    },
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 214,
+      "test_resident_size": 214,
+      "train_test_jaccard": 0.6653696498054474,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 130.31390376912896,
+        "avg_residual_stall_ms": 5.673778246808142
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 154.36926312028544,
+        "avg_residual_stall_ms": 4.4779735278061334
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 92.10230607560679,
+        "avg_residual_stall_ms": 8.857491441952254
+      },
+      "native_gain_over_single": 62.26695704467865,
+      "transfer_gain_over_single": 38.211597693522165,
+      "transfer_regret_vs_native": 24.055359351156483,
+      "retained_gain_fraction": 0.6136737606448963
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 300,
+      "test_resident_size": 300,
+      "train_test_jaccard": 0.6085790884718498,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 327.1120209768766,
+        "avg_residual_stall_ms": 1.0570567141297231
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 421.99742211651926,
+        "avg_residual_stall_ms": 0.3696827221942211
+      },
+      "best_single": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 170.36840745872527,
+        "avg_residual_stall_ms": 3.8696328440021244
+      },
+      "native_gain_over_single": 251.629014657794,
+      "transfer_gain_over_single": 156.7436135181513,
+      "transfer_regret_vs_native": 94.88540113964268,
+      "retained_gain_fraction": 0.6229155001513508
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 428,
+      "test_resident_size": 415,
+      "train_test_jaccard": 0.656188605108055,
+      "best_transfer": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 470.8176905179402,
+        "avg_residual_stall_ms": 0.12396437121975815
+      },
+      "best_test_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 488.7486375642091,
+        "avg_residual_stall_ms": 0.04604150915657082
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 266.48151678326195,
+        "avg_residual_stall_ms": 1.7526054792505827
+      },
+      "native_gain_over_single": 222.26712078094715,
+      "transfer_gain_over_single": 204.33617373467825,
+      "transfer_regret_vs_native": 17.930947046268898,
+      "retained_gain_fraction": 0.9193270377405908
+    }
+  ],
+  "cv_folds": 8,
+  "folds": [
+    {
+      "fold_index": 0,
+      "train_sequences": [
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.671875,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 301.5214275028113,
+            "avg_residual_stall_ms": 1.3165138818884137
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 259.10252638699626,
+            "avg_residual_stall_ms": 1.8594760689682817
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 98.46320547455265,
+            "avg_residual_stall_ms": 8.156078051495207
+          },
+          "native_gain_over_single": 160.63932091244362,
+          "transfer_gain_over_single": 203.05822202825868,
+          "transfer_regret_vs_native": -42.41890111581506,
+          "retained_gain_fraction": 1.2640630007327749
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.6853932584269663,
+          "best_transfer": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 406.0293430301374,
+            "avg_residual_stall_ms": 0.46287618657595275
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 407.4523319021691,
+            "avg_residual_stall_ms": 0.45427482358872884
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 167.4920838436601,
+            "avg_residual_stall_ms": 3.9704314201111113
+          },
+          "native_gain_over_single": 239.96024805850897,
+          "transfer_gain_over_single": 238.53725918647729,
+          "transfer_regret_vs_native": 1.4229888720316808,
+          "retained_gain_fraction": 0.994069897478666
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 394,
+          "train_test_jaccard": 0.7018633540372671,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 485.4694841963637,
+            "avg_residual_stall_ms": 0.059861706149193776
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 465.9265066887504,
+            "avg_residual_stall_ms": 0.14626123571909053
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 270.15068534436756,
+            "avg_residual_stall_ms": 1.701637842321784
+          },
+          "native_gain_over_single": 195.77582134438285,
+          "transfer_gain_over_single": 215.31879885199612,
+          "transfer_regret_vs_native": -19.542977507613273,
+          "retained_gain_fraction": 1.0998232436130908
+        }
+      ]
+    },
+    {
+      "fold_index": 1,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.6461538461538462,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 359.58959390788885,
+            "avg_residual_stall_ms": 0.7809481056787736
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 362.0130016692581,
+            "avg_residual_stall_ms": 0.7623317267305285
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 95.23111911214502,
+            "avg_residual_stall_ms": 8.50076917422696
+          },
+          "native_gain_over_single": 266.781882557113,
+          "transfer_gain_over_single": 264.35847479574386,
+          "transfer_regret_vs_native": 2.4234077613692193,
+          "retained_gain_fraction": 0.9909161456612393
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.7142857142857143,
+          "best_transfer": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 436.5796856949116,
+            "avg_residual_stall_ms": 0.29053259408604726
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 418.46447240716174,
+            "avg_residual_stall_ms": 0.38968912760417596
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 168.5697033608183,
+            "avg_residual_stall_ms": 3.932264102402811
+          },
+          "native_gain_over_single": 249.89476904634344,
+          "transfer_gain_over_single": 268.00998233409325,
+          "transfer_regret_vs_native": -18.11521328774984,
+          "retained_gain_fraction": 1.0724913664935112
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 403,
+          "train_test_jaccard": 0.7063655030800822,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 494.25498386884533,
+            "avg_residual_stall_ms": 0.023247175319220433
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 492.13564581762233,
+            "avg_residual_stall_ms": 0.03196010794689443
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 274.4512189630218,
+            "avg_residual_stall_ms": 1.6436347551242518
+          },
+          "native_gain_over_single": 217.68442685460053,
+          "transfer_gain_over_single": 219.80376490582353,
+          "transfer_regret_vs_native": -2.1193380512229965,
+          "retained_gain_fraction": 1.0097358276007433
+        }
+      ]
+    },
+    {
+      "fold_index": 2,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.5970149253731343,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 159.5256711081565,
+            "avg_residual_stall_ms": 4.268583564348496
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 293.24970929300144,
+            "avg_residual_stall_ms": 1.4100630565355867
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 90.68103617785937,
+            "avg_residual_stall_ms": 9.027664020497172
+          },
+          "native_gain_over_single": 202.56867311514208,
+          "transfer_gain_over_single": 68.84463493029713,
+          "transfer_regret_vs_native": 133.72403818484494,
+          "retained_gain_fraction": 0.33985825089136634
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.6085790884718498,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 379.32043997537346,
+            "avg_residual_stall_ms": 0.6362934727822603
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 425.2676845993951,
+            "avg_residual_stall_ms": 0.35146011844759084
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 155.21429121504602,
+            "avg_residual_stall_ms": 4.4427057081656205
+          },
+          "native_gain_over_single": 270.0533933843491,
+          "transfer_gain_over_single": 224.10614876032744,
+          "transfer_regret_vs_native": 45.947244624021664,
+          "retained_gain_fraction": 0.8298586659171212
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 428,
+          "train_test_jaccard": 0.6525096525096525,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 474.7544301652303,
+            "avg_residual_stall_ms": 0.10635211903561752
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 493.785679842003,
+            "avg_residual_stall_ms": 0.025170110887097003
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 251.61092805503947,
+            "avg_residual_stall_ms": 1.9743901734709968
+          },
+          "native_gain_over_single": 242.17475178696353,
+          "transfer_gain_over_single": 223.14350211019084,
+          "transfer_regret_vs_native": 19.03124967677269,
+          "retained_gain_fraction": 0.9214152196447212
+        }
+      ]
+    },
+    {
+      "fold_index": 3,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.6653696498054474,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 326.2591938332768,
+            "avg_residual_stall_ms": 1.0650477255544502
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 360.3628148803846,
+            "avg_residual_stall_ms": 0.7749810987903356
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 103.49355406712664,
+            "avg_residual_stall_ms": 7.662437521001184
+          },
+          "native_gain_over_single": 256.86926081325794,
+          "transfer_gain_over_single": 222.76563976615017,
+          "transfer_regret_vs_native": 34.103621047107765,
+          "retained_gain_fraction": 0.8672335454264384
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.7191977077363897,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 417.3688956479183,
+            "avg_residual_stall_ms": 0.39596196656587307
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 447.66316205122223,
+            "avg_residual_stall_ms": 0.23382240213374533
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 183.1303175219444,
+            "avg_residual_stall_ms": 3.460592290406752
+          },
+          "native_gain_over_single": 264.53284452927784,
+          "transfer_gain_over_single": 234.2385781259739,
+          "transfer_regret_vs_native": 30.294266403303936,
+          "retained_gain_fraction": 0.8854801321279746
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 405,
+          "train_test_jaccard": 0.7034764826175869,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 487.3785401597576,
+            "avg_residual_stall_ms": 0.05179325226814542
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 500.0000000000433,
+            "avg_residual_stall_ms": 0.0
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 287.21980879305033,
+            "avg_residual_stall_ms": 1.4816540133567297
+          },
+          "native_gain_over_single": 212.78019120699298,
+          "transfer_gain_over_single": 200.1587313667073,
+          "transfer_regret_vs_native": 12.621459840285695,
+          "retained_gain_fraction": 0.9406831069720794
+        }
+      ]
+    },
+    {
+      "fold_index": 4,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.6784313725490196,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 304.5681869970062,
+            "avg_residual_stall_ms": 1.2833370085685298
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 313.45906981334133,
+            "avg_residual_stall_ms": 1.190209173387059
+          },
+          "best_single": {
+            "prefetch_window": 0,
+            "throughput_tokens_per_sec": 91.05309542231682,
+            "avg_residual_stall_ms": 8.982603011592742
+          },
+          "native_gain_over_single": 222.40597439102453,
+          "transfer_gain_over_single": 213.5150915746894,
+          "transfer_regret_vs_native": 8.890882816335136,
+          "retained_gain_fraction": 0.9600240828031734
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.7142857142857143,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 405.46793297338644,
+            "avg_residual_stall_ms": 0.46628627982188814
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 445.4787638376117,
+            "avg_residual_stall_ms": 0.24477591565862156
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 172.26307146131347,
+            "avg_residual_stall_ms": 3.8050747122816886
+          },
+          "native_gain_over_single": 273.21569237629825,
+          "transfer_gain_over_single": 233.20486151207297,
+          "transfer_regret_vs_native": 40.010830864225284,
+          "retained_gain_fraction": 0.8535558828402923
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 420,
+          "train_test_jaccard": 0.7028112449799196,
+          "best_transfer": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 486.8515646418048,
+            "avg_residual_stall_ms": 0.05401414440524218
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 497.5174931350297,
+            "avg_residual_stall_ms": 0.009979576192873403
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 272.7926029870032,
+            "avg_residual_stall_ms": 1.6657885479670147
+          },
+          "native_gain_over_single": 224.72489014802653,
+          "transfer_gain_over_single": 214.05896165480164,
+          "transfer_regret_vs_native": 10.665928493224897,
+          "retained_gain_fraction": 0.9525378408853633
+        }
+      ]
+    },
+    {
+      "fold_index": 5,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.5910780669144982,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 276.0087817813862,
+            "avg_residual_stall_ms": 1.6230731266801002
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 359.23335862271296,
+            "avg_residual_stall_ms": 0.7837058446740771
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 106.09138116145961,
+            "avg_residual_stall_ms": 7.425836378528225
+          },
+          "native_gain_over_single": 253.14197746125336,
+          "transfer_gain_over_single": 169.91740061992658,
+          "transfer_regret_vs_native": 83.22457684132678,
+          "retained_gain_fraction": 0.6712335991210095
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.680672268907563,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 402.55655879070235,
+            "avg_residual_stall_ms": 0.4841229838709861
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 435.30474520432955,
+            "avg_residual_stall_ms": 0.2972412109374975
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 185.10970187332063,
+            "avg_residual_stall_ms": 3.4022019909274848
+          },
+          "native_gain_over_single": 250.19504333100892,
+          "transfer_gain_over_single": 217.44685691738172,
+          "transfer_regret_vs_native": 32.748186413627195,
+          "retained_gain_fraction": 0.86910937172204
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 428,
+          "train_test_jaccard": 0.7017892644135189,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 487.87541328364966,
+            "avg_residual_stall_ms": 0.04970361853158599
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 499.8205685517166,
+            "avg_residual_stall_ms": 0.0007179834509279482
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 279.91577425114997,
+            "avg_residual_stall_ms": 1.572503202704923
+          },
+          "native_gain_over_single": 219.9047943005666,
+          "transfer_gain_over_single": 207.9596390324997,
+          "transfer_regret_vs_native": 11.945155268066912,
+          "retained_gain_fraction": 0.9456803326818776
+        }
+      ]
+    },
+    {
+      "fold_index": 6,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "test_sequences": [
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.6653696498054474,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 346.971306152097,
+            "avg_residual_stall_ms": 0.8820827032930083
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 364.4400052810575,
+            "avg_residual_stall_ms": 0.7439358618951777
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 99.74344593118826,
+            "avg_residual_stall_ms": 8.025721396169283
+          },
+          "native_gain_over_single": 264.69655934986923,
+          "transfer_gain_over_single": 247.22786022090872,
+          "transfer_regret_vs_native": 17.46869912896051,
+          "retained_gain_fraction": 0.9340048122579833
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.7045454545454546,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 409.75046213205405,
+            "avg_residual_stall_ms": 0.44050975512436163
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 436.13257043413506,
+            "avg_residual_stall_ms": 0.2928808068716629
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 193.86719317580918,
+            "avg_residual_stall_ms": 3.158170310399928
+          },
+          "native_gain_over_single": 242.26537725832588,
+          "transfer_gain_over_single": 215.88326895624488,
+          "transfer_regret_vs_native": 26.382108302081008,
+          "retained_gain_fraction": 0.8911024406349656
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 400,
+          "train_test_jaccard": 0.7072164948453609,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 487.1538443831599,
+            "avg_residual_stall_ms": 0.05273962533602154
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 469.33527838325017,
+            "avg_residual_stall_ms": 0.13067298807122735
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 286.7995329026952,
+            "avg_residual_stall_ms": 1.4867560273857032
+          },
+          "native_gain_over_single": 182.53574548055497,
+          "transfer_gain_over_single": 200.35431148046467,
+          "transfer_regret_vs_native": -17.81856599990971,
+          "retained_gain_fraction": 1.0976168582926016
+        }
+      ]
+    },
+    {
+      "fold_index": 7,
+      "train_sequences": [
+        "2bd886d129484761a29a584d255b7b3e",
+        "5fca638a4f1142cdb3d441b55fd5881c",
+        "78f9065a18864453bf2b06711d75df28",
+        "8d9320d811bd4279bb4dea73f2668910",
+        "915d1f1beda9498982ecba54bd381a6e",
+        "3650a64bdc3f413ab4502107c2be9960",
+        "199dfbc419ab44ffbe9b3f59dff30658",
+        "14f1217a1d174a0e97077039b0db01d9",
+        "258b9909f2024754ae6ea5701227e115",
+        "6c44fdbd49054185b3994659a7d1c030",
+        "4d707824986343ed8d7b9a6f21c9e5f3",
+        "dc8eb53b27d24766929d8a28b03f756f",
+        "e059c041175a482c926db5b768e244ab",
+        "a44fa912b685457c96fac4f18b34ae35",
+        "f6495ce6983c405ebfe50c91611d12be",
+        "de855af231864c269383f31dfc99e9d6",
+        "ec87931901a9473d8e8036464f47d918",
+        "f70df9d957384b24813531c84f1f9dad",
+        "9f3e85d6464343ae91edef05d472b94b",
+        "78550a9a199240ddbf2b91bc5c68d0df",
+        "48a8d7ea84214e719a6fa5fbb1970b47",
+        "007575672f054076be51939aa53e3907",
+        "83d052efd05b49fab8aafcb48adefa44",
+        "9bfb7d2c131b40ab9f0de99cf77fa100",
+        "3ec9a7e2bca647d0a0219f850ffc45b1",
+        "bdfc5561b75740cc83f468b53755ddbb",
+        "17ed8489753b417ea8ab2eaf9c795578",
+        "97b0145feb984fd482986e705df25b72",
+        "79f162a9ae7e459492bbee7cf9622916",
+        "7818bcfdffd14620868aa777ba8b0c5d",
+        "dbe6f9bc02eb42d585ef88ae64ceb228",
+        "10ca66cbc4274c0d848fdf28976ac8b3",
+        "f5ef128f33aa4ef1ba73a23762f19d0f",
+        "cb7627a704934814a3718a3a6a01cc65",
+        "243c0477d34a4f649e663b5178aab052",
+        "6d4d805160f04cbbbecf7a61b687bc12",
+        "aa480e64baae4b4fb03b58ef8dbb00ee",
+        "9a472af930ea45c0a8d41e90da6a4013",
+        "915a7633da4c40c6a658c8ea3131d94a",
+        "65d7887c6534421c88b5f9347677bf3f",
+        "d5d5a64e1e3e49e3b55db548394dc269",
+        "9d10e2d6ca3c4a19a8e0dab9671aa7b1",
+        "fa778df92c4940b28df1b89069cca472",
+        "f583561a8daf48019ed4d9642ae856b4",
+        "cda3f3f9b5c148d5880f9708677c4010",
+        "13f323ef294a43bc81ad995fc300d367",
+        "17b50753381242ec8dd883870713b44a",
+        "80d460f7ca824900b1debef9fcde7eb4",
+        "e166794a2b6a46cab6b8a71ac1eca796",
+        "d2abafac1d814d399d96947ace8a3ad7",
+        "eec0b4ffb9c94328aaaf40d117ef7e2d",
+        "522d4a40f87040ed9f9b9ee7bfd776cb",
+        "f8e8667dde484c7aa2788dc92ade816c",
+        "c47242208e5d4e5bab71230ef53ddebb",
+        "03d124e19bac4612974a9950efca9c71",
+        "f7a33e3c8b2d42759fcc8816399532ee"
+      ],
+      "test_sequences": [
+        "556f3994912b468da3a0f850d1a0c2e5",
+        "02c26437f08d42a184800911e8998df8",
+        "2efa12eb208e4510aeae77a899a7b619",
+        "0275bb39cbe0454b9a99f8aa583253a3",
+        "5358f8099fb14ebb8965c2e81e3ede47",
+        "c7c90551d8474872ab606d425ca92557",
+        "b402a01535614d81b14606f8b0fa2219",
+        "124e035cf66a47f680dfa8d0d4df9ba4"
+      ],
+      "results": [
+        {
+          "device_memory_ratio": 0.05,
+          "train_resident_size": 214,
+          "test_resident_size": 214,
+          "train_test_jaccard": 0.6653696498054474,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 130.31390376912896,
+            "avg_residual_stall_ms": 5.673778246808142
+          },
+          "best_test_native": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 154.36926312028544,
+            "avg_residual_stall_ms": 4.4779735278061334
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 92.10230607560679,
+            "avg_residual_stall_ms": 8.857491441952254
+          },
+          "native_gain_over_single": 62.26695704467865,
+          "transfer_gain_over_single": 38.211597693522165,
+          "transfer_regret_vs_native": 24.055359351156483,
+          "retained_gain_fraction": 0.6136737606448963
+        },
+        {
+          "device_memory_ratio": 0.07,
+          "train_resident_size": 300,
+          "test_resident_size": 300,
+          "train_test_jaccard": 0.6085790884718498,
+          "best_transfer": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 327.1120209768766,
+            "avg_residual_stall_ms": 1.0570567141297231
+          },
+          "best_test_native": {
+            "prefetch_window": 4,
+            "throughput_tokens_per_sec": 421.99742211651926,
+            "avg_residual_stall_ms": 0.3696827221942211
+          },
+          "best_single": {
+            "prefetch_window": 1,
+            "throughput_tokens_per_sec": 170.36840745872527,
+            "avg_residual_stall_ms": 3.8696328440021244
+          },
+          "native_gain_over_single": 251.629014657794,
+          "transfer_gain_over_single": 156.7436135181513,
+          "transfer_regret_vs_native": 94.88540113964268,
+          "retained_gain_fraction": 0.6229155001513508
+        },
+        {
+          "device_memory_ratio": 0.1,
+          "train_resident_size": 428,
+          "test_resident_size": 415,
+          "train_test_jaccard": 0.656188605108055,
+          "best_transfer": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 470.8176905179402,
+            "avg_residual_stall_ms": 0.12396437121975815
+          },
+          "best_test_native": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 488.7486375642091,
+            "avg_residual_stall_ms": 0.04604150915657082
+          },
+          "best_single": {
+            "prefetch_window": 10,
+            "throughput_tokens_per_sec": 266.48151678326195,
+            "avg_residual_stall_ms": 1.7526054792505827
+          },
+          "native_gain_over_single": 222.26712078094715,
+          "transfer_gain_over_single": 204.33617373467825,
+          "transfer_regret_vs_native": 17.930947046268898,
+          "retained_gain_fraction": 0.9193270377405908
+        }
+      ]
+    }
+  ],
+  "aggregate": [
+    {
+      "device_memory_ratio": 0.05,
+      "train_test_jaccard": {
+        "mean": 0.6475827700508551,
+        "ci95": 0.02377931783354636,
+        "num_points": 8
+      },
+      "native_gain_over_single": {
+        "mean": 211.1713257055978,
+        "ci95": 48.81312095544058,
+        "num_points": 8
+      },
+      "transfer_gain_over_single": {
+        "mean": 178.4873652036871,
+        "ci95": 57.18089209209536,
+        "num_points": 8
+      },
+      "transfer_regret_vs_native": {
+        "mean": 32.68396050191072,
+        "ci95": 37.219431812355005,
+        "num_points": 8
+      },
+      "retained_gain_fraction": {
+        "mean": 0.8301258996923602,
+        "ci95": 0.19523848055170448,
+        "num_points": 8
+      }
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_test_jaccard": {
+        "mean": 0.6794422868914377,
+        "ci95": 0.031776041598125915,
+        "num_points": 8
+      },
+      "native_gain_over_single": {
+        "mean": 255.2182978302383,
+        "ci95": 8.678038074405707,
+        "num_points": 8
+      },
+      "transfer_gain_over_single": {
+        "mean": 223.52132116384035,
+        "ci95": 21.863623880777375,
+        "num_points": 8
+      },
+      "transfer_regret_vs_native": {
+        "mean": 31.69697666639795,
+        "ci95": 22.974165199514665,
+        "num_points": 8
+      },
+      "retained_gain_fraction": {
+        "mean": 0.8773229071707402,
+        "ci95": 0.09057346702969406,
+        "num_points": 8
+      }
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_test_jaccard": {
+        "mean": 0.6915275751989304,
+        "ci95": 0.015974248183515442,
+        "num_points": 8
+      },
+      "native_gain_over_single": {
+        "mean": 214.73096773787938,
+        "ci95": 12.68322792525847,
+        "num_points": 8
+      },
+      "transfer_gain_over_single": {
+        "mean": 210.64173539214525,
+        "ci95": 6.066438191267765,
+        "num_points": 8
+      },
+      "transfer_regret_vs_native": {
+        "mean": 4.089232345734139,
+        "ci95": 10.702093668898398,
+        "num_points": 8
+      },
+      "retained_gain_fraction": {
+        "mean": 0.9858524334288835,
+        "ci95": 0.05198406767251999,
+        "num_points": 8
+      }
+    }
+  ]
+}

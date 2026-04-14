@@ -7,11 +7,13 @@ build/
 *.pkl
 *.npy
 *.pt
-data/*.pkl
-data/*.npy
 .pytest_cache/
 
-# Keep JSON configs but ignore large result JSONs
+# Data files (large, download separately)
+data/*.pkl
+data/*.npy
+
+# Runtime artifacts
 demo/experiments/experiments/
 demo/experiments/figures/
 demo/experiments/logs/

@@ -1,0 +1,66 @@
+{
+  "analysis": "backbone_generalization",
+  "mode": "split_transfer",
+  "train_fraction": 0.5,
+  "train_sequences": [
+    "029bb806053d496c8d9da3115f5da646",
+    "85294f5c5d33412781911ef272f02ac1",
+    "0457115b55fa49a3b1ad4ccbf0c6210a",
+    "052169daffc04e82807ab36939331810"
+  ],
+  "test_sequences": [
+    "9b604520a2e24e1da40bf726324f66f6",
+    "6b49c315a3ee465ea8487690925188d2",
+    "54b8a0040ce94eedbe1ad228df372fa6",
+    "c26aff643b864c2c8da3ad404dd04bf7"
+  ],
+  "train_state_file": "experiments/results/generalization_tmp/train_state.pkl",
+  "test_state_file": "experiments/results/generalization_tmp/test_state.pkl",
+  "resident_policy": "profile_freq",
+  "resident_ratio": 0.9,
+  "resident_profile_ratio": 0.2,
+  "memory_ratios": [
+    0.1
+  ],
+  "prefetch_windows": [
+    0,
+    1,
+    4,
+    10
+  ],
+  "results": [
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 324,
+      "test_resident_size": 344,
+      "train_test_jaccard": 0.5498839907192575,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 324.3436546900939,
+        "avg_residual_stall_ms": 1.0831495715725725
+      },
+      "best_test_native": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 373.47310338336837,
+        "avg_residual_stall_ms": 0.67756898941533
+      },
+      "best_test_oracle_native": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 483.43448034293897,
+        "avg_residual_stall_ms": 0.06853263608870964
+      },
+      "best_single": {
+        "prefetch_window": 4,
+        "throughput_tokens_per_sec": 189.12602791550296,
+        "avg_residual_stall_ms": 3.2874795236895515
+      },
+      "native_gain_over_single": 184.3470754678654,
+      "oracle_native_gain_over_single": 294.308452427436,
+      "transfer_gain_over_single": 135.21762677459094,
+      "transfer_regret_vs_native": 49.12944869327447,
+      "transfer_regret_vs_oracle_native": 159.09082565284507,
+      "retained_gain_fraction": 0.7334948299636112,
+      "retained_gain_fraction_vs_oracle_native": 0.4594418735151002
+    }
+  ]
+}
