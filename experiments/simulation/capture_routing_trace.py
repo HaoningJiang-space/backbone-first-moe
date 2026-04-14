@@ -22,55 +22,57 @@ import torch
 import numpy as np
 
 
-def get_moe_layers(model):
-    """Find all MoE gate modules in the model."""
-    moe_gates = []
+def get_moe_gates(model):
+    """Find all MoE gate (Linear) modules in the model.
+
+    Returns (gate_module, parent_moe_module, layer_index) tuples.
+    Hooks on the gate directly to avoid re-running the MoE forward.
+    """
+    gates = []
+    moe_idx = 0
     for name, module in model.named_modules():
-        # DeepSeek-V2: DeepseekV2MoE has self.gate
-        # Qwen: Qwen2MoeSparseMoeBlock has self.gate
-        # Mixtral: MixtralSparseMoeBlock has self.gate
         if hasattr(module, 'gate') and hasattr(module, 'experts'):
-            moe_gates.append((name, module))
-    return moe_gates
+            gate = module.gate
+            topk = getattr(module, 'num_experts_per_tok',
+                   getattr(module, 'top_k', 4))
+            gates.append((name, gate, topk, moe_idx))
+            moe_idx += 1
+    return gates
 
 
 def capture_trace(model, tokenizer, prompts, max_length, device):
     """Run forward pass and capture routing decisions per token per layer."""
     model.eval()
-    num_layers = len(get_moe_layers(model))
+    gates = get_moe_gates(model)
+    num_layers = len(gates)
     num_experts = None
 
     # Storage for routing matrices
-    # routing_trace[seq_id] = {"matrix": [L, E], "iters": [...]}
     traces = {}
 
     # Hook to capture routing decisions
     routing_log = []
 
-    def make_hook(layer_idx):
+    def make_gate_hook(layer_idx, topk):
         def hook_fn(module, input, output):
-            # Get the gate logits -> routing weights
-            hidden = input[0]
-            if hasattr(module, 'gate'):
-                gate_out = module.gate(hidden.view(-1, hidden.shape[-1]))
-                routing_weights = torch.softmax(gate_out, dim=-1)
-                # Get top-k selected experts
-                topk = getattr(module, 'num_experts_per_tok',
-                       getattr(module, 'top_k', 4))
-                _, selected = torch.topk(routing_weights, topk, dim=-1)
-                routing_log.append({
-                    'layer': layer_idx,
-                    'routing_weights': routing_weights.detach().cpu(),
-                    'selected_experts': selected.detach().cpu(),
-                    'num_experts': routing_weights.shape[-1],
-                })
+            # output of gate Linear = logits [num_tokens, num_experts]
+            logits = output.detach()
+            if logits.dim() == 1:
+                logits = logits.unsqueeze(0)
+            routing_weights = torch.softmax(logits, dim=-1)
+            _, selected = torch.topk(routing_weights, topk, dim=-1)
+            routing_log.append({
+                'layer': layer_idx,
+                'routing_weights': routing_weights.cpu(),
+                'selected_experts': selected.cpu(),
+                'num_experts': routing_weights.shape[-1],
+            })
         return hook_fn
 
-    # Register hooks
-    moe_layers = get_moe_layers(model)
+    # Register hooks on gate modules (not MoE modules)
     hooks = []
-    for i, (name, module) in enumerate(moe_layers):
-        hooks.append(module.register_forward_hook(make_hook(i)))
+    for name, gate, topk, idx in gates:
+        hooks.append(gate.register_forward_hook(make_gate_hook(idx, topk)))
 
     for prompt_idx, prompt in enumerate(prompts):
         inputs = tokenizer(
