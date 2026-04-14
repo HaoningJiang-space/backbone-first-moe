@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--resident-ratio", type=float, default=0.96)
     args = parser.parse_args()
 
+    mem_ratios = [float(x) for x in args.memory_ratios.split(",")]
     rratio = args.resident_ratio
 
     configs = [
