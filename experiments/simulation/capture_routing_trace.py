@@ -63,6 +63,7 @@ def capture_trace(model, tokenizer, prompts, max_length, device):
                 logits = output.detach()
             if logits.dim() == 1:
                 logits = logits.unsqueeze(0)
+            logits = logits.to(dtype=torch.float32)
             routing_weights = torch.softmax(logits, dim=-1)
             _, selected = torch.topk(routing_weights, topk, dim=-1)
             routing_log.append({
