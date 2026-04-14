@@ -95,7 +95,13 @@ def capture_trace(model, tokenizer, prompts, max_length, device):
             print(f"  WARNING: no routing captured for prompt {prompt_idx}")
             continue
 
-        num_experts = routing_log[0]['num_experts']
+        # Get true num_experts from model config, not gate output shape
+        # (gate may output top-k indices, not full expert logits)
+        # 从模型配置获取真实 expert 数量，而非 gate output shape
+        cfg = model.config
+        num_experts = getattr(cfg, 'n_routed_experts',
+                     getattr(cfg, 'num_experts',
+                     routing_log[0]['num_experts']))
         num_tokens = inputs.input_ids.shape[1]
 
         # Build per-iter routing matrix [num_layers, num_experts]
@@ -110,9 +116,22 @@ def capture_trace(model, tokenizer, prompts, max_length, device):
                 layer = entry['layer']
                 if token_idx < entry['selected_experts'].shape[0]:
                     for eid in entry['selected_experts'][token_idx]:
-                        nodes[layer, eid.item()] = 1.0
+                        eid_val = eid.item()
+                        if 0 <= eid_val < num_experts:
+                            nodes[layer, eid_val] = 1.0
                 if token_idx < entry['routing_weights'].shape[0]:
-                    probs[layer] = entry['routing_weights'][token_idx]
+                    rw = entry['routing_weights'][token_idx]
+                    # routing_weights may be [num_experts] or [top_k]
+                    # If full width, copy directly; if top-k, scatter
+                    if rw.shape[0] == num_experts:
+                        probs[layer] = rw
+                    else:
+                        # top-k: scatter into full width using selected indices
+                        sel = entry['selected_experts'][token_idx]
+                        for j, eid in enumerate(sel):
+                            eid_val = eid.item()
+                            if 0 <= eid_val < num_experts and j < rw.shape[0]:
+                                probs[layer, eid_val] = rw[j]
 
             matrix += nodes
             # Create a dummy embed (zero) since we don't have the real embedding
