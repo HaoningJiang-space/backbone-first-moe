@@ -55,8 +55,12 @@ def capture_trace(model, tokenizer, prompts, max_length, device):
 
     def make_gate_hook(layer_idx, topk):
         def hook_fn(module, input, output):
-            # output of gate Linear = logits [num_tokens, num_experts]
-            logits = output.detach()
+            # output of gate: may be Tensor or tuple (some gates return (logits, aux_loss))
+            # gate 的输出可能是 Tensor 或 tuple
+            if isinstance(output, tuple):
+                logits = output[0].detach()
+            else:
+                logits = output.detach()
             if logits.dim() == 1:
                 logits = logits.unsqueeze(0)
             routing_weights = torch.softmax(logits, dim=-1)
