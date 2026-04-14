@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "backbone-moe"
+version = "0.1.0"
+description = "Backbone-First MoE Serving: resident backbone extraction and demand-only tail for expert offloading"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "torch>=2.0",
+    "numpy",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+runtime = ["transformers>=4.40"]
+
+[tool.setuptools.packages.find]
+include = ["backbone_moe*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
