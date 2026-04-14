@@ -74,3 +74,29 @@ Current causal prefetch adds nothing (overhead cancels benefit).
 
 **Conclusion**: Backbone is the primary mechanism. Better prefetch (batch-aware, lightweight)
 is future work with significant headroom.
+
+## Batch-Aware Prefetch Results (batch=8, native C++ pinning)
+
+| Config | mem=0.07 | mem=0.10 | Description |
+|---|---:|---:|---|
+| A demand-only | 2.356 | 2.499 | LRU cache baseline |
+| B per-seq prefetch | 1.691 | 1.702 | Per-sequence prefetch (harmful) |
+| C_optimal backbone-only | 2.643 | 3.585 | Throughput-sweep backbone, no prefetch |
+| D per-seq backbone+prefetch | 1.771 | 1.878 | Backbone + per-sequence prefetch |
+| **E batch-aware backbone+prefetch** | **3.283** | **3.522** | **Backbone + batch-aware prefetch** |
+
+### Key findings
+
+1. **Batch-aware prefetch works**: E > C at mem=0.07 (+24.2%), nearly matches C at mem=0.10 (-1.8%)
+2. **Per-sequence prefetch is the problem, not prefetch itself**: E >> D (+85% at mem=0.07)
+3. **Mid-budget is where batch prefetch shines**: at mem=0.07, backbone-only leaves more headroom that batch prefetch captures
+4. **High-budget backbone-only is already near-optimal**: at mem=0.10, most experts are pinned so prefetch adds little
+
+### Design implication
+
+The final system design is:
+- **Backbone pinning** (primary mechanism, +43% over baseline)
+- **Batch-aware prefetch** for tail experts (secondary, +24% at mid-budget)
+- **No per-sequence prefetch** (harmful due to CPU overhead x batch_size)
+
+This closes part of the oracle headroom (+18-45% in simulator) with a practical implementation.

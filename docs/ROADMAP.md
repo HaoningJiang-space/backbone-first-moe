@@ -323,15 +323,30 @@ This creates three compounding costs:
 2. H2D bandwidth contention between speculative and demand transfers
 3. Cache pollution across sequences in the same batch
 
+### Batch-aware prefetch results
+
+| Config | mem=0.07 | mem=0.10 |
+|---|---:|---:|
+| C_optimal backbone-only | 2.643 | 3.585 |
+| D per-seq backbone+prefetch | 1.771 | 1.878 |
+| **E batch-aware backbone+prefetch** | **3.283** | **3.522** |
+
+Batch-aware prefetch replaces 200 per-sequence Python calls per step with 24 batch-level calls (one per layer). This eliminates CPU scheduling overhead while preserving prefetch benefit.
+
+At mem=0.07: E beats C by +24% (batch prefetch captures oracle headroom at mid-budget).
+At mem=0.10: E nearly matches C (-1.8%, backbone already near-saturated).
+
 ### Design conclusion
 
 The strongest runtime configuration is:
 
 ```text
-resident backbone + demand fallback (no speculative prefetch)
+resident backbone + batch-aware prefetch for tail
 ```
 
-This is simpler than the earlier three-way hierarchy (resident + speculative + fallback) and is directly supported by hardware evidence.
+- **Backbone pinning** is the primary mechanism (+43% over demand-only baseline)
+- **Batch-aware prefetch** adds secondary gain at mid-budget (+24% at mem=0.07)
+- **Per-sequence prefetch** is harmful and should not be used
 
 ---
 
@@ -341,7 +356,9 @@ This is simpler than the earlier three-way hierarchy (resident + speculative + f
 
 The paper should claim:
 
-> MoE serving has a stable resident backbone that generalizes across held-out sequences, and once this backbone is pinned, the remaining tail offers little system-useful novel opportunity even under strong prediction.
+> MoE serving has a stable resident backbone that generalizes across held-out sequences.
+> Once this backbone is pinned, the tail should be served via batch-aware demand/prefetch, not per-sequence speculative prefetch.
+> The backbone is extracted automatically via throughput-sweep selection with zero manual tuning.
 
 Therefore:
 
@@ -903,7 +920,8 @@ Discuss:
 | 5 | Real hardware: `C_optimal > A > B` in batched regime | PASS (3.585 > 2.499 > 1.702 at mem=0.10, batch=8) |
 | 6 | Throughput sweep: automatic, beats hand-tuned ratio | PASS (3.585 vs 3.040 = +18% over ratio=0.9) |
 | 7 | Runtime-native C++ pinning: no shape mismatch | PASS (is_resident flag, all mem points work) |
-| 8 | Paper reads as structural systems result, not heuristic | ON TRACK |
+| 8 | Batch-aware prefetch captures oracle headroom | PASS (E=3.283 > C=2.643 at mem=0.07, +24%) |
+| 9 | Paper reads as structural systems result, not heuristic | ON TRACK |
 
 ---
 
@@ -912,24 +930,25 @@ Discuss:
 The project has completed its core experimental validation:
 
 - **Structural evidence** (Section 3): backbone exists, generalizes, tail is low-value
-- **System design** (Section 4): resident backbone + demand fallback, no prefetch needed
+- **System design** (Section 4): backbone pinning + batch-aware tail prefetch
 - **Algorithm** (Section 4): two-stage throughput-sweep extraction, zero manual tuning
-- **Runtime** (Phase B): C++ native `is_resident` flag, eviction exemption
-- **Real hardware** (Section 5): `C_optimal` beats all baselines at all memory budgets
+- **Runtime** (Phase B): C++ native `is_resident` flag, eviction exemption, batch prefetch
+- **Real hardware** (Section 5): E/C beats all baselines at all memory budgets
 
 The main remaining work is:
 
 1. **Write the paper** -- all data exists, just needs to be written up
-2. **Batch=1 C configs** -- confirm backbone-only wins at batch=1 too
+2. **Batch=1 configs** -- confirm backbone wins at batch=1 too
 3. **Second model** (optional) -- DeepSeek-V2-Lite for generality
 4. **Section 3 formal plots** -- n=64 CV bar plots, funnel figure, Lorenz curve
 
 The project thesis is:
 
 ```text
-MoE serving decomposes into a stable resident backbone and a demand-only tail.
+MoE serving decomposes into a stable resident backbone and a lightweight tail.
 The backbone is extracted automatically via throughput-sweep selection.
-Speculative prefetch is unnecessary and harmful in the current runtime.
+The tail is served via batch-aware prefetch, not per-sequence speculation.
+Per-sequence prefetch is harmful due to CPU overhead scaling with batch size.
 ```
 
 This is a structural systems contribution, not a heuristic improvement.
