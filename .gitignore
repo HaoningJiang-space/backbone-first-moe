@@ -7,9 +7,14 @@ build/
 *.pkl
 *.npy
 *.pt
-*.json
-!pyproject.toml
 data/*.pkl
 data/*.npy
-results/
 .pytest_cache/
+
+# Keep JSON configs but ignore large result JSONs
+demo/experiments/experiments/
+demo/experiments/figures/
+demo/experiments/logs/
+demo/offloads/
+demo/states/*.pkl
+demo/states/*.npy
