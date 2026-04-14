@@ -100,3 +100,75 @@ The final system design is:
 - **No per-sequence prefetch** (harmful due to CPU overhead x batch_size)
 
 This closes part of the oracle headroom (+18-45% in simulator) with a practical implementation.
+
+## Cross-Model Analysis: DeepSeek-V2-Lite
+
+### Model
+- DeepSeek-V2-Lite (27 layers, 64 routed experts, top-6 routing, 2 shared experts)
+- 26 MoE layers (first layer is dense)
+- moe_intermediate_size=1408, hidden_size=2048
+
+### Routing Trace Statistics (64 sequences, lmsys-chat-1m)
+- Total (layer, expert) pairs: 1664 (26 x 64)
+- Coverage across all sequences: **100%** (every expert accessed at least once)
+- Per-sequence unique experts: mean=1585/1664 = **95.3%**
+- Routing is near-uniform; no strong backbone concentration
+
+### Backbone Generalization (50/50 split)
+
+| mem | retained | Jaccard | transfer gain | native gain |
+|---|---:|---:|---:|---:|
+| 0.05 | 1.000 | 1.000 | 8.6 | 8.6 |
+| 0.07 | 1.000 | 1.000 | 8.6 | 8.6 |
+| 0.10 | 1.000 | 1.000 | 8.6 | 8.6 |
+
+Jaccard=1.0 means train and test select identical backbone. This is NOT because
+backbone is trivially stable - it's because routing is so uniform that almost
+all experts are used by every sequence. The backbone "exists" only in the
+sense that frequency ranking is reproducible, not in the sense that a small
+subset dominates.
+
+### Throughput Sweep
+
+| mem | cache | knee_k | optimal_k | ratio | tp |
+|---|---:|---:|---:|---:|---:|
+| 0.05 | 238 | 1 | 156 | 0.66 | 500.0 |
+| 0.07 | 333 | 1 | 156 | 0.47 | 500.0 |
+| 0.10 | 476 | 1 | 156 | 0.33 | 500.0 |
+
+knee_k=1 means the utility curve is flat: no structural knee, no
+clear backbone/tail boundary.
+
+### Oracle Analysis (simulator, mem=0.10)
+
+| Config | tok/s |
+|---|---:|
+| A demand-only | 495.8 |
+| B oracle-prefetch | 495.9 |
+| C backbone-only | 500.0 |
+| D backbone+oracle-pf | 500.0 |
+
+Backbone pinning provides only +0.8% over demand-only. This confirms
+that when routing is near-uniform, backbone-first has minimal benefit.
+
+### Key Finding
+
+**Backbone-first is NOT universally applicable.** Its effectiveness depends on
+routing concentration:
+
+| Model | Routing | Coverage | Backbone? | Improvement |
+|---|---|---|---|---|
+| Qwen1.5-MoE-A2.7B | top-4 / 60 experts | ~65% | Yes (stable) | +41% |
+| DeepSeek-V2-Lite | top-6 / 64 experts | ~95% | No (uniform) | +0.8% |
+
+The boundary condition: backbone-first works when the routing pattern has
+structural concentration (a small subset of experts handles most of the load).
+When routing is near-uniform (high top-k / expert ratio), demand-only caching
+is sufficient.
+
+## Reproducibility Verification (Qwen, batch=8)
+
+| Config | Verified gen tok/s | Archived gen tok/s | Match |
+|---|---:|---:|---|
+| C_optimal mem=0.07 (ratio=0.83) | 3.199 | 2.643 | Higher (single GPU, no contention) |
+| C_optimal mem=0.10 (ratio=0.96) | 3.533 | 3.585 | -1.4% (within variance) |

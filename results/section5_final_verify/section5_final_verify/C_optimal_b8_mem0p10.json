@@ -1,0 +1,72 @@
+{
+  "tag": "C_optimal_b8_mem0p10",
+  "model_path": "/data/ziheng/models/Qwen1.5-MoE-A2.7B-Chat",
+  "prompt_file": "/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-chat-1m~eval_prompts.json",
+  "offload_path": "/data/finemoe_offloads/Qwen1.5-MoE-A2.7B-Chat",
+  "store_prefix": "/data/ziheng/FineMoE-EuroSys26/demo/states/Qwen1.5-MoE-A2.7B-Chat~lmsys-chat-1m",
+  "resident_expert_ids_file": "/data/ziheng/backbone-first-moe/results/adaptive_sweep/adaptive_sweep_mem0p10.json",
+  "device_memory_ratio": 0.1,
+  "prefetch_distance": 0,
+  "num_prompts": 16,
+  "batch_size": 8,
+  "max_new_tokens": 64,
+  "total_elapsed_sec": 289.815766685002,
+  "total_prompt_tokens": 2101,
+  "total_generated_tokens": 1024,
+  "generated_tokens_per_sec": 3.533279130092932,
+  "end_to_end_tokens_per_sec": 10.78271218900431,
+  "peak_memory_mb": 13655.193359375,
+  "resident_count": 456,
+  "per_batch": [
+    {
+      "batch_size": 8,
+      "elapsed_sec": 174.41693464899436,
+      "prompt_tokens": [
+        256,
+        256,
+        256,
+        131,
+        256,
+        215,
+        94,
+        83
+      ],
+      "generated_tokens": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64
+      ],
+      "tokens_per_sec": 2.935494773087116
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 115.39883203600766,
+      "prompt_tokens": [
+        58,
+        72,
+        96,
+        77,
+        70,
+        74,
+        62,
+        45
+      ],
+      "generated_tokens": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64
+      ],
+      "tokens_per_sec": 4.436786672504984
+    }
+  ]
+}
