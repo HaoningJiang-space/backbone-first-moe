@@ -55,12 +55,33 @@ def capture_trace(model, tokenizer, prompts, max_length, device):
 
     def make_gate_hook(layer_idx, topk):
         def hook_fn(module, input, output):
-            # output of gate: may be Tensor or tuple (some gates return (logits, aux_loss))
-            # gate 的输出可能是 Tensor 或 tuple
+            # Gate output formats:
+            #   Qwen: Tensor logits [tokens, num_experts]
+            #   DeepSeek: tuple (topk_indices[int64], topk_weights[float32], aux_loss)
+            # We detect by checking dtype of first element.
             if isinstance(output, tuple):
-                logits = output[0].detach()
+                first = output[0].detach()
+                if first.dtype in (torch.int64, torch.int32, torch.long):
+                    # DeepSeek format: (indices, weights, ...)
+                    # indices are real expert IDs, weights are routing scores
+                    selected = first.cpu()
+                    if selected.dim() == 1:
+                        selected = selected.unsqueeze(0)
+                    weights = output[1].detach().to(dtype=torch.float32).cpu()
+                    if weights.dim() == 1:
+                        weights = weights.unsqueeze(0)
+                    routing_log.append({
+                        'layer': layer_idx,
+                        'routing_weights': weights,
+                        'selected_experts': selected,
+                        'num_experts': topk,  # will be overridden by model config
+                    })
+                    return
+                else:
+                    logits = first
             else:
                 logits = output.detach()
+            # Qwen/Mixtral format: full logits -> softmax -> topk
             if logits.dim() == 1:
                 logits = logits.unsqueeze(0)
             logits = logits.to(dtype=torch.float32)
