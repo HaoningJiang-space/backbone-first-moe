@@ -172,3 +172,45 @@ is sufficient.
 |---|---:|---:|---|
 | C_optimal mem=0.07 (ratio=0.83) | 3.199 | 2.643 | Higher (single GPU, no contention) |
 | C_optimal mem=0.10 (ratio=0.96) | 3.533 | 3.585 | -1.4% (within variance) |
+
+## Cross-Model Analysis: Mixtral-8x7B-Instruct-v0.1
+
+### Model
+- Mixtral-8x7B (32 layers, 8 experts, top-2 routing)
+- expert_size ~50MB, total model ~93GB (FP16)
+
+### Routing Trace Statistics (64 sequences, lmsys-chat-1m)
+- Total (layer, expert) pairs: 256 (32 x 8)
+- Per-sequence coverage: **99.9%** (nearly every expert used every sequence)
+- Per-layer Gini: mean=0.073 (near-uniform), range 0.020-0.166
+- Top-1 expert per layer: 13-22% of traffic (uniform=12.5%)
+
+### Throughput Sweep (expert_size=50MB)
+
+| mem | cache | optimal_k | ratio | tp (simulator) |
+|---|---:|---:|---:|---:|
+| 0.05 | 81 | 78 | 0.96 | 7.7 |
+| 0.07 | 114 | 59 | 0.52 | 10.3 |
+| 0.10 | 163 | 87 | 0.53 | 15.8 |
+
+Note: Low throughput reflects large expert size (50MB vs Qwen's 17.2MB).
+Cache can only hold 81-163 experts vs 256 total needed per step.
+
+### Key Finding
+
+Mixtral's 8 experts with top-2 routing = 25% per-token selection.
+With only 8 experts, a few dozen tokens cover all experts.
+Per-layer Gini=0.073 confirms near-uniform routing.
+**Backbone-first is not the right approach for Mixtral** — the model needs
+larger cache or expert compression, not selective pinning.
+
+## Complete Three-Model Comparison
+
+| Model | Experts | top-k | k/E ratio | Per-seq Coverage | Per-layer Gini | Backbone? |
+|---|---:|---:|---:|---:|---:|---|
+| **Qwen1.5-MoE-A2.7B** | 60 | 4 | 6.7% | ~65% | 0.40 (global) | **Yes (+41%)** |
+| DeepSeek-V2-Lite | 64 | 6 | 9.4% | ~95% | 0.23 | No (+0.8%) |
+| Mixtral-8x7B | 8 | 2 | 25% | ~100% | 0.07 | No |
+
+**Diagnostic rule**: Backbone-first is effective when per-sequence expert
+coverage is below ~70% and per-layer Gini exceeds ~0.3.

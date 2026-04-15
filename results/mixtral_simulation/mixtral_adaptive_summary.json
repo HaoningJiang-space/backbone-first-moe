@@ -1,0 +1,760 @@
+{
+  "state_file": "results/mixtral_trace/Mixtral-8x7B~lmsys-chat-1m~64.pkl",
+  "profile_fraction": 0.2,
+  "resident_policy": "profile_freq",
+  "resident_profile_ratio": 0.2,
+  "selection_method": "capacity_search",
+  "candidate_ratios": [
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "prefetch_windows": [
+    0
+  ],
+  "results": [
+    {
+      "device_memory_ratio": 0.05,
+      "selected_resident_ratio": 0.9629629629629629,
+      "selected_resident_capacity": 78,
+      "best_prefetch_window": 0,
+      "profile_throughput_tokens_per_sec": 7.702617743116502,
+      "cache_capacity": 81,
+      "resident_capacity": 78,
+      "speculative_capacity": 3,
+      "resident_count": 78,
+      "resident_file": "results/mixtral_simulation/mixtral_adaptive_mem0p05.json",
+      "candidates": [
+        {
+          "resident_capacity": 78,
+          "resident_ratio": 0.9629629629629629,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.702617743116502,
+          "avg_residual_stall_ms": 127.82599336357526,
+          "speculative_capacity": 3,
+          "num_pinned_residents": 78,
+          "selection_rule": "throughput_sweep",
+          "knee_capacity": 32,
+          "knee_ratio": 0.3950617283950617
+        },
+        {
+          "resident_capacity": 76,
+          "resident_ratio": 0.9382716049382716,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.607930807709933,
+          "avg_residual_stall_ms": 129.44178427419354,
+          "speculative_capacity": 5,
+          "num_pinned_residents": 76,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 74,
+          "resident_ratio": 0.9135802469135802,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.5198460781505885,
+          "avg_residual_stall_ms": 130.9814453125,
+          "speculative_capacity": 7,
+          "num_pinned_residents": 74,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 72,
+          "resident_ratio": 0.8888888888888888,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.4216117971457285,
+          "avg_residual_stall_ms": 132.74162046370967,
+          "speculative_capacity": 9,
+          "num_pinned_residents": 72,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 70,
+          "resident_ratio": 0.8641975308641975,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.326756393889784,
+          "avg_residual_stall_ms": 134.48604460685485,
+          "speculative_capacity": 11,
+          "num_pinned_residents": 70,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 68,
+          "resident_ratio": 0.8395061728395061,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.242134695857264,
+          "avg_residual_stall_ms": 136.0808341733871,
+          "speculative_capacity": 13,
+          "num_pinned_residents": 68,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 66,
+          "resident_ratio": 0.8148148148148148,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.161464355223432,
+          "avg_residual_stall_ms": 137.63624621975808,
+          "speculative_capacity": 15,
+          "num_pinned_residents": 66,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 64,
+          "resident_ratio": 0.7901234567901234,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.078162665590632,
+          "avg_residual_stall_ms": 139.27960139448925,
+          "speculative_capacity": 17,
+          "num_pinned_residents": 64,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 62,
+          "resident_ratio": 0.7654320987654321,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.990228492653442,
+          "avg_residual_stall_ms": 141.05684013776883,
+          "speculative_capacity": 19,
+          "num_pinned_residents": 62,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 60,
+          "resident_ratio": 0.7407407407407407,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.9043272322827764,
+          "avg_residual_stall_ms": 142.83670404905914,
+          "speculative_capacity": 21,
+          "num_pinned_residents": 60,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 58,
+          "resident_ratio": 0.7160493827160493,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.817948001834787,
+          "avg_residual_stall_ms": 144.67169648857526,
+          "speculative_capacity": 23,
+          "num_pinned_residents": 58,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 56,
+          "resident_ratio": 0.691358024691358,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.743418560290901,
+          "avg_residual_stall_ms": 146.29273773521504,
+          "speculative_capacity": 25,
+          "num_pinned_residents": 56,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 54,
+          "resident_ratio": 0.6666666666666666,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.667056847804994,
+          "avg_residual_stall_ms": 147.99122143817203,
+          "speculative_capacity": 27,
+          "num_pinned_residents": 54,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 52,
+          "resident_ratio": 0.6419753086419753,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.5896681874551355,
+          "avg_residual_stall_ms": 149.7527091733871,
+          "speculative_capacity": 29,
+          "num_pinned_residents": 52,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 50,
+          "resident_ratio": 0.6172839506172839,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.508045806714211,
+          "avg_residual_stall_ms": 151.65595598118279,
+          "speculative_capacity": 31,
+          "num_pinned_residents": 50,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 48,
+          "resident_ratio": 0.5925925925925926,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.435371187360854,
+          "avg_residual_stall_ms": 153.39119203629033,
+          "speculative_capacity": 33,
+          "num_pinned_residents": 48,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 46,
+          "resident_ratio": 0.5679012345679012,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.371966771991824,
+          "avg_residual_stall_ms": 154.93741599462365,
+          "speculative_capacity": 35,
+          "num_pinned_residents": 46,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 44,
+          "resident_ratio": 0.5432098765432098,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.308859034046057,
+          "avg_residual_stall_ms": 156.50726646505376,
+          "speculative_capacity": 37,
+          "num_pinned_residents": 44,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 42,
+          "resident_ratio": 0.5185185185185185,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.224277518908551,
+          "avg_residual_stall_ms": 158.66121681787635,
+          "speculative_capacity": 39,
+          "num_pinned_residents": 42,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 40,
+          "resident_ratio": 0.49382716049382713,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.168139711162506,
+          "avg_residual_stall_ms": 160.1234353998656,
+          "speculative_capacity": 41,
+          "num_pinned_residents": 40,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 38,
+          "resident_ratio": 0.4691358024691358,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.11128922584946,
+          "avg_residual_stall_ms": 161.631594422043,
+          "speculative_capacity": 43,
+          "num_pinned_residents": 38,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 36,
+          "resident_ratio": 0.4444444444444444,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.052013686936028,
+          "avg_residual_stall_ms": 163.23425949260752,
+          "speculative_capacity": 45,
+          "num_pinned_residents": 36,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 34,
+          "resident_ratio": 0.41975308641975306,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 6.010142873425377,
+          "avg_residual_stall_ms": 164.3853956653226,
+          "speculative_capacity": 47,
+          "num_pinned_residents": 34,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 32,
+          "resident_ratio": 0.3950617283950617,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 5.984131419649595,
+          "avg_residual_stall_ms": 165.10862945228496,
+          "speculative_capacity": 49,
+          "num_pinned_residents": 32,
+          "selection_rule": "throughput_sweep"
+        }
+      ]
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "selected_resident_ratio": 0.5175438596491229,
+      "selected_resident_capacity": 59,
+      "best_prefetch_window": 0,
+      "profile_throughput_tokens_per_sec": 10.293583080701055,
+      "cache_capacity": 114,
+      "resident_capacity": 59,
+      "speculative_capacity": 55,
+      "resident_count": 59,
+      "resident_file": "results/mixtral_simulation/mixtral_adaptive_mem0p07.json",
+      "candidates": [
+        {
+          "resident_capacity": 59,
+          "resident_ratio": 0.5175438596491229,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 10.293583080701055,
+          "avg_residual_stall_ms": 95.14790196572581,
+          "speculative_capacity": 55,
+          "num_pinned_residents": 59,
+          "selection_rule": "throughput_sweep",
+          "knee_capacity": 47,
+          "knee_ratio": 0.41228070175438597
+        },
+        {
+          "resident_capacity": 62,
+          "resident_ratio": 0.543859649122807,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 10.265703998204536,
+          "avg_residual_stall_ms": 95.41173135080645,
+          "speculative_capacity": 52,
+          "num_pinned_residents": 62,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 56,
+          "resident_ratio": 0.49122807017543857,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 10.169237416113296,
+          "avg_residual_stall_ms": 96.33579049059139,
+          "speculative_capacity": 58,
+          "num_pinned_residents": 56,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 53,
+          "resident_ratio": 0.4649122807017544,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 10.025910164130693,
+          "avg_residual_stall_ms": 97.74156796034946,
+          "speculative_capacity": 61,
+          "num_pinned_residents": 53,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 65,
+          "resident_ratio": 0.5701754385964912,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.927017160255154,
+          "avg_residual_stall_ms": 98.73519405241936,
+          "speculative_capacity": 49,
+          "num_pinned_residents": 65,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 50,
+          "resident_ratio": 0.43859649122807015,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.879003165924244,
+          "avg_residual_stall_ms": 99.22478788642474,
+          "speculative_capacity": 64,
+          "num_pinned_residents": 50,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 47,
+          "resident_ratio": 0.41228070175438597,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.747550599349692,
+          "avg_residual_stall_ms": 100.58987525201613,
+          "speculative_capacity": 67,
+          "num_pinned_residents": 47,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 110,
+          "resident_ratio": 0.9649122807017544,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.533721414953542,
+          "avg_residual_stall_ms": 102.89083501344086,
+          "speculative_capacity": 4,
+          "num_pinned_residents": 110,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 68,
+          "resident_ratio": 0.5964912280701754,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.34165520687511,
+          "avg_residual_stall_ms": 105.04741053427419,
+          "speculative_capacity": 46,
+          "num_pinned_residents": 68,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 107,
+          "resident_ratio": 0.9385964912280702,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.315611837377073,
+          "avg_residual_stall_ms": 105.3466796875,
+          "speculative_capacity": 7,
+          "num_pinned_residents": 107,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 104,
+          "resident_ratio": 0.9122807017543859,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 9.137405929296788,
+          "avg_residual_stall_ms": 107.44025117607526,
+          "speculative_capacity": 10,
+          "num_pinned_residents": 104,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 101,
+          "resident_ratio": 0.8859649122807017,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.938225329777266,
+          "avg_residual_stall_ms": 109.87903225806451,
+          "speculative_capacity": 13,
+          "num_pinned_residents": 101,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 98,
+          "resident_ratio": 0.8596491228070176,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.746840094717022,
+          "avg_residual_stall_ms": 112.32700142809139,
+          "speculative_capacity": 16,
+          "num_pinned_residents": 98,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 71,
+          "resident_ratio": 0.6228070175438597,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.696419247183336,
+          "avg_residual_stall_ms": 112.98985635080645,
+          "speculative_capacity": 43,
+          "num_pinned_residents": 71,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 95,
+          "resident_ratio": 0.8333333333333334,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.580550194263434,
+          "avg_residual_stall_ms": 114.54264322916667,
+          "speculative_capacity": 19,
+          "num_pinned_residents": 95,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 92,
+          "resident_ratio": 0.8070175438596491,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.414234220925248,
+          "avg_residual_stall_ms": 116.84622815860214,
+          "speculative_capacity": 22,
+          "num_pinned_residents": 92,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 89,
+          "resident_ratio": 0.7807017543859649,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.259075056790248,
+          "avg_residual_stall_ms": 119.07893355174731,
+          "speculative_capacity": 25,
+          "num_pinned_residents": 89,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 74,
+          "resident_ratio": 0.6491228070175439,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.243168627209295,
+          "avg_residual_stall_ms": 119.3125735047043,
+          "speculative_capacity": 40,
+          "num_pinned_residents": 74,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 86,
+          "resident_ratio": 0.7543859649122807,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 8.091619372372701,
+          "avg_residual_stall_ms": 121.58465641801075,
+          "speculative_capacity": 28,
+          "num_pinned_residents": 86,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 77,
+          "resident_ratio": 0.6754385964912281,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.981167421731434,
+          "avg_residual_stall_ms": 123.29495337701613,
+          "speculative_capacity": 37,
+          "num_pinned_residents": 77,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 83,
+          "resident_ratio": 0.7280701754385965,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.964397057709263,
+          "avg_residual_stall_ms": 123.55878276209677,
+          "speculative_capacity": 31,
+          "num_pinned_residents": 83,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 80,
+          "resident_ratio": 0.7017543859649122,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 7.909986690437382,
+          "avg_residual_stall_ms": 124.42246303763442,
+          "speculative_capacity": 34,
+          "num_pinned_residents": 80,
+          "selection_rule": "throughput_sweep"
+        }
+      ]
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "selected_resident_ratio": 0.5337423312883436,
+      "selected_resident_capacity": 87,
+      "best_prefetch_window": 0,
+      "profile_throughput_tokens_per_sec": 15.818706776868728,
+      "cache_capacity": 163,
+      "resident_capacity": 87,
+      "speculative_capacity": 76,
+      "resident_count": 87,
+      "resident_file": "results/mixtral_simulation/mixtral_adaptive_mem0p10.json",
+      "candidates": [
+        {
+          "resident_capacity": 87,
+          "resident_ratio": 0.5337423312883436,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.818706776868728,
+          "avg_residual_stall_ms": 61.216292842741936,
+          "speculative_capacity": 76,
+          "num_pinned_residents": 87,
+          "selection_rule": "throughput_sweep",
+          "knee_capacity": 71,
+          "knee_ratio": 0.43558282208588955
+        },
+        {
+          "resident_capacity": 83,
+          "resident_ratio": 0.50920245398773,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.740594890422273,
+          "avg_residual_stall_ms": 61.53000042002688,
+          "speculative_capacity": 80,
+          "num_pinned_residents": 83,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 79,
+          "resident_ratio": 0.48466257668711654,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.716241568561179,
+          "avg_residual_stall_ms": 61.628444220430104,
+          "speculative_capacity": 84,
+          "num_pinned_residents": 79,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 75,
+          "resident_ratio": 0.4601226993865031,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.69745994289495,
+          "avg_residual_stall_ms": 61.704574092741936,
+          "speculative_capacity": 88,
+          "num_pinned_residents": 75,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 91,
+          "resident_ratio": 0.558282208588957,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.683887453878185,
+          "avg_residual_stall_ms": 61.759702620967744,
+          "speculative_capacity": 72,
+          "num_pinned_residents": 91,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 71,
+          "resident_ratio": 0.43558282208588955,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.669371522161173,
+          "avg_residual_stall_ms": 61.81876890120968,
+          "speculative_capacity": 92,
+          "num_pinned_residents": 71,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 95,
+          "resident_ratio": 0.5828220858895705,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.57487295697546,
+          "avg_residual_stall_ms": 62.205981182795696,
+          "speculative_capacity": 68,
+          "num_pinned_residents": 95,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 123,
+          "resident_ratio": 0.754601226993865,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.570416600857982,
+          "avg_residual_stall_ms": 62.22435735887097,
+          "speculative_capacity": 40,
+          "num_pinned_residents": 123,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 119,
+          "resident_ratio": 0.7300613496932515,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.484653961918275,
+          "avg_residual_stall_ms": 62.58006762432796,
+          "speculative_capacity": 44,
+          "num_pinned_residents": 119,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 99,
+          "resident_ratio": 0.6073619631901841,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.483395167519728,
+          "avg_residual_stall_ms": 62.585317960349464,
+          "speculative_capacity": 64,
+          "num_pinned_residents": 99,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 103,
+          "resident_ratio": 0.6319018404907976,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.396407537242501,
+          "avg_residual_stall_ms": 62.95021631384409,
+          "speculative_capacity": 60,
+          "num_pinned_residents": 103,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 115,
+          "resident_ratio": 0.7055214723926381,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.33751569674714,
+          "avg_residual_stall_ms": 63.19960727486559,
+          "speculative_capacity": 48,
+          "num_pinned_residents": 115,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 127,
+          "resident_ratio": 0.7791411042944786,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.333502718044977,
+          "avg_residual_stall_ms": 63.21667086693548,
+          "speculative_capacity": 36,
+          "num_pinned_residents": 127,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 111,
+          "resident_ratio": 0.6809815950920245,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.299323377013325,
+          "avg_residual_stall_ms": 63.362367691532256,
+          "speculative_capacity": 52,
+          "num_pinned_residents": 111,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 107,
+          "resident_ratio": 0.656441717791411,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 15.252460314485896,
+          "avg_residual_stall_ms": 63.56319304435484,
+          "speculative_capacity": 56,
+          "num_pinned_residents": 107,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 131,
+          "resident_ratio": 0.803680981595092,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 14.914749034821597,
+          "avg_residual_stall_ms": 65.04772555443549,
+          "speculative_capacity": 32,
+          "num_pinned_residents": 131,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 159,
+          "resident_ratio": 0.9754601226993865,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 14.905411397462142,
+          "avg_residual_stall_ms": 65.08972824260752,
+          "speculative_capacity": 4,
+          "num_pinned_residents": 159,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 155,
+          "resident_ratio": 0.950920245398773,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 14.28175298800001,
+          "avg_residual_stall_ms": 68.01941574260752,
+          "speculative_capacity": 8,
+          "num_pinned_residents": 155,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 135,
+          "resident_ratio": 0.8282208588957055,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 14.122642407611563,
+          "avg_residual_stall_ms": 68.8082787298387,
+          "speculative_capacity": 28,
+          "num_pinned_residents": 135,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 151,
+          "resident_ratio": 0.9263803680981595,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 13.649489950069972,
+          "avg_residual_stall_ms": 71.26281081989248,
+          "speculative_capacity": 12,
+          "num_pinned_residents": 151,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 139,
+          "resident_ratio": 0.852760736196319,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 13.362445819247494,
+          "avg_residual_stall_ms": 72.8365990423387,
+          "speculative_capacity": 24,
+          "num_pinned_residents": 139,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 147,
+          "resident_ratio": 0.901840490797546,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 13.193291304469499,
+          "avg_residual_stall_ms": 73.79609795026882,
+          "speculative_capacity": 16,
+          "num_pinned_residents": 147,
+          "selection_rule": "throughput_sweep"
+        },
+        {
+          "resident_capacity": 143,
+          "resident_ratio": 0.8773006134969326,
+          "best_prefetch_window": 0,
+          "throughput_tokens_per_sec": 13.040184779768872,
+          "avg_residual_stall_ms": 74.68602990591398,
+          "speculative_capacity": 20,
+          "num_pinned_residents": 143,
+          "selection_rule": "throughput_sweep"
+        }
+      ]
+    }
+  ],
+  "profile_sequences": 13
+}
