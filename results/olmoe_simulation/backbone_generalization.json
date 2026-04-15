@@ -1,0 +1,190 @@
+{
+  "analysis": "backbone_generalization",
+  "mode": "split_transfer",
+  "train_fraction": 0.5,
+  "train_sequences": [
+    "e0f49cc0ea40e3c3e3a3c267b7e86b80",
+    "640539a1d3ac6c8e51d80bbbf802c31a",
+    "d37e89051cfab44a71afd3e91bcb8c8d",
+    "19d7f6615147803d3fed8c8c54cd7612",
+    "b78ee11bca93e2794772c4d58f6b061c",
+    "3ef65aa6c6fe794c342f8579bd0be47c",
+    "1e42ec2e5500631aba82a5b486a7046b",
+    "21b8715902d8a46c2081fa682c4213a8",
+    "75a3f05536794004e053acf98b3e584b",
+    "1bf72140655a100a3c18a9a44ad43b1d",
+    "5ddba6d219d911fa75efefda7aa40d7b",
+    "ba3949ccb9ba96d5a7fc00cea8f08b63",
+    "e88212b4f6976cdfd18907e5c86335fe",
+    "6672b8295968171a4f4bc54770b4d5dd",
+    "2a5fc591246e01567d58daff5423dce5",
+    "9c77d2fd16612f6b2b4ae33abf3b15c6",
+    "a8470eb1bc51c9ca5de84c1f621daf38",
+    "1928d7f0c3a8d084f2279cb3dd63129e",
+    "a8cf3dfd5f9c60e99eedfff5175e2163",
+    "db85dc3ab6b01ac573344ab4254057b8",
+    "dcffb5ea6a9e2e37a05b45d97dc164c3",
+    "a6734238987ae1d5154b65eb5900fb19",
+    "7fece3a109ddf7731d2b65dfda833ae9",
+    "94272eb7d7d001c6a93db73a6e41a760",
+    "059753835e9934a70a260eec3204d335",
+    "c7df09dc126c2934c0871da9bd0ece88",
+    "75b20bdc6c8c811daad0304178d74a5b",
+    "3f544e62db4935566c090f7be1ed254c",
+    "b7d17c68e2c743e46f497b0ccf35216e",
+    "d1f42a184283ff1dab7864d2f8c723ea",
+    "f11dda7e46d87b50d1aa3d8456a11387",
+    "ec6f4322427cb2c657bc33aef3acfda0"
+  ],
+  "test_sequences": [
+    "55ef1bc4d66e519a6ccf88a7b5d1e26c",
+    "dbfa37b66bd4183c7dd2f1e4fd83d3cf",
+    "427d040aaec124d1576be698fa9643d6",
+    "d2971b513d464a584c07bc477fad08d1",
+    "f925554937d1bde35638d2fd80bcedae",
+    "26459f6fda2efd6d6945b4b2cead8590",
+    "2130be2779433578d692929fd0da84d1",
+    "138cc6731743345cf4087ba396a65ff4",
+    "64dbad9080f22a01f21f81762cb5ed4d",
+    "e759120d196350ba2208be7119fe87c8",
+    "0892bc591c8961bd80969c3badf07a1c",
+    "0954f8b39b162db1cf30ca599ee1a261",
+    "6f46b815dabc1ee3c3d35f2e75a15ad3",
+    "69b627dc04d1086facfc3720fe3b4f02",
+    "ba7aa28afeb2bbfb0ea3b735175aca3f",
+    "0bcbab1b51f0d838d51b5d97d1dde0f3",
+    "7a8c48983881f155814345dcd6f2a080",
+    "ce074e554bd2ab241d5663681a71a612",
+    "6a28f2b3f1b545337e13b97b293611c0",
+    "bc3b1b6ef4db11026a8288bddeaff360",
+    "a40428785bbdfdfca3b780e08ef12414",
+    "495b04cc61f7064e37f1d91ec58dca3f",
+    "a5ce6205ff497b003f159806690f0d6d",
+    "fedf26ac8a4a01af6e449dfc21b0d721",
+    "e2b7cfa8bd1054d00f4246bd05b50cfb",
+    "ca31857ca0f493392faef5e719e7550a",
+    "b23cfa09cdf33a6c162ef001952561e5",
+    "cc33f73a9ffd2929b5bff10c0c087e90",
+    "b118eee0b74598d8459faef67ab1140a",
+    "c0f2325ee738da1620bedbf5d4134dc1",
+    "febd194e22f08f9881dfdc1b198bde4d",
+    "b929dc2ce32f2b2a893ae2116ff85e7a"
+  ],
+  "train_state_file": "results/olmoe_simulation/generalization_tmp/train_state.pkl",
+  "test_state_file": "results/olmoe_simulation/generalization_tmp/test_state.pkl",
+  "resident_policy": "profile_freq",
+  "resident_ratio": 0.9,
+  "resident_profile_ratio": 0.2,
+  "memory_ratios": [
+    0.05,
+    0.07,
+    0.1
+  ],
+  "prefetch_windows": [
+    0,
+    1,
+    4,
+    10
+  ],
+  "results": [
+    {
+      "device_memory_ratio": 0.05,
+      "train_resident_size": 922,
+      "test_resident_size": 922,
+      "train_test_jaccard": 0.8835546475995915,
+      "best_transfer": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 499.8946208869081,
+        "avg_residual_stall_ms": 0.000421605309154468
+      },
+      "best_test_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 499.9355726735975,
+        "avg_residual_stall_ms": 0.00025774251693248855
+      },
+      "best_test_oracle_native": {
+        "prefetch_window": 1,
+        "throughput_tokens_per_sec": 499.90240547570346,
+        "avg_residual_stall_ms": 0.0003904543095914354
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 495.2860176655981,
+        "avg_residual_stall_ms": 0.019035394363119948
+      },
+      "native_gain_over_single": 4.649555007999425,
+      "oracle_native_gain_over_single": 4.61638781010538,
+      "transfer_gain_over_single": 4.608603221310034,
+      "transfer_regret_vs_native": 0.0409517866893907,
+      "transfer_regret_vs_oracle_native": 0.007784588795345826,
+      "retained_gain_fraction": 0.9911923212825885,
+      "retained_gain_fraction_vs_oracle_native": 0.9983137056253581
+    },
+    {
+      "device_memory_ratio": 0.07,
+      "train_resident_size": 1024,
+      "test_resident_size": 1024,
+      "train_test_jaccard": 1.0,
+      "best_transfer": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 500.0,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_test_native": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 500.0,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_test_oracle_native": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 500.0,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 495.2860176655981,
+        "avg_residual_stall_ms": 0.019035394363119948
+      },
+      "native_gain_over_single": 4.713982334401919,
+      "oracle_native_gain_over_single": 4.713982334401919,
+      "transfer_gain_over_single": 4.713982334401919,
+      "transfer_regret_vs_native": 0.0,
+      "transfer_regret_vs_oracle_native": 0.0,
+      "retained_gain_fraction": 1.0,
+      "retained_gain_fraction_vs_oracle_native": 1.0
+    },
+    {
+      "device_memory_ratio": 0.1,
+      "train_resident_size": 1024,
+      "test_resident_size": 1024,
+      "train_test_jaccard": 1.0,
+      "best_transfer": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 500.0,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_test_native": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 500.0,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_test_oracle_native": {
+        "prefetch_window": 0,
+        "throughput_tokens_per_sec": 500.0,
+        "avg_residual_stall_ms": 0.0
+      },
+      "best_single": {
+        "prefetch_window": 10,
+        "throughput_tokens_per_sec": 495.2860176655981,
+        "avg_residual_stall_ms": 0.019035394363119948
+      },
+      "native_gain_over_single": 4.713982334401919,
+      "oracle_native_gain_over_single": 4.713982334401919,
+      "transfer_gain_over_single": 4.713982334401919,
+      "transfer_regret_vs_native": 0.0,
+      "transfer_regret_vs_oracle_native": 0.0,
+      "retained_gain_fraction": 1.0,
+      "retained_gain_fraction_vs_oracle_native": 1.0
+    }
+  ]
+}

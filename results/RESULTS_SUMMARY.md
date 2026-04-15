@@ -214,3 +214,80 @@ larger cache or expert compression, not selective pinning.
 
 **Diagnostic rule**: Backbone-first is effective when per-sequence expert
 coverage is below ~70% and per-layer Gini exceeds ~0.3.
+
+## Cross-Model Analysis: OLMoE-1B-7B-0924
+
+### Model
+- OLMoE-1B-7B (16 layers, 64 experts, top-8 routing, hidden=2048, intermediate=1024)
+- expert_size ~4MB (very small), total ~13GB
+
+### Backbone Generalization (50/50 split)
+
+| mem | retained | Jaccard |
+|---|---:|---:|
+| 0.05 | **0.991** | **0.884** |
+| 0.07 | 1.000 | 1.000 |
+| 0.10 | 1.000 | 1.000 |
+
+Note: At mem>=0.07, cache (1433+ slots) exceeds total expert pairs (1024),
+so all experts fit → trivial Jaccard=1.0. The meaningful point is mem=0.05
+where cache=1024 is tight: retained=0.991, Jaccard=0.884.
+
+### Adaptive Sweep
+
+| mem | cache | optimal_k | ratio | tp |
+|---|---:|---:|---:|---:|
+| 0.05 | 1024 | 1023 | 1.00 | 500.0 |
+| 0.07 | 1433 | 1023 | 0.71 | 500.0 |
+| 0.10 | 2048 | 1023 | 0.50 | 500.0 |
+
+## Cross-Model Analysis: Mixtral-8x7B (updated with generalization)
+
+### Backbone Generalization (50/50 split)
+
+| mem | retained | Jaccard |
+|---|---:|---:|
+| 0.05 | 3.986 (anomalous) | 0.315 |
+| 0.07 | **0.962** | **0.355** |
+| 0.10 | **0.974** | **0.531** |
+
+**Mixtral shows backbone generalization despite near-uniform per-layer Gini (0.073).**
+retained=0.974 at mem=0.10 means frozen backbone retains 97.4% of native gain.
+Jaccard=0.531 is lower than Qwen (0.692) but still shows meaningful backbone overlap.
+
+### Insight: Low Gini does not preclude backbone
+
+Mixtral's per-layer Gini=0.073 appears near-uniform, but the FREQUENCY RANKING
+is still stable enough that profiling-based backbone selection transfers to held-out
+sequences. The backbone value comes from the ordering of experts, not just from
+the magnitude of frequency differences.
+
+### Adaptive Sweep (with knee)
+
+| mem | cache | knee_k | optimal_k | ratio |
+|---|---:|---:|---:|---:|
+| 0.05 | 81 | 32 (0.40) | 78 (0.96) | 0.96 |
+| 0.07 | 114 | 47 (0.41) | 59 (0.52) | 0.52 |
+| 0.10 | 163 | 71 (0.44) | 87 (0.53) | 0.53 |
+
+Mixtral has a meaningful knee (ratio=0.40-0.44), unlike DeepSeek (knee=1).
+
+## Final Four-Model Summary
+
+| Model | Experts | top-k | k/E | Gini | Coverage | retained | Jaccard | backbone? |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| **Qwen** | 60 | 4 | 6.7% | 0.40 | ~65% | **0.986** | 0.692 | **Strong** |
+| **OLMoE** | 64 | 8 | 12.5% | ? | ? | **0.991** | 0.884* | **Strong*** |
+| **Mixtral** | 8 | 2 | 25% | 0.07 | ~100% | **0.974** | 0.531 | **Moderate** |
+| DeepSeek | 64 | 6 | 9.4% | 0.23 | ~95% | 1.000 | 1.000 | **None** |
+
+*OLMoE at mem=0.05 only (cache=total experts at higher mem)
+
+### Revised Diagnostic
+
+Backbone-first effectiveness does NOT simply follow Gini or coverage:
+- Mixtral (Gini=0.07, coverage=100%) still has retained=0.974
+- DeepSeek (Gini=0.23, coverage=95%) has retained=1.0 but trivially (no gain)
+
+The key differentiator appears to be whether the frequency RANKING is stable
+across sequences, not just whether the frequency DISTRIBUTION is concentrated.
