@@ -100,11 +100,15 @@ def capture_trace(model, tokenizer, prompts, max_length, device):
     for name, gate, topk, idx in gates:
         hooks.append(gate.register_forward_hook(make_gate_hook(idx, topk)))
 
+    # Determine input device (first parameter's device for multi-GPU models)
+    # 确定输入设备（多 GPU 模型取第一个参数的设备）
+    input_device = next(model.parameters()).device
+
     for prompt_idx, prompt in enumerate(prompts):
         inputs = tokenizer(
             prompt, return_tensors="pt", truncation=True,
             max_length=max_length, padding=False
-        ).to(device)
+        ).to(input_device)
 
         seq_id = hashlib.md5(prompt.encode()).hexdigest()
         routing_log.clear()
@@ -188,7 +192,8 @@ def main():
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--num-prompts", type=int, default=64)
     parser.add_argument("--max-length", type=int, default=256)
-    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--device", type=str, default="cuda:0",
+                        help="Device or 'auto' for multi-GPU")
     parser.add_argument("--dtype", type=str, default="float16",
                         choices=["float16", "bfloat16", "float32"])
     args = parser.parse_args()
@@ -197,10 +202,13 @@ def main():
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     dtype_map = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
+    # Use "auto" for large models that don't fit on a single GPU
+    # 大模型使用 "auto" 自动分配到多 GPU
+    device_map = args.device if args.device != "auto" else "auto"
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
         torch_dtype=dtype_map[args.dtype],
-        device_map=args.device,
+        device_map=device_map,
         trust_remote_code=True,
     )
     tokenizer = AutoTokenizer.from_pretrained(
