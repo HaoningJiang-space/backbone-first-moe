@@ -9,7 +9,7 @@ from accelerate import init_empty_weights
 from accelerate.utils.versions import is_torch_version
 from finemoe.common.constants import MODEL_MAPPING_NAMES
 from finemoe.runtime import OffloadEngine
-from finemoe.utils import get_checkpoint_paths, ArcherConfig
+from finemoe.utils import get_checkpoint_paths, ArcherConfig, parse_moe_architecture, parse_expert_layout
 from finemoe.models import apply_rotary_pos_emb
 import finemoe
 
@@ -55,7 +55,6 @@ class MoE:
             model_name_or_path,
             trust_remote_code=True,
         )
-        architecture = model_config.architectures[0].lower()
 
         self.prefetch_distance = config.pop('prefetch_distance')
         self.store_capacity = config.pop('store_capacity')
@@ -64,19 +63,23 @@ class MoE:
         self.eval_max_length = config.pop('eval_max_length')
         self.eval_mode = config.pop('eval_mode')
 
-        arch = None
-        for supp_arch in MODEL_MAPPING_NAMES:
-            if supp_arch in architecture:
-                arch = supp_arch
-                break
-        if arch is None:
+        arch = parse_moe_architecture(model_config)
+        if arch not in MODEL_MAPPING_NAMES:
             raise RuntimeError(
-                f"The `load_checkpoint_and_dispatch` function does not support the architecture {architecture}. "
+                f"The `load_checkpoint_and_dispatch` function does not support the architecture {arch}. "
                 f"Please provide a model that is supported by the function. "
                 f"Supported architectures are {list(MODEL_MAPPING_NAMES.keys())}."
             )
         self.arch = arch
+        self.expert_layout = parse_expert_layout(model_config)
         model_cls = MODEL_MAPPING_NAMES[arch]
+
+        if self.expert_layout != "modulelist":
+            raise NotImplementedError(
+                f"Runtime offload for packed-expert architecture {arch} is not implemented yet. "
+                "Current runtime support is limited to modulelist layouts (Qwen/OLMoE). "
+                "Use trace/simulation flows for Mixtral/DeepSeek until the slice-based runtime path lands."
+            )
         if os.path.exists(model_name_or_path):
             checkpoint_paths = get_checkpoint_paths(model_name_or_path)
         else:

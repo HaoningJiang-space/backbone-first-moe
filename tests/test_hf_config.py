@@ -4,6 +4,7 @@ from transformers import MixtralConfig, DeepseekV2Config
 
 from finemoe.models.modeling_olmoe import OlmoeConfig
 from finemoe.models.modeling_qwen.configuration_qwen2_moe import Qwen2MoeConfig
+from finemoe.common.constants import MODEL_MAPPING_NAMES, parse_expert_type
 from finemoe.utils import (
     parse_expert_id,
     parse_expert_layout,
@@ -72,6 +73,19 @@ class HFConfigParsingTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "slice-based runtime path"):
             parse_expert_id("layers.5.mlp.experts.gate_up_proj", cfg)
+
+    def test_model_registry_includes_packed_architectures(self):
+        self.assertIn("mixtral", MODEL_MAPPING_NAMES)
+        self.assertIn("deepseek_v2", MODEL_MAPPING_NAMES)
+        self.assertIn("deepseek_v3", MODEL_MAPPING_NAMES)
+
+        mixtral_cfg = MixtralConfig(num_hidden_layers=2, num_local_experts=8, num_experts_per_tok=2, hidden_size=64)
+        deepseek_cfg = DeepseekV2Config(
+            num_hidden_layers=2, hidden_size=64, n_routed_experts=8, num_experts_per_tok=2,
+            n_shared_experts=2, q_lora_rank=1536, kv_lora_rank=16, qk_rope_head_dim=8, v_head_dim=8, qk_nope_head_dim=0,
+        )
+        self.assertEqual(parse_expert_type(mixtral_cfg), 4)
+        self.assertEqual(parse_expert_type(deepseek_cfg), 4)
 
 
 if __name__ == "__main__":
