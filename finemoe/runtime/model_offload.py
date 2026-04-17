@@ -30,6 +30,7 @@ from finemoe.utils import (
     parse_moe_param,
     parse_expert_id,
     parse_expert_dtype,
+    parse_expert_dtype_id,
 )
 from finemoe.common import parse_expert_type
 from finemoe.memory import ExpertTracer
@@ -762,7 +763,7 @@ class OffloadEngine(object):
                 self.expert_dispatcher = self.prefetch_lib.expert_dispatcher(
                     self.num_experts,
                     self.num_layers,
-                    self.dtype,
+                    parse_expert_dtype_id(self.config),
                     parse_expert_type(self.config),
                 )
 
