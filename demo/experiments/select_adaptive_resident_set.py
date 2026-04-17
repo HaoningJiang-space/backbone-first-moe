@@ -9,6 +9,7 @@ from finemoe.backbone.evaluation import (
     evaluate_with_fixed_resident_layout,
     parse_float_list,
     parse_int_list,
+    select_feasible_resident_prefix,
 )
 from finemoe.backbone.workload import load_state_dict, save_subset_state
 
@@ -59,7 +60,6 @@ def rank_resident_candidates(analyzer, cache_capacity, args):
             score_mode="depth_freq",
         )
     elif args.resident_policy == "profile_miss_stall":
-        # Rank candidates by direct stall contribution with zero resident reservation.
         scores = analyzer._profile_miss_stall_scores(
             args.resident_profile_ratio,
             cache_capacity,
@@ -76,21 +76,70 @@ def rank_resident_candidates(analyzer, cache_capacity, args):
     return ranked
 
 
+def select_frontier_prefix(profile_state_file, mem_ratio, args):
+    """
+    Select the resident size by trace-level feasibility, not throughput sweep.
+
+    1. Rank experts by profiling utility.
+    2. Compute F(k): residual batch-step demand frontier after pinning top-k.
+    3. Choose the largest feasible prefix k* such that k + F(k) <= B.
+    4. Run one simulator evaluation at k* as a sanity check only.
+    """
+    cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
+    profile_analyzer = build_analyzer(profile_state_file, args, resident_ratio=0.5)
+    ranked = rank_resident_candidates(profile_analyzer, cache_capacity, args)
+    knee_capacity = compute_capacity_knee(ranked, cache_capacity)
+    selected = select_feasible_resident_prefix(
+        ranked=ranked,
+        access_sequence=profile_analyzer.access_sequence,
+        cache_capacity=cache_capacity,
+        frontier_percentile=args.frontier_percentile,
+    )
+
+    resident_capacity = selected["resident_capacity"]
+    resident_set = {expert_key for expert_key, _ in ranked[:resident_capacity]}
+    rows = evaluate_with_fixed_resident_layout(
+        eval_analyzer=profile_analyzer,
+        resident_set=resident_set,
+        resident_capacity=resident_capacity,
+        cache_capacity=cache_capacity,
+        mem_ratio=mem_ratio,
+        windows=[0],
+        reset_mode=args.reset_mode,
+    )
+    best_row = best_by_throughput(rows)
+
+    best = {
+        **selected,
+        "best_prefetch_window": 0,
+        "throughput_tokens_per_sec": float(best_row["throughput_tokens_per_sec"]),
+        "avg_residual_stall_ms": float(best_row["avg_residual_stall_ms"]),
+        "num_pinned_residents": int(best_row["num_pinned_residents"]),
+        "knee_capacity": int(knee_capacity),
+        "knee_ratio": float(knee_capacity / cache_capacity) if cache_capacity > 0 else 0.0,
+    }
+    candidates = [
+        {
+            "resident_capacity": int(best["resident_capacity"]),
+            "resident_ratio": float(best["resident_ratio"]),
+            "speculative_capacity": int(best["speculative_capacity"]),
+            "frontier_capacity": int(best["frontier_capacity"]),
+            "best_prefetch_window": 0,
+            "throughput_tokens_per_sec": float(best["throughput_tokens_per_sec"]),
+            "avg_residual_stall_ms": float(best["avg_residual_stall_ms"]),
+            "num_pinned_residents": int(best["num_pinned_residents"]),
+            "selection_rule": best["selection_rule"],
+        }
+    ]
+    return best, candidates, cache_capacity
+
+
 def search_best_capacity(profile_state_file, mem_ratio, args):
-    """Find throughput-optimal resident capacity by sweeping from knee to cache limit.
+    """
+    Legacy oracle: throughput-sweep resident capacity search.
 
-    Two-stage approach:
-      1. Compute utility-curve knee as the structural lower bound.
-      2. Sweep ~20 candidate capacities from knee to cache_capacity,
-         evaluate simulated throughput at each, and pick the best.
-
-    This is fully data-driven with zero manual ratio tuning.
-
-    两阶段方法：
-      1. 从 utility 曲线计算 knee 作为结构下界。
-      2. 从 knee 到 cache_capacity 搜索约 20 个候选容量，
-         在每个点评估模拟吞吐量，选最佳。
-    全数据驱动，无需手动调 ratio。
+    Kept only for comparison against the analytic frontier selector. This is not
+    the main method and should not be used for paper claims.
     """
     cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
     profile_analyzer = build_analyzer(profile_state_file, args, resident_ratio=0.5)
@@ -100,8 +149,6 @@ def search_best_capacity(profile_state_file, mem_ratio, args):
     ranked_experts = [expert_key for expert_key, _ in ranked[:cache_capacity]]
     num_ranked = min(cache_capacity, len(ranked_experts))
 
-    # Build candidate capacities: knee, then evenly spaced up to num_ranked
-    # 构建候选容量：knee 起步，均匀分布到 num_ranked
     num_steps = min(20, num_ranked - knee_capacity + 1)
     if num_steps <= 1:
         candidate_capacities = [knee_capacity]
@@ -110,8 +157,6 @@ def search_best_capacity(profile_state_file, mem_ratio, args):
         candidate_capacities = list(range(knee_capacity, num_ranked + 1, step))
         if candidate_capacities[-1] != num_ranked:
             candidate_capacities.append(num_ranked)
-    # Always include knee and full capacity
-    # 始终包含 knee 和满容量
     candidate_capacities = sorted(set(candidate_capacities))
 
     candidates = []
@@ -128,8 +173,6 @@ def search_best_capacity(profile_state_file, mem_ratio, args):
                 reset_mode=args.reset_mode,
             )
         except RuntimeError:
-            # Demand cache too small at this capacity; skip
-            # 该容量下 demand cache 过小，跳过
             continue
         best_row = best_by_throughput(rows)
         candidates.append({
@@ -145,12 +188,8 @@ def search_best_capacity(profile_state_file, mem_ratio, args):
 
     candidates.sort(key=lambda c: (-c["throughput_tokens_per_sec"], c["resident_capacity"]))
     best = candidates[0]
-
-    # Record knee for reference
-    # 记录 knee 供参考
     best["knee_capacity"] = int(knee_capacity)
     best["knee_ratio"] = float(knee_capacity / cache_capacity) if cache_capacity > 0 else 0.0
-
     return best, candidates, cache_capacity
 
 
@@ -172,6 +211,7 @@ def search_best_ratio(profile_state_file, mem_ratio, args):
                 "resident_capacity": int(best_row["resident_capacity"]),
                 "speculative_capacity": int(best_row["speculative_capacity"]),
                 "num_pinned_residents": int(best_row["num_pinned_residents"]),
+                "selection_rule": "ratio_grid",
             }
         )
 
@@ -191,12 +231,14 @@ def export_selected_resident_set(full_state_file, mem_ratio, best_ratio, args, b
 
     cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
     ranked = rank_resident_candidates(analyzer, cache_capacity, args)
-    resident_set = ranked[:best_capacity]
+    resident_prefix = ranked[:best_capacity]
+    resident_order = [
+        {"layer": int(expert_key[0]), "expert": int(expert_key[1])}
+        for expert_key, _ in resident_prefix
+    ]
     return {
-        "resident_set": [
-            {"layer": int(expert_key[0]), "expert": int(expert_key[1])}
-            for expert_key, _ in resident_set
-        ],
+        "resident_set": list(resident_order),
+        "resident_selection_order": list(resident_order),
         "resident_capacity": int(best_capacity),
         "speculative_capacity": int(max(0, cache_capacity - best_capacity)),
         "resident_policy": args.resident_policy,
@@ -217,9 +259,10 @@ def main():
     parser.add_argument(
         "--selection-method",
         type=str,
-        choices=["capacity_search", "ratio_grid"],
-        default="capacity_search",
+        choices=["frontier_prefix", "capacity_search", "ratio_grid"],
+        default="frontier_prefix",
     )
+    parser.add_argument("--frontier-percentile", type=float, default=1.0)
     parser.add_argument("--prefetch-windows", type=parse_int_list, default=[0, 1, 4, 10])
     parser.add_argument("--profile-fraction", type=float, default=0.2)
     parser.add_argument("--mode", type=str, default="oracle")
@@ -240,6 +283,7 @@ def main():
         "resident_policy": args.resident_policy,
         "resident_profile_ratio": float(args.resident_profile_ratio),
         "selection_method": args.selection_method,
+        "frontier_percentile": float(args.frontier_percentile),
         "candidate_ratios": [float(x) for x in args.candidate_ratios],
         "prefetch_windows": [int(x) for x in args.prefetch_windows],
         "results": [],
@@ -250,7 +294,16 @@ def main():
         summary["profile_sequences"] = len(profile_keys)
 
         for mem_ratio in args.memory_ratios:
-            if args.selection_method == "capacity_search":
+            if args.selection_method == "frontier_prefix":
+                best_row, candidates, cache_capacity = select_frontier_prefix(profile_state_file, mem_ratio, args)
+                resident_info = export_selected_resident_set(
+                    args.state_file,
+                    mem_ratio,
+                    best_row["resident_ratio"],
+                    args,
+                    best_capacity=best_row["resident_capacity"],
+                )
+            elif args.selection_method == "capacity_search":
                 best_row, candidates, cache_capacity = search_best_capacity(profile_state_file, mem_ratio, args)
                 resident_info = export_selected_resident_set(
                     args.state_file,
@@ -268,6 +321,7 @@ def main():
                     best_row["resident_ratio"],
                     args,
                 )
+
             mem_tag = f"{mem_ratio:.2f}".replace(".", "p")
             resident_path = args.output_dir / f"{args.output_prefix}_mem{mem_tag}.json"
             resident_payload = {
@@ -275,8 +329,11 @@ def main():
                 "selection_method": args.selection_method,
                 "selected_resident_ratio": float(best_row["resident_ratio"]),
                 "selected_resident_capacity": int(best_row.get("resident_capacity", resident_info["resident_capacity"])),
-                "selection_best_prefetch_window": int(best_row["best_prefetch_window"]),
+                "selection_best_prefetch_window": int(best_row.get("best_prefetch_window", 0)),
                 "selection_profile_fraction": float(args.profile_fraction),
+                "selection_frontier_capacity": int(best_row.get("frontier_capacity", 0)),
+                "selection_frontier_percentile": float(best_row.get("frontier_percentile", args.frontier_percentile)),
+                "selection_knee_capacity": int(best_row.get("knee_capacity", 0)),
                 "selection_candidates": candidates,
             }
             resident_path.write_text(json.dumps(resident_payload, indent=2))
@@ -285,8 +342,9 @@ def main():
                     "device_memory_ratio": float(mem_ratio),
                     "selected_resident_ratio": float(best_row["resident_ratio"]),
                     "selected_resident_capacity": int(best_row.get("resident_capacity", resident_info["resident_capacity"])),
-                    "best_prefetch_window": int(best_row["best_prefetch_window"]),
+                    "best_prefetch_window": int(best_row.get("best_prefetch_window", 0)),
                     "profile_throughput_tokens_per_sec": float(best_row["throughput_tokens_per_sec"]),
+                    "frontier_capacity": int(best_row.get("frontier_capacity", 0)),
                     "cache_capacity": int(cache_capacity or resident_info["cache_capacity"]),
                     "resident_capacity": int(resident_info["resident_capacity"]),
                     "speculative_capacity": int(resident_info["speculative_capacity"]),
@@ -299,10 +357,10 @@ def main():
             knee_r = best_row.get("knee_ratio", best_row["resident_ratio"])
             print(
                 f"mem={mem_ratio:.2f}: "
-                f"optimal_k={best_row['resident_capacity']} (ratio={best_row['resident_ratio']:.2f}), "
+                f"frontier_k={best_row['resident_capacity']} (ratio={best_row['resident_ratio']:.2f}), "
+                f"frontier={best_row.get('frontier_capacity', 0)}, "
                 f"knee_k={knee_k} (ratio={knee_r:.2f}), "
-                f"tp={best_row['throughput_tokens_per_sec']:.1f} tok/s, "
-                f"searched {len(candidates)} points"
+                f"tp={best_row['throughput_tokens_per_sec']:.1f} tok/s"
             )
 
     summary_path = args.output_dir / f"{args.output_prefix}_summary.json"

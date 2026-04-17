@@ -1,3 +1,6 @@
+from bisect import bisect_right
+
+
 def parse_float_list(text):
     return [float(item.strip()) for item in text.split(",") if item.strip()]
 
@@ -156,8 +159,6 @@ def compute_capacity_knee(ranked, cache_capacity):
     max_capacity = min(cache_capacity, len(top_scores))
 
     if total_score <= 0.0:
-        # Flat utility implies no clear backbone concentration; fall back to
-        # using the full capacity as the neutral cutoff.
         return max_capacity
 
     cumulative = []
@@ -177,6 +178,124 @@ def compute_capacity_knee(ranked, cache_capacity):
             knee_idx = idx
 
     return max(0, min(cache_capacity, knee_idx))
+
+
+def build_batch_union_demand_steps(access_sequence):
+    """
+    Collapse a routed trace into batch-step demand sets.
+
+    Each step corresponds to one (iter_idx, layer_idx) pair across all active
+    sequences. Resident memory covers the backbone prefix; the remaining slack
+    must absorb the non-resident union at each batch step.
+    """
+    grouped = {}
+    for token_data in access_sequence:
+        iter_idx = int(token_data["iter_idx"])
+        for layer_idx, layer_experts in enumerate(token_data["layer_experts"]):
+            if not layer_experts:
+                continue
+            grouped.setdefault((iter_idx, layer_idx), set()).update(layer_experts)
+    return [grouped[key] for key in sorted(grouped.keys())]
+
+
+def _percentile_int(values, percentile):
+    if not values:
+        return 0
+    if percentile >= 1.0:
+        return int(max(values))
+    if percentile <= 0.0:
+        return int(min(values))
+    ordered = sorted(int(v) for v in values)
+    idx = int(round((len(ordered) - 1) * percentile))
+    return ordered[max(0, min(len(ordered) - 1, idx))]
+
+
+def compute_residual_demand_frontier_curve(
+    ranked,
+    access_sequence,
+    cache_capacity,
+    frontier_percentile=1.0,
+):
+    """
+    Compute F(k): the residual demand frontier after pinning the top-k prefix.
+
+    For each batch-step (iter_idx, layer_idx), we take the union of demanded
+    experts across active sequences, remove the resident prefix, and count the
+    remaining tail demand. This is a pure trace-level computation: no simulator
+    calls and no search over ratios.
+    """
+    if cache_capacity <= 0:
+        return [0]
+
+    if not ranked or not access_sequence:
+        return [0] * (cache_capacity + 1)
+
+    max_ranked = len(ranked)
+    rank_index = {
+        expert_key: idx + 1
+        for idx, (expert_key, _) in enumerate(ranked[:max_ranked])
+    }
+    sentinel_rank = cache_capacity + 1
+    demand_steps = build_batch_union_demand_steps(access_sequence)
+    if not demand_steps:
+        return [0] * (cache_capacity + 1)
+
+    step_rank_lists = []
+    for step_set in demand_steps:
+        step_ranks = sorted(rank_index.get(expert_key, sentinel_rank) for expert_key in step_set)
+        step_rank_lists.append(step_ranks)
+
+    frontier_curve = []
+    for resident_capacity in range(cache_capacity + 1):
+        residual_counts = [
+            len(step_ranks) - bisect_right(step_ranks, resident_capacity)
+            for step_ranks in step_rank_lists
+        ]
+        frontier_curve.append(_percentile_int(residual_counts, frontier_percentile))
+    return frontier_curve
+
+
+def select_feasible_resident_prefix(
+    ranked,
+    access_sequence,
+    cache_capacity,
+    frontier_percentile=1.0,
+):
+    """
+    Select the largest resident prefix that still leaves enough tail slack.
+
+    k* = max { k : k + F(k) <= B }
+
+    where F(k) is the residual demand frontier after pinning the top-k experts,
+    and B is the total cache capacity. This is the non-incremental selector:
+    resident sizing becomes a feasibility rule induced by the routed trace,
+    rather than a sweep over ratios or capacities.
+    """
+    frontier_curve = compute_residual_demand_frontier_curve(
+        ranked=ranked,
+        access_sequence=access_sequence,
+        cache_capacity=cache_capacity,
+        frontier_percentile=frontier_percentile,
+    )
+    max_ranked = min(cache_capacity, len(ranked))
+    feasible_capacity = 0
+    feasible_frontier = frontier_curve[0] if frontier_curve else 0
+
+    for resident_capacity in range(max_ranked + 1):
+        frontier = frontier_curve[resident_capacity]
+        if resident_capacity + frontier <= cache_capacity:
+            feasible_capacity = resident_capacity
+            feasible_frontier = frontier
+
+    return {
+        "resident_capacity": int(feasible_capacity),
+        "speculative_capacity": int(max(0, cache_capacity - feasible_capacity)),
+        "resident_ratio": float(feasible_capacity / cache_capacity) if cache_capacity > 0 else 0.0,
+        "frontier_capacity": int(feasible_frontier),
+        "selection_rule": "frontier_feasible_prefix",
+        "frontier_percentile": float(frontier_percentile),
+        "frontier_curve": [int(x) for x in frontier_curve],
+    }
 
 
 def best_by_throughput(rows):
