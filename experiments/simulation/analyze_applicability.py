@@ -5,6 +5,7 @@ from pathlib import Path
 
 from backbone_moe.evaluation import (
     cache_capacity_for_mem_ratio,
+    infer_frontier_horizon,
     parse_float_list,
     rank_resident_candidates,
     summarize_resident_applicability,
@@ -105,6 +106,16 @@ def main():
     with tempfile.TemporaryDirectory(dir=args.output_dir) as temp_dir:
         profile_state_file = build_profile_subset(args.state_file, args.profile_fraction, temp_dir)
         analyzer = build_analyzer(profile_state_file, args)
+        frontier_horizon = (
+            int(args.frontier_horizon)
+            if int(args.frontier_horizon) > 0
+            else infer_frontier_horizon(
+                access_sequence=analyzer.access_sequence,
+                expert_size_mb=args.expert_size_mb,
+                h2d_bandwidth_gbps=args.h2d_bandwidth_gbps,
+                gpu_compute_time_ms=args.gpu_compute_time_ms,
+            )
+        )
 
         output = {
             "analysis": "backbone_applicability",
@@ -115,7 +126,7 @@ def main():
             "resident_policy": args.resident_policy,
             "resident_profile_ratio": float(args.resident_profile_ratio),
             "frontier_percentile": float(args.frontier_percentile),
-            "frontier_horizon": int(args.frontier_horizon),
+            "frontier_horizon": int(frontier_horizon),
             "probe_fractions": [float(x) for x in args.probe_fractions],
             "memory_ratios": [],
         }
@@ -138,7 +149,7 @@ def main():
                 access_sequence=analyzer.access_sequence,
                 cache_capacity=cache_capacity,
                 frontier_percentile=args.frontier_percentile,
-                frontier_horizon=args.frontier_horizon,
+                frontier_horizon=frontier_horizon,
             )
             output["memory_ratios"].append(
                 {
