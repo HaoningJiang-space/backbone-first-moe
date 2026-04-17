@@ -30,9 +30,11 @@ from finemoe.memory import ExpertPrefetcher
 import finemoe
 from finemoe.utils import (
     parse_moe_param,
+    parse_expert_layout,
     parse_expert_id,
     parse_expert_dtype,
     parse_expert_dtype_id,
+    expand_state_dict_for_offload,
 )
 from finemoe.common import parse_expert_type
 from finemoe.memory import ExpertTracer
@@ -475,6 +477,7 @@ class OffloadEngine(object):
 
         self.cls = cls
         self.name_id_map = {}
+        self.synthetic_name_map = {}
         self.tensor_id_map = {}
         self.registered_tensors = set()
         self.forward_hooks = []
@@ -1139,14 +1142,22 @@ class OffloadEngine(object):
         state_dict: Dict[str, torch.Tensor],
         empty_state_dict: Dict[str, torch.Tensor],
     ) -> None:
-        param_names = list(state_dict.keys())
+        if parse_expert_layout(self.config) == "packed":
+            for entry in expand_state_dict_for_offload(state_dict, self.config):
+                tensor_id = self._generate_param_id()
+                self.name_id_map[entry.name] = tensor_id
+                self.synthetic_name_map[entry.name] = entry.source_name
+                if not self.archer_engine.is_tensor_offloaded(tensor_id):
+                    self.archer_engine.offload(entry.tensor, tensor_id)
+        else:
+            param_names = list(state_dict.keys())
 
-        for param_name in param_names:
-            self.name_id_map[param_name] = self._generate_param_id()
-            if not self.archer_engine.is_tensor_offloaded(self.name_id_map[param_name]):
-                self.archer_engine.offload(
-                    state_dict[param_name], self.name_id_map[param_name]
-                )
+            for param_name in param_names:
+                self.name_id_map[param_name] = self._generate_param_id()
+                if not self.archer_engine.is_tensor_offloaded(self.name_id_map[param_name]):
+                    self.archer_engine.offload(
+                        state_dict[param_name], self.name_id_map[param_name]
+                    )
 
         gc.collect()
         torch.cuda.empty_cache()
