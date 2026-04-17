@@ -403,15 +403,6 @@ class OffloadEngine(object):
         self._resident_ids_are_ordered = resident_ordered
         return list(OrderedDict.fromkeys(resident_ids))
 
-    @staticmethod
-    def _expert_module_bytes(expert_module):
-        total_bytes = 0
-        for param in expert_module.parameters(recurse=True):
-            total_bytes += param.numel() * param.element_size()
-        for buf in expert_module.buffers(recurse=True):
-            total_bytes += buf.numel() * buf.element_size()
-        return int(total_bytes)
-
     def _resident_slack_experts(self):
         configured = int(getattr(self.archer_config, "resident_slack_experts", -1))
         if configured >= 0:
@@ -449,9 +440,13 @@ class OffloadEngine(object):
                     f"Resident expert_id out of range: "
                     f"layer={layer_id}, expert={expert_id}"
                 )
-            resident_bytes.append(
-                self._expert_module_bytes(expert_block.experts[expert_id])
-            )
+            tensor_id = self.expert_tensor_map.get((layer_id, expert_id))
+            if tensor_id is None:
+                raise KeyError(
+                    f"Could not find tensor id for resident expert "
+                    f"({layer_id}, {expert_id})"
+                )
+            resident_bytes.append(int(self.archer_engine.get_node_byte_size([tensor_id])))
 
         reserve_bytes = slack_experts * max(resident_bytes) if resident_bytes else 0
         selected_count = requested_count

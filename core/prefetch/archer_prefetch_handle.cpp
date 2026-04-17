@@ -453,6 +453,12 @@ int ArcherPrefetchHandle::GetNodeDevice(std::vector<std::uint32_t> tensor_ids) c
     return node->device.index();
 }
 
+std::int64_t ArcherPrefetchHandle::GetNodeByteSize(std::vector<std::uint32_t> tensor_ids) const
+{
+    auto node = kTopologyHandle->GetNodeFromTensorID(tensor_ids[0]);
+    return node->byte_size;
+}
+
 std::int64_t ArcherPrefetchHandle::GetDeviceFreeMemory(const torch::Device& device) const
 {
     return kDeviceMemoryPool->GetFreeMemory(device);

@@ -32,6 +32,7 @@ public:
 
     int GetNodeDefaultDevice(std::vector<std::uint32_t> tensor_ids) const;
     int GetNodeDevice(std::vector<std::uint32_t> tensor_ids) const;
+    std::int64_t GetNodeByteSize(std::vector<std::uint32_t> tensor_ids) const;
     std::int64_t GetDeviceFreeMemory(const torch::Device& device) const;
     std::int64_t GetDeviceMemoryCapacity(const torch::Device& device) const;
 
