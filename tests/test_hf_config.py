@@ -83,6 +83,18 @@ class HFConfigParsingTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "slice-based runtime path"):
             parse_expert_id("layers.5.mlp.experts.gate_up_proj", cfg)
+        self.assertEqual(
+            parse_expert_id("layers.5.mlp.experts.3.gate_proj.weight", cfg),
+            (5, 3),
+        )
+        self.assertEqual(
+            parse_expert_id("layers.5.mlp.experts.3.up_proj.weight", cfg),
+            (5, 3),
+        )
+        self.assertEqual(
+            parse_expert_id("layers.5.mlp.experts.3.down_proj.weight", cfg),
+            (5, 3),
+        )
 
     def test_model_registry_includes_packed_architectures(self):
         self.assertIn("mixtral", MODEL_MAPPING_NAMES)
@@ -134,6 +146,26 @@ class HFConfigParsingTest(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0].name, "layers.0.mlp.shared_experts.up_proj.weight")
         self.assertIsNone(entries[0].expert_idx)
+
+    def test_deepseek_routed_tensor_expands_to_gate_up_down_names(self):
+        cfg = DeepseekV2Config(
+            num_hidden_layers=2, hidden_size=64, num_attention_heads=8, num_key_value_heads=8,
+            n_routed_experts=4, num_experts_per_tok=2, n_shared_experts=2,
+            q_lora_rank=1536, kv_lora_rank=16, qk_rope_head_dim=8, v_head_dim=8, qk_nope_head_dim=0,
+        )
+        gate_up = torch.arange(4 * 10 * 16, dtype=torch.float32).reshape(4, 10, 16)
+        entries = expand_tensor_for_offload("layers.0.mlp.experts.gate_up_proj", gate_up, cfg)
+        self.assertEqual(len(entries), 8)
+        self.assertEqual(entries[0].name, "layers.0.mlp.experts.0.gate_proj.weight")
+        self.assertEqual(entries[1].name, "layers.0.mlp.experts.0.up_proj.weight")
+        self.assertEqual(entries[6].name, "layers.0.mlp.experts.3.gate_proj.weight")
+        self.assertEqual(entries[7].name, "layers.0.mlp.experts.3.up_proj.weight")
+
+        down = torch.arange(4 * 16 * 5, dtype=torch.float32).reshape(4, 16, 5)
+        down_entries = expand_tensor_for_offload("layers.0.mlp.experts.down_proj", down, cfg)
+        self.assertEqual(len(down_entries), 4)
+        self.assertEqual(down_entries[0].name, "layers.0.mlp.experts.0.down_proj.weight")
+        self.assertTrue(torch.equal(down_entries[3].tensor, down[3]))
 
 
 if __name__ == "__main__":

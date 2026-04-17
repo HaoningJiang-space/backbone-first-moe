@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional, Tuple
 import re
 
@@ -6,6 +7,17 @@ from transformers import PretrainedConfig
 
 
 _PACKED_MOE_PREFIX = r"(?:model\.)?layers\.(\d+)\.(?:mlp|block_sparse_moe)"
+
+
+@dataclass(frozen=True)
+class PackedExpertSchema:
+    gate_name: str
+    down_name: str
+    up_name: str
+
+    @property
+    def expanded_names(self) -> Tuple[str, str, str]:
+        return (self.gate_name, self.down_name, self.up_name)
 
 
 def _config_arch_string(config: PretrainedConfig) -> str:
@@ -44,6 +56,15 @@ def parse_expert_layout(config: PretrainedConfig) -> str:
     if arch in {"mixtral", "deepseek_v2", "deepseek_v3"}:
         return "packed"
     raise RuntimeError(f"Unsupported architecture {arch}")
+
+
+def get_packed_expert_schema(config: PretrainedConfig) -> PackedExpertSchema:
+    arch = parse_moe_architecture(config)
+    if arch == "mixtral":
+        return PackedExpertSchema("w1", "w2", "w3")
+    if arch in {"deepseek_v2", "deepseek_v3"}:
+        return PackedExpertSchema("gate_proj", "down_proj", "up_proj")
+    raise RuntimeError(f"Packed expert schema is undefined for architecture {arch}")
 
 
 def parse_expert_dtype(config: PretrainedConfig) -> torch.dtype:
@@ -129,8 +150,10 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
         else:
             return None, None
     elif parse_expert_layout(config) == "packed":
+        schema = get_packed_expert_schema(config)
+        expanded_names = "|".join(re.escape(name) for name in schema.expanded_names)
         routed = re.findall(
-            rf"{_PACKED_MOE_PREFIX}\.experts\.(\d+)\.(w[123])\.weight$",
+            rf"{_PACKED_MOE_PREFIX}\.experts\.(\d+)\.({expanded_names})\.weight$",
             param_name,
         )
         if routed:

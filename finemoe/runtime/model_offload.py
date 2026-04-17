@@ -35,6 +35,7 @@ from finemoe.utils import (
     parse_moe_param,
     parse_expert_layout,
     parse_expert_id,
+    get_packed_expert_schema,
     parse_expert_dtype,
     parse_expert_dtype_id,
     parse_packed_expert_tensor,
@@ -376,16 +377,17 @@ class OffloadEngine(object):
         }
 
     @staticmethod
-    def _packed_role_order(param_name):
-        if ".w1.weight" in param_name:
+    def _packed_role_order(param_name, schema):
+        if f".{schema.gate_name}.weight" in param_name:
             return 0
-        if ".w2.weight" in param_name:
+        if f".{schema.down_name}.weight" in param_name:
             return 1
-        if ".w3.weight" in param_name:
+        if f".{schema.up_name}.weight" in param_name:
             return 2
         return 99
 
     def _build_packed_expert_groups(self):
+        schema = get_packed_expert_schema(self.config)
         expert_groups = {}
         for name, tensor_id in self.name_id_map.items():
             try:
@@ -401,7 +403,7 @@ class OffloadEngine(object):
         for key, entries in expert_groups.items():
             ordered = [
                 tensor_id
-                for _, tensor_id in sorted(entries, key=lambda item: self._packed_role_order(item[0]))
+                for _, tensor_id in sorted(entries, key=lambda item: self._packed_role_order(item[0], schema))
             ]
             self.expert_tensor_groups[key] = ordered
             if ordered:

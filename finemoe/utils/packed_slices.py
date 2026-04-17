@@ -4,7 +4,12 @@ from typing import Iterable, List, Optional
 import torch
 from transformers import PretrainedConfig
 
-from .hf_config import parse_expert_layout, parse_moe_param, parse_packed_expert_tensor
+from .hf_config import (
+    parse_expert_layout,
+    get_packed_expert_schema,
+    parse_moe_param,
+    parse_packed_expert_tensor,
+)
 
 
 @dataclass(frozen=True)
@@ -34,6 +39,7 @@ def expand_tensor_for_offload(
             )
         ]
 
+    schema = get_packed_expert_schema(config)
     layer_id, expert_group, tensor_role = parse_packed_expert_tensor(param_name, config)
     if layer_id is None:
         return [
@@ -63,38 +69,41 @@ def expand_tensor_for_offload(
                     raise RuntimeError(
                         f"Packed gate_up tensor {param_name!r} must split evenly into w1/w3, got shape {tuple(expert_tensor.shape)}"
                     )
-                w1, w3 = expert_tensor.chunk(2, dim=0)
+                first_proj, second_proj = expert_tensor.chunk(2, dim=0)
+                first_name = schema.gate_name
+                second_name = schema.up_name
                 entries.extend(
                     [
                         SyntheticTensorEntry(
-                            name=f"{prefix}.{expert_idx}.w1.weight",
-                            tensor=w1,
+                            name=f"{prefix}.{expert_idx}.{first_name}.weight",
+                            tensor=first_proj,
                             layer_id=layer_id,
                             expert_idx=expert_idx,
                             expert_group=expert_group,
-                            tensor_role="w1",
+                            tensor_role=first_name,
                             source_name=param_name,
                         ),
                         SyntheticTensorEntry(
-                            name=f"{prefix}.{expert_idx}.w3.weight",
-                            tensor=w3,
+                            name=f"{prefix}.{expert_idx}.{second_name}.weight",
+                            tensor=second_proj,
                             layer_id=layer_id,
                             expert_idx=expert_idx,
                             expert_group=expert_group,
-                            tensor_role="w3",
+                            tensor_role=second_name,
                             source_name=param_name,
                         ),
                     ]
                 )
             elif tensor_role == "down_proj":
+                down_name = schema.down_name
                 entries.append(
                     SyntheticTensorEntry(
-                        name=f"{prefix}.{expert_idx}.w2.weight",
+                        name=f"{prefix}.{expert_idx}.{down_name}.weight",
                         tensor=expert_tensor,
                         layer_id=layer_id,
                         expert_idx=expert_idx,
                         expert_group=expert_group,
-                        tensor_role="w2",
+                        tensor_role=down_name,
                         source_name=param_name,
                     )
                 )
