@@ -138,7 +138,7 @@ class MoE:
             finemoe.models.modeling_olmoe.modeling_olmoe.apply_rotary_pos_emb = (
                 apply_rotary_pos_emb
             )
-        else:
+        elif self.expert_layout != "packed":
             raise ValueError(f"{self.arch} not supported")
 
         if self.prefetch_distance <= 0:
