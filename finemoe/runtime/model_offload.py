@@ -1026,18 +1026,15 @@ class OffloadEngine(object):
         finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
             finemoe.models.modeling_olmoe.modeling_olmoe._old_sparse_mlp
         )
-        if hasattr(transformers.models.mixtral.modeling_mixtral, "_old_sparse_mlp"):
-            transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
-                transformers.models.mixtral.modeling_mixtral._old_sparse_mlp
-            )
-        if hasattr(transformers.models.deepseek_v2.modeling_deepseek_v2, "_old_sparse_mlp"):
-            transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
-                transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp
-            )
-        if hasattr(transformers.models.deepseek_v3.modeling_deepseek_v3, "_old_sparse_mlp"):
-            transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
-                transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp
-            )
+        mixtral_mod = getattr(getattr(transformers.models, "mixtral", None), "modeling_mixtral", None)
+        if mixtral_mod is not None and hasattr(mixtral_mod, "_old_sparse_mlp"):
+            mixtral_mod.MixtralSparseMoeBlock = mixtral_mod._old_sparse_mlp
+        deepseek_v2_mod = getattr(getattr(transformers.models, "deepseek_v2", None), "modeling_deepseek_v2", None)
+        if deepseek_v2_mod is not None and hasattr(deepseek_v2_mod, "_old_sparse_mlp"):
+            deepseek_v2_mod.DeepseekV2Moe = deepseek_v2_mod._old_sparse_mlp
+        deepseek_v3_mod = getattr(getattr(transformers.models, "deepseek_v3", None), "modeling_deepseek_v3", None)
+        if deepseek_v3_mod is not None and hasattr(deepseek_v3_mod, "_old_sparse_mlp"):
+            deepseek_v3_mod.DeepseekV3MoE = deepseek_v3_mod._old_sparse_mlp
 
     def get_topology(self, model):
         name_lst = []

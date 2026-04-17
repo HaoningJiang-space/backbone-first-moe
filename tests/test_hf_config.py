@@ -48,6 +48,14 @@ class HFConfigParsingTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "slice-based runtime path"):
             parse_expert_id("layers.3.mlp.experts.gate_up_proj", cfg)
+        self.assertEqual(
+            parse_packed_expert_tensor("model.layers.3.block_sparse_moe.experts.gate_up_proj", cfg),
+            (3, "routed_experts", "gate_up_proj"),
+        )
+        self.assertEqual(
+            parse_expert_id("model.layers.3.block_sparse_moe.experts.5.w2.weight", cfg),
+            (3, 5),
+        )
 
     def test_deepseek_v2_packed_layout(self):
         cfg = DeepseekV2Config(
@@ -106,6 +114,14 @@ class HFConfigParsingTest(unittest.TestCase):
         self.assertEqual(len(down_entries), 4)
         self.assertEqual(down_entries[0].name, "layers.1.mlp.experts.0.w2.weight")
         self.assertTrue(torch.equal(down_entries[3].tensor, down[3]))
+
+        alt_entries = expand_tensor_for_offload(
+            "model.layers.1.block_sparse_moe.experts.gate_up_proj",
+            gate_up,
+            cfg,
+        )
+        self.assertEqual(alt_entries[0].name, "model.layers.1.block_sparse_moe.experts.0.w1.weight")
+        self.assertEqual(alt_entries[1].name, "model.layers.1.block_sparse_moe.experts.0.w3.weight")
 
     def test_deepseek_shared_tensor_is_kept_as_single_entry(self):
         cfg = DeepseekV2Config(

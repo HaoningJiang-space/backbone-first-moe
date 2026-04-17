@@ -5,6 +5,9 @@ import torch
 from transformers import PretrainedConfig
 
 
+_PACKED_MOE_PREFIX = r"(?:model\.)?layers\.(\d+)\.(?:mlp|block_sparse_moe)"
+
+
 def _config_arch_string(config: PretrainedConfig) -> str:
     architecture = ""
     if getattr(config, "architectures", None):
@@ -87,17 +90,23 @@ def parse_packed_expert_tensor(param_name: str, config: PretrainedConfig) -> Tup
     if parse_expert_layout(config) != "packed":
         return None, None, None
 
-    routed = re.findall(r"layers\.(\d+)\.mlp\.experts\.(gate_up_proj|down_proj)$", param_name)
+    routed = re.findall(
+        rf"{_PACKED_MOE_PREFIX}\.experts\.(gate_up_proj|down_proj)$",
+        param_name,
+    )
     if routed:
         layer_id, tensor_role = routed[0]
         return int(layer_id), "routed_experts", tensor_role
 
-    shared = re.findall(r"layers\.(\d+)\.mlp\.shared_experts\.(gate_proj|up_proj|down_proj)\.weight$", param_name)
+    shared = re.findall(
+        rf"{_PACKED_MOE_PREFIX}\.shared_experts\.(gate_proj|up_proj|down_proj)\.weight$",
+        param_name,
+    )
     if shared:
         layer_id, tensor_role = shared[0]
         return int(layer_id), "shared_experts", tensor_role
 
-    router = re.findall(r"layers\.(\d+)\.mlp\.gate\.weight$", param_name)
+    router = re.findall(rf"{_PACKED_MOE_PREFIX}\.gate\.weight$", param_name)
     if router:
         layer_id = router[0]
         return int(layer_id), "router", "gate"
@@ -112,7 +121,7 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
     if arch in {"qwen", "olmoe"}:
         decoder_sparse_step = 1
         layer_type = "decoder"
-        result = re.findall(r"layers\.(\d+)\.mlp\.experts\.(\d+)\.", param_name)
+        result = re.findall(r"(?:model\.)?layers\.(\d+)\.mlp\.experts\.(\d+)\.", param_name)
         if result:
             layer_id, expert_id = result[0]
             layer_id = int(layer_id)
@@ -120,7 +129,10 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
         else:
             return None, None
     elif parse_expert_layout(config) == "packed":
-        routed = re.findall(r"layers\.(\d+)\.mlp\.experts\.(\d+)\.(w[123])\.weight$", param_name)
+        routed = re.findall(
+            rf"{_PACKED_MOE_PREFIX}\.experts\.(\d+)\.(w[123])\.weight$",
+            param_name,
+        )
         if routed:
             layer_id, expert_id, _ = routed[0]
             return int(layer_id), int(expert_id)
