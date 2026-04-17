@@ -26,7 +26,7 @@ class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):
             hidden_states=flat_states,
             top_k_index=top_k_index,
             top_k_weights=top_k_weights,
-            num_experts=self.num_experts,
+            num_experts=self.experts.num_experts,
             layer_id=self.layer_id,
             expert_dispatcher=self.expert_dispatcher,
         )

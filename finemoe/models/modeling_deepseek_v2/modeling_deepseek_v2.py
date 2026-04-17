@@ -29,7 +29,7 @@ class SyncDeepseekV2Moe(DeepseekV2Moe):
             hidden_states=flat_states,
             top_k_index=topk_indices,
             top_k_weights=topk_weights,
-            num_experts=self.n_routed_experts,
+            num_experts=self.config.n_routed_experts,
             layer_id=self.layer_id,
             expert_dispatcher=self.expert_dispatcher,
         ).view(*orig_shape)
