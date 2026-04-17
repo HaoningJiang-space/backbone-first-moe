@@ -656,6 +656,12 @@ class OffloadEngine(object):
         finemoe.models.modeling_qwen.modeling_qwen2_moe.Qwen2MoeSparseMoeBlock = (
             SyncQwen2MoeSparseMoeBlock
         )
+        finemoe.models.modeling_olmoe.modeling_olmoe._old_sparse_mlp = (
+            finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock
+        )
+        finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
+            SyncOlmoeSparseMoeBlock
+        )
 
         def from_pretrained_decorator(orig_from_pretrained: Callable) -> Callable:
 
