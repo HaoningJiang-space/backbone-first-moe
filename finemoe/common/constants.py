@@ -1,9 +1,5 @@
-from transformers import (
-    PretrainedConfig,
-    MixtralForCausalLM,
-    DeepseekV2ForCausalLM,
-    DeepseekV3ForCausalLM,
-)
+from transformers import PretrainedConfig
+
 from ..models.modeling_qwen.modeling_qwen2_moe import Qwen2MoeForCausalLM
 from ..models.modeling_olmoe import OlmoeForCausalLM
 from ..utils import parse_moe_architecture
@@ -11,18 +7,30 @@ from ..utils import parse_moe_architecture
 MODEL_MAPPING_NAMES = {
     "qwen": Qwen2MoeForCausalLM,
     "olmoe": OlmoeForCausalLM,
-    "mixtral": MixtralForCausalLM,
-    "deepseek_v2": DeepseekV2ForCausalLM,
-    "deepseek_v3": DeepseekV3ForCausalLM,
 }
 
-MODEL_MAPPING_TYPES = {
-    "qwen": 4,
-    "olmoe": 4,
-    "mixtral": 4,
-    "deepseek_v2": 4,
-    "deepseek_v3": 4,
-}
+try:
+    from transformers.models.mixtral.modeling_mixtral import MixtralForCausalLM
+
+    MODEL_MAPPING_NAMES["mixtral"] = MixtralForCausalLM
+except ImportError:
+    pass
+
+try:
+    from transformers.models.deepseek_v2.modeling_deepseek_v2 import DeepseekV2ForCausalLM
+
+    MODEL_MAPPING_NAMES["deepseek_v2"] = DeepseekV2ForCausalLM
+except ImportError:
+    pass
+
+try:
+    from transformers.models.deepseek_v3.modeling_deepseek_v3 import DeepseekV3ForCausalLM
+
+    MODEL_MAPPING_NAMES["deepseek_v3"] = DeepseekV3ForCausalLM
+except ImportError:
+    pass
+
+MODEL_MAPPING_TYPES = {arch: 4 for arch in MODEL_MAPPING_NAMES}
 
 
 def parse_expert_type(config: PretrainedConfig) -> int:
