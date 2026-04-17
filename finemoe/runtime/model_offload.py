@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import functools
 import json
+from collections import OrderedDict
 
 from tqdm import tqdm
 
@@ -310,6 +311,7 @@ class OffloadEngine(object):
         prefetch_distance,
         device,
         eval_mode,
+        eval_batch_size,
     ):
         self.offload_exemption = set()
         self.expert_modules = []
@@ -342,8 +344,12 @@ class OffloadEngine(object):
         self.prefetch_distance = prefetch_distance
         self.device = torch.device(device)
         self.eval_mode = eval_mode
+        self.eval_batch_size = int(eval_batch_size)
 
         self.moe_layers = []
+        self.resident_requested_count = 0
+        self.resident_clipped = False
+        self._resident_ids_are_ordered = False
 
     def init_expert_map_matcher(self):
         self.expert_map_matcher = ExpertMapMatcher(
@@ -366,8 +372,12 @@ class OffloadEngine(object):
         with open(resident_file, "r") as f:
             payload = json.load(f)
 
+        resident_ordered = False
         if isinstance(payload, dict):
-            if "resident_set" in payload:
+            if "resident_selection_order" in payload:
+                payload = payload["resident_selection_order"]
+                resident_ordered = True
+            elif "resident_set" in payload:
                 payload = payload["resident_set"]
             elif "resident_expert_ids" in payload:
                 payload = payload["resident_expert_ids"]
@@ -390,7 +400,23 @@ class OffloadEngine(object):
                 )
             resident_ids.append((layer_id, expert_id))
 
-        return sorted(set(resident_ids))
+        self._resident_ids_are_ordered = resident_ordered
+        return list(OrderedDict.fromkeys(resident_ids))
+
+    @staticmethod
+    def _expert_module_bytes(expert_module):
+        total_bytes = 0
+        for param in expert_module.parameters(recurse=True):
+            total_bytes += param.numel() * param.element_size()
+        for buf in expert_module.buffers(recurse=True):
+            total_bytes += buf.numel() * buf.element_size()
+        return int(total_bytes)
+
+    def _resident_slack_experts(self):
+        configured = int(getattr(self.archer_config, "resident_slack_experts", -1))
+        if configured >= 0:
+            return configured
+        return max(1, int(self.top_k) * max(1, int(self.eval_batch_size)))
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.
@@ -403,6 +429,70 @@ class OffloadEngine(object):
         """
         if not resident_expert_ids:
             return
+
+        requested_count = len(resident_expert_ids)
+        available_pool_bytes = int(self.archer_engine.get_device_free_memory(self.device))
+        capacity_pool_bytes = int(self.archer_engine.get_device_memory_capacity(self.device))
+        slack_experts = self._resident_slack_experts()
+        resident_bytes = []
+        for layer_id, expert_id in resident_expert_ids:
+            if not (0 <= layer_id < len(self.moe_layers)):
+                raise IndexError(
+                    f"Resident layer_id out of range: {layer_id} "
+                    f"(num_moe_layers={len(self.moe_layers)})"
+                )
+            expert_block = self.moe_layers[layer_id]
+            if not hasattr(expert_block, "experts") or not (
+                0 <= expert_id < len(expert_block.experts)
+            ):
+                raise IndexError(
+                    f"Resident expert_id out of range: "
+                    f"layer={layer_id}, expert={expert_id}"
+                )
+            resident_bytes.append(
+                self._expert_module_bytes(expert_block.experts[expert_id])
+            )
+
+        reserve_bytes = slack_experts * max(resident_bytes) if resident_bytes else 0
+        selected_count = requested_count
+        selected_bytes = sum(resident_bytes)
+        if selected_bytes + reserve_bytes > available_pool_bytes:
+            if not self._resident_ids_are_ordered:
+                raise RuntimeError(
+                    "Resident set exceeds runtime sparse-pool budget, but the resident file "
+                    "does not preserve ranked order for safe prefix clipping. "
+                    f"requested={requested_count}, reserve_experts={slack_experts}, "
+                    f"selected_bytes={selected_bytes}, reserve_bytes={reserve_bytes}, "
+                    f"pool_free_bytes={available_pool_bytes}, pool_capacity_bytes={capacity_pool_bytes}. "
+                    "Regenerate the resident file with resident_selection_order metadata."
+                )
+            running_bytes = 0
+            selected_count = 0
+            for expert_bytes in resident_bytes:
+                if running_bytes + expert_bytes + reserve_bytes > available_pool_bytes:
+                    break
+                running_bytes += expert_bytes
+                selected_count += 1
+            if selected_count <= 0:
+                raise RuntimeError(
+                    "Runtime sparse-pool budget is too small to pin any resident experts "
+                    f"while reserving {slack_experts} demand-slack experts. "
+                    f"pool_free_bytes={available_pool_bytes}, reserve_bytes={reserve_bytes}"
+                )
+            resident_expert_ids = resident_expert_ids[:selected_count]
+            resident_bytes = resident_bytes[:selected_count]
+            selected_bytes = running_bytes
+            self.resident_clipped = selected_count < requested_count
+            print(
+                "Clipped resident set to preserve demand slack: "
+                f"requested={requested_count}, effective={selected_count}, "
+                f"slack_experts={slack_experts}, selected_bytes={selected_bytes}, "
+                f"pool_free_bytes={available_pool_bytes}",
+                flush=True,
+            )
+        else:
+            self.resident_clipped = False
+        self.resident_requested_count = requested_count
 
         # Collect tensor_ids (C++ node ids) for all resident experts
         # 收集所有 resident expert 的 tensor_id（C++ 节点 id）

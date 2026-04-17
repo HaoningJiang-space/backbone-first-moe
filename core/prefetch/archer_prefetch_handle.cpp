@@ -453,6 +453,16 @@ int ArcherPrefetchHandle::GetNodeDevice(std::vector<std::uint32_t> tensor_ids) c
     return node->device.index();
 }
 
+std::int64_t ArcherPrefetchHandle::GetDeviceFreeMemory(const torch::Device& device) const
+{
+    return kDeviceMemoryPool->GetFreeMemory(device);
+}
+
+std::int64_t ArcherPrefetchHandle::GetDeviceMemoryCapacity(const torch::Device& device) const
+{
+    return kDeviceMemoryPool->GetMemoryCapacity(device);
+}
+
 // void ArcherPrefetchHandle::SetNodeCachePriority(const std::uint32_t tensor_id, const float priority) {
 //     auto node = kTopologyHandle->GetNodeFromTensorID(tensor_id);
 //     node->cache_priority = priority;

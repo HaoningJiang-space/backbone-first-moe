@@ -84,6 +84,13 @@ class SystemBottleneckAnalyzer:
         ]
 
     @staticmethod
+    def _serialize_ranked_expert_pairs(ranked_items):
+        return [
+            {'layer': int(layer_idx), 'expert': int(expert_idx)}
+            for (layer_idx, expert_idx), _ in ranked_items
+        ]
+
+    @staticmethod
     def _serialize_expert_metric(metric_dict):
         return [
             {'layer': int(layer_idx), 'expert': int(expert_idx), 'value': float(value)}
@@ -95,6 +102,9 @@ class SystemBottleneckAnalyzer:
         available_memory_mb = total_gpu_memory_mb * device_memory_ratio
         cache_capacity = int(available_memory_mb / self.expert_size_mb)
         resident_capacity, speculative_capacity = self._pool_capacities(cache_capacity)
+        ranked_resident = self._rank_resident_experts(
+            resident_capacity, cache_capacity, reset_mode
+        )
         resident_set = self._select_resident_experts(resident_capacity, cache_capacity, reset_mode)
         return {
             'device_memory_ratio': float(device_memory_ratio),
@@ -106,6 +116,8 @@ class SystemBottleneckAnalyzer:
             'resident_profile_ratio': self.resident_profile_ratio,
             'resident_depth_power': self.resident_depth_power,
             'resident_set': self._serialize_expert_pairs(resident_set),
+            'resident_selection_order': self._serialize_ranked_expert_pairs(ranked_resident[:resident_capacity]),
+            'resident_ordered': True,
         }
 
     def _result_file(self, reset_mode):
@@ -542,18 +554,19 @@ class SystemBottleneckAnalyzer:
 
         return dict(scores)
 
-    def _select_resident_experts(self, resident_capacity, cache_capacity, reset_mode):
+    def _rank_resident_experts(self, resident_capacity, cache_capacity, reset_mode):
         """
-        选择固定驻留在 resident pool 的 expert。
+        返回 resident 候选的有序排名，供 resident pool 选择和 runtime 裁剪复用。
 
         `oracle_freq` 使用全 trace 访问频率做一个 oracle-labeled upper-bound，
         用来验证 two-pool 结构本身是否值得继续做。
         """
         if self.cache_layout != 'two_pool' or resident_capacity <= 0:
-            return set()
+            return []
         if self.resident_policy == 'none':
-            return set()
+            return []
         cache_key = (
+            "ranked",
             self.resident_policy,
             resident_capacity,
             cache_capacity,
@@ -568,18 +581,16 @@ class SystemBottleneckAnalyzer:
                 self.expert_access_count.items(),
                 key=lambda item: (-item[1], item[0][0], item[0][1]),
             )
-            selected = {expert_key for expert_key, _ in ranked[:resident_capacity]}
-            self._resident_selection_cache[cache_key] = selected
-            return selected
+            self._resident_selection_cache[cache_key] = ranked
+            return ranked
         if self.resident_policy == 'profile_freq':
             profiled_access_count = self._count_expert_accesses(self.resident_profile_ratio)
             ranked = sorted(
                 profiled_access_count.items(),
                 key=lambda item: (-item[1], item[0][0], item[0][1]),
             )
-            selected = {expert_key for expert_key, _ in ranked[:resident_capacity]}
-            self._resident_selection_cache[cache_key] = selected
-            return selected
+            self._resident_selection_cache[cache_key] = ranked
+            return ranked
         if self.resident_policy == 'profile_depth_freq':
             profiled_access_count = self._count_expert_accesses(
                 self.resident_profile_ratio,
@@ -589,9 +600,8 @@ class SystemBottleneckAnalyzer:
                 profiled_access_count.items(),
                 key=lambda item: (-item[1], item[0][0], item[0][1]),
             )
-            selected = {expert_key for expert_key, _ in ranked[:resident_capacity]}
-            self._resident_selection_cache[cache_key] = selected
-            return selected
+            self._resident_selection_cache[cache_key] = ranked
+            return ranked
         if self.resident_policy == 'profile_miss_stall':
             profiled_scores = self._profile_miss_stall_scores(
                 self.resident_profile_ratio,
@@ -603,10 +613,17 @@ class SystemBottleneckAnalyzer:
                 profiled_scores.items(),
                 key=lambda item: (-item[1], item[0][0], item[0][1]),
             )
-            selected = {expert_key for expert_key, _ in ranked[:resident_capacity]}
-            self._resident_selection_cache[cache_key] = selected
-            return selected
+            self._resident_selection_cache[cache_key] = ranked
+            return ranked
         raise ValueError(f"Unsupported resident_policy: {self.resident_policy}")
+
+    def _select_resident_experts(self, resident_capacity, cache_capacity, reset_mode):
+        ranked = self._rank_resident_experts(
+            resident_capacity,
+            cache_capacity,
+            reset_mode,
+        )
+        return {expert_key for expert_key, _ in ranked[:resident_capacity]}
 
     @staticmethod
     def _seed_resident_cache(cache, speculative_entries, pinned_resident_keys):

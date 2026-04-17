@@ -197,6 +197,11 @@ def export_selected_resident_set(full_state_file, mem_ratio, best_ratio, args, b
             {"layer": int(expert_key[0]), "expert": int(expert_key[1])}
             for expert_key, _ in resident_set
         ],
+        "resident_selection_order": [
+            {"layer": int(expert_key[0]), "expert": int(expert_key[1])}
+            for expert_key, _ in resident_set
+        ],
+        "resident_ordered": True,
         "resident_capacity": int(best_capacity),
         "speculative_capacity": int(max(0, cache_capacity - best_capacity)),
         "resident_policy": args.resident_policy,

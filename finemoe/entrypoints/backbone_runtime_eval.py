@@ -26,6 +26,12 @@ def build_parser():
     parser.add_argument("--max-new-tokens", type=int, default=64)
     parser.add_argument("--min-new-tokens", type=int, default=1)
     parser.add_argument("--store-capacity", type=int, default=1000)
+    parser.add_argument(
+        "--resident-slack-experts",
+        type=int,
+        default=-1,
+        help="Reserve this many expert slots for demand fallback; -1 derives from top-k x batch size",
+    )
     parser.add_argument("--batch-prefetch", action="store_true",
                         help="Enable batch-aware prefetch (one call per layer instead of per-sequence)")
     parser.add_argument("--tag", type=str, default="runtime_eval")
@@ -51,10 +57,11 @@ def main():
         seed=args.seed,
         max_length=args.max_length,
         max_new_tokens=args.max_new_tokens,
-        min_new_tokens=args.min_new_tokens,
-        store_capacity=args.store_capacity,
-        batch_prefetch=args.batch_prefetch,
-        tag=args.tag,
+            min_new_tokens=args.min_new_tokens,
+            store_capacity=args.store_capacity,
+            batch_prefetch=args.batch_prefetch,
+            resident_slack_experts=args.resident_slack_experts,
+            tag=args.tag,
     )
     payload = evaluate_runtime(runtime_cfg)
     print(json.dumps(payload, indent=2))

@@ -30,6 +30,7 @@ class RuntimeEvalConfig:
     min_new_tokens: int = 1
     store_capacity: int = 1000
     batch_prefetch: bool = False
+    resident_slack_experts: int = -1
     tag: str = "runtime_eval"
 
 
@@ -57,6 +58,7 @@ def build_model(runtime_cfg):
             "offload_path": runtime_cfg.offload_path,
             "device_memory_ratio": runtime_cfg.device_memory_ratio,
             "resident_expert_ids_file": runtime_cfg.resident_expert_ids_file,
+            "resident_slack_experts": runtime_cfg.resident_slack_experts,
             "prefetch_distance": runtime_cfg.prefetch_distance,
             "store_capacity": runtime_cfg.store_capacity,
             "device": runtime_cfg.device,
@@ -172,6 +174,8 @@ def evaluate_runtime(runtime_cfg):
         "end_to_end_tokens_per_sec": float((total_prompt_tokens + total_generated_tokens) / total_elapsed) if total_elapsed > 0 else 0.0,
         "peak_memory_mb": peak_memory_mb,
         "resident_count": len(getattr(model.engine, "resident_expert_ids", [])),
+        "resident_requested_count": int(getattr(model.engine, "resident_requested_count", 0)),
+        "resident_clipped": bool(getattr(model.engine, "resident_clipped", False)),
         "per_batch": per_batch,
     }
 

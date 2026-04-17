@@ -24,6 +24,10 @@ class ArcherConfig:
         default="",
         metadata={"help": "Path to JSON file listing resident (layer, expert) pairs"},
     )
+    resident_slack_experts: int = field(
+        default=-1,
+        metadata={"help": "Reserve this many expert slots for demand fallback; -1 derives from top-k x batch size"},
+    )
     # master_addr: str = field(
     #     default="127.0.0.1",
     #     metadata={"help": "Hosts for running archer"},

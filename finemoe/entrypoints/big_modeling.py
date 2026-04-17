@@ -105,6 +105,7 @@ class MoE:
             prefetch_distance=self.prefetch_distance,
             device=self.device,
             eval_mode=self.eval_mode,
+            eval_batch_size=self.eval_batch_size,
         )
         self.engine.ckpt_files = checkpoint_paths
         # self.engine.save(config.offload_path, checkpoint_paths)
