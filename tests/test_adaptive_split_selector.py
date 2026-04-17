@@ -4,6 +4,7 @@ from backbone_moe.evaluation import (
     build_batch_union_demand_steps,
     compute_capacity_knee,
     compute_residual_demand_frontier_curve,
+    infer_frontier_horizon,
     select_feasible_resident_prefix,
 )
 
@@ -96,6 +97,39 @@ class AdaptiveSplitSelectorTest(unittest.TestCase):
         self.assertEqual(selected["frontier_capacity"], 1)
         self.assertEqual(selected["speculative_capacity"], 1)
         self.assertEqual(selected["selection_rule"], "frontier_feasible_prefix")
+
+    def test_infer_frontier_horizon_uses_layer_granularity(self):
+        access_sequence = [
+            {"iter_idx": 0, "layer_experts": [[(0, 0)], [(1, 0)], [(2, 0)], [(3, 0)]]},
+        ]
+        horizon = infer_frontier_horizon(
+            access_sequence=access_sequence,
+            expert_size_mb=17.2,
+            h2d_bandwidth_gbps=16.0,
+            gpu_compute_time_ms=2.0,
+        )
+        self.assertEqual(horizon, 3)
+
+    def test_burst_frontier_shrinks_feasible_prefix(self):
+        ranked = [((0, idx), float(10 - idx)) for idx in range(6)]
+        access_sequence = [
+            {"iter_idx": 0, "layer_experts": [[(0, 0), (0, 4)]]},
+            {"iter_idx": 1, "layer_experts": [[(0, 1), (0, 5)]]},
+        ]
+        single_step = select_feasible_resident_prefix(
+            ranked=ranked,
+            access_sequence=access_sequence,
+            cache_capacity=5,
+            frontier_horizon=1,
+        )
+        burst = select_feasible_resident_prefix(
+            ranked=ranked,
+            access_sequence=access_sequence,
+            cache_capacity=5,
+            frontier_horizon=2,
+        )
+        self.assertEqual(single_step["resident_capacity"], 4)
+        self.assertEqual(burst["resident_capacity"], 3)
 
 
 if __name__ == "__main__":

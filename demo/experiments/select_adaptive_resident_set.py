@@ -7,6 +7,7 @@ from finemoe.backbone.evaluation import (
     best_by_throughput,
     compute_capacity_knee,
     evaluate_with_fixed_resident_layout,
+    infer_frontier_horizon,
     parse_float_list,
     parse_int_list,
     select_feasible_resident_prefix,
@@ -94,6 +95,12 @@ def select_frontier_prefix(profile_state_file, mem_ratio, args):
         access_sequence=profile_analyzer.access_sequence,
         cache_capacity=cache_capacity,
         frontier_percentile=args.frontier_percentile,
+        frontier_horizon=args.frontier_horizon if args.frontier_horizon > 0 else infer_frontier_horizon(
+            access_sequence=profile_analyzer.access_sequence,
+            expert_size_mb=args.expert_size_mb,
+            h2d_bandwidth_gbps=args.h2d_bandwidth_gbps,
+            gpu_compute_time_ms=args.gpu_compute_time_ms,
+        ),
     )
 
     resident_capacity = selected["resident_capacity"]
@@ -263,6 +270,8 @@ def main():
         default="frontier_prefix",
     )
     parser.add_argument("--frontier-percentile", type=float, default=1.0)
+    parser.add_argument("--frontier-horizon", type=int, default=0,
+                        help="Residual demand burst horizon in batch-steps; <=0 means auto-infer from transfer/compute overlap.")
     parser.add_argument("--prefetch-windows", type=parse_int_list, default=[0, 1, 4, 10])
     parser.add_argument("--profile-fraction", type=float, default=0.2)
     parser.add_argument("--mode", type=str, default="oracle")
@@ -284,6 +293,7 @@ def main():
         "resident_profile_ratio": float(args.resident_profile_ratio),
         "selection_method": args.selection_method,
         "frontier_percentile": float(args.frontier_percentile),
+        "frontier_horizon": int(args.frontier_horizon),
         "candidate_ratios": [float(x) for x in args.candidate_ratios],
         "prefetch_windows": [int(x) for x in args.prefetch_windows],
         "results": [],
@@ -333,6 +343,7 @@ def main():
                 "selection_profile_fraction": float(args.profile_fraction),
                 "selection_frontier_capacity": int(best_row.get("frontier_capacity", 0)),
                 "selection_frontier_percentile": float(best_row.get("frontier_percentile", args.frontier_percentile)),
+                "selection_frontier_horizon": int(best_row.get("frontier_horizon", args.frontier_horizon)),
                 "selection_knee_capacity": int(best_row.get("knee_capacity", 0)),
                 "selection_candidates": candidates,
             }
@@ -345,6 +356,7 @@ def main():
                     "best_prefetch_window": int(best_row.get("best_prefetch_window", 0)),
                     "profile_throughput_tokens_per_sec": float(best_row["throughput_tokens_per_sec"]),
                     "frontier_capacity": int(best_row.get("frontier_capacity", 0)),
+                    "frontier_horizon": int(best_row.get("frontier_horizon", args.frontier_horizon)),
                     "cache_capacity": int(cache_capacity or resident_info["cache_capacity"]),
                     "resident_capacity": int(resident_info["resident_capacity"]),
                     "speculative_capacity": int(resident_info["speculative_capacity"]),
@@ -359,6 +371,7 @@ def main():
                 f"mem={mem_ratio:.2f}: "
                 f"frontier_k={best_row['resident_capacity']} (ratio={best_row['resident_ratio']:.2f}), "
                 f"frontier={best_row.get('frontier_capacity', 0)}, "
+                f"horizon={best_row.get('frontier_horizon', args.frontier_horizon)}, "
                 f"knee_k={knee_k} (ratio={knee_r:.2f}), "
                 f"tp={best_row['throughput_tokens_per_sec']:.1f} tok/s"
             )
