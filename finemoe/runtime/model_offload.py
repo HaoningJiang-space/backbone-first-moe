@@ -46,7 +46,11 @@ from typing import Dict, Type, Union
 from transformers import (
     AutoConfig,
 )
-from transformers.modeling_utils import PreTrainedModel, PretrainedConfig
+from transformers.modeling_utils import PreTrainedModel
+try:
+    from transformers.modeling_utils import PretrainedConfig
+except ImportError:
+    from transformers import PretrainedConfig
 import transformers
 from typing import Callable
 
