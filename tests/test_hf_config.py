@@ -9,6 +9,7 @@ from finemoe.utils import (
     parse_expert_layout,
     parse_moe_architecture,
     parse_moe_param,
+    parse_packed_expert_tensor,
 )
 
 
@@ -34,8 +35,16 @@ class HFConfigParsingTest(unittest.TestCase):
         self.assertEqual(parse_moe_architecture(cfg), "mixtral")
         self.assertEqual(parse_expert_layout(cfg), "packed")
         self.assertEqual(parse_moe_param(cfg), (32, 8, 0, 4096, 2))
+        self.assertEqual(
+            parse_packed_expert_tensor("layers.3.mlp.experts.gate_up_proj", cfg),
+            (3, "routed_experts", "gate_up_proj"),
+        )
+        self.assertEqual(
+            parse_packed_expert_tensor("layers.3.mlp.gate.weight", cfg),
+            (3, "router", "gate"),
+        )
         with self.assertRaisesRegex(RuntimeError, "slice-based runtime path"):
-            parse_expert_id("model.layers.0.mlp.experts.gate_up_proj", cfg)
+            parse_expert_id("layers.3.mlp.experts.gate_up_proj", cfg)
 
     def test_deepseek_v2_packed_layout(self):
         cfg = DeepseekV2Config(
@@ -53,8 +62,16 @@ class HFConfigParsingTest(unittest.TestCase):
         self.assertEqual(parse_moe_architecture(cfg), "deepseek_v2")
         self.assertEqual(parse_expert_layout(cfg), "packed")
         self.assertEqual(parse_moe_param(cfg), (27, 64, 0, 2048, 6))
+        self.assertEqual(
+            parse_packed_expert_tensor("layers.5.mlp.experts.down_proj", cfg),
+            (5, "routed_experts", "down_proj"),
+        )
+        self.assertEqual(
+            parse_packed_expert_tensor("layers.5.mlp.shared_experts.up_proj.weight", cfg),
+            (5, "shared_experts", "up_proj"),
+        )
         with self.assertRaisesRegex(RuntimeError, "slice-based runtime path"):
-            parse_expert_id("model.layers.0.mlp.experts.gate_up_proj", cfg)
+            parse_expert_id("layers.5.mlp.experts.gate_up_proj", cfg)
 
 
 if __name__ == "__main__":

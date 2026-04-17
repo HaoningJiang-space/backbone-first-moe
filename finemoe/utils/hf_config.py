@@ -82,6 +82,29 @@ def parse_moe_param(config: PretrainedConfig) -> Tuple[int, int, int, int, int]:
     return num_layers, num_experts, num_encoder_layers, embed_dim, top_k
 
 
+def parse_packed_expert_tensor(param_name: str, config: PretrainedConfig) -> Tuple[Optional[int], Optional[str], Optional[str]]:
+    arch = parse_moe_architecture(config)
+    if parse_expert_layout(config) != "packed":
+        return None, None, None
+
+    routed = re.findall(r"layers\.(\d+)\.mlp\.experts\.(gate_up_proj|down_proj)$", param_name)
+    if routed:
+        layer_id, tensor_role = routed[0]
+        return int(layer_id), "routed_experts", tensor_role
+
+    shared = re.findall(r"layers\.(\d+)\.mlp\.shared_experts\.(gate_proj|up_proj|down_proj)\.weight$", param_name)
+    if shared:
+        layer_id, tensor_role = shared[0]
+        return int(layer_id), "shared_experts", tensor_role
+
+    router = re.findall(r"layers\.(\d+)\.mlp\.gate\.weight$", param_name)
+    if router:
+        layer_id = router[0]
+        return int(layer_id), "router", "gate"
+
+    return None, None, None
+
+
 def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional[int], Optional[int]]:
     arch = parse_moe_architecture(config)
     _, _, num_encoder_layers, _, _ = parse_moe_param(config)
@@ -97,9 +120,11 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
         else:
             return None, None
     elif parse_expert_layout(config) == "packed":
+        layer_id, expert_group, tensor_role = parse_packed_expert_tensor(param_name, config)
         raise RuntimeError(
             f"Packed-expert architecture {arch} does not expose per-expert tensor ids via parameter names; "
-            "it requires a slice-based runtime path instead of parse_expert_id()."
+            f"{param_name!r} maps to packed tensor ({expert_group}, {tensor_role}) at layer {layer_id}. "
+            "It requires a slice-based runtime path instead of parse_expert_id()."
         )
     else:
         raise ValueError(f"{arch} not supported")

@@ -2,6 +2,7 @@ from .hf_config import (
     parse_moe_param,
     parse_moe_architecture,
     parse_expert_layout,
+    parse_packed_expert_tensor,
     parse_expert_id,
     parse_expert_dtype,
     parse_expert_dtype_id,
