@@ -120,6 +120,10 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
         else:
             return None, None
     elif parse_expert_layout(config) == "packed":
+        routed = re.findall(r"layers\.(\d+)\.mlp\.experts\.(\d+)\.(gate_up_proj|down_proj)$", param_name)
+        if routed:
+            layer_id, expert_id, _ = routed[0]
+            return int(layer_id), int(expert_id)
         layer_id, expert_group, tensor_role = parse_packed_expert_tensor(param_name, config)
         raise RuntimeError(
             f"Packed-expert architecture {arch} does not expose per-expert tensor ids via parameter names; "

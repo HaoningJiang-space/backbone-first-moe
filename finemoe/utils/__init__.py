@@ -7,5 +7,6 @@ from .hf_config import (
     parse_expert_dtype,
     parse_expert_dtype_id,
 )
+from .packed_slices import SyntheticTensorEntry, expand_tensor_for_offload, expand_state_dict_for_offload
 from .config import ArcherConfig
 from .checkpoints import get_checkpoint_paths
