@@ -21,7 +21,7 @@ class SyncDeepseekV2Moe(DeepseekV2Moe):
         orig_shape = hidden_states.shape
         router_logits = F.linear(
             hidden_states.to(torch.float32),
-            self.gate.weight.to(torch.float32),
+            self.gate.weight.to(device=hidden_states.device, dtype=torch.float32),
         )
         topk_indices, topk_weights = self.route_tokens_to_experts(router_logits)
         flat_states = hidden_states.view(-1, hidden_states.shape[-1])

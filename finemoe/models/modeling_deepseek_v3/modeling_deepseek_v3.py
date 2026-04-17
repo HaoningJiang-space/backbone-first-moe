@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 from transformers.models.deepseek_v3.modeling_deepseek_v3 import (
     DeepseekV3ForCausalLM,
@@ -18,7 +19,11 @@ class SyncDeepseekV3MoE(DeepseekV3MoE):
 
         residuals = hidden_states
         orig_shape = hidden_states.shape
-        router_logits = self.gate(hidden_states)
+        flat_hidden_states = hidden_states.view(-1, self.config.hidden_size)
+        router_logits = F.linear(
+            flat_hidden_states.to(torch.float32),
+            self.gate.weight.to(device=hidden_states.device, dtype=torch.float32),
+        )
         router_scores = router_logits.sigmoid()
         correction_bias = self.gate.e_score_correction_bias.to(
             device=router_scores.device,
@@ -47,9 +52,8 @@ class SyncDeepseekV3MoE(DeepseekV3MoE):
             denominator = topk_weights.sum(dim=-1, keepdim=True) + 1e-20
             topk_weights /= denominator
         topk_weights = topk_weights * self.routed_scaling_factor
-        flat_states = hidden_states.view(-1, hidden_states.shape[-1])
         hidden_states = dispatch_packed_experts(
-            hidden_states=flat_states,
+            hidden_states=flat_hidden_states,
             top_k_index=topk_indices,
             top_k_weights=topk_weights,
             num_experts=self.n_routed_experts,
