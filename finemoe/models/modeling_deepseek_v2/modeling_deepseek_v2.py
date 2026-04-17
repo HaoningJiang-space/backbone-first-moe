@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 from transformers.models.deepseek_v2.modeling_deepseek_v2 import (
     DeepseekV2Experts,
     DeepseekV2ForCausalLM,
@@ -7,11 +10,31 @@ from transformers.models.deepseek_v2.modeling_deepseek_v2 import (
     DeepseekV2PreTrainedModel,
 )
 
+from ..packed_runtime import dispatch_packed_experts, ensure_no_prefetch_runtime
+
 
 class SyncDeepseekV2Moe(DeepseekV2Moe):
-    """Placeholder sync block for future packed-expert runtime support."""
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        ensure_no_prefetch_runtime(self)
 
-    pass
+        residuals = hidden_states
+        orig_shape = hidden_states.shape
+        router_logits = nn.functional.linear(
+            hidden_states.type(torch.float32),
+            self.gate.weight.type(torch.float32),
+        )
+        topk_indices, topk_weights = self.route_tokens_to_experts(router_logits)
+        flat_states = hidden_states.view(-1, hidden_states.shape[-1])
+        hidden_states = dispatch_packed_experts(
+            hidden_states=flat_states,
+            top_k_index=topk_indices,
+            top_k_weights=topk_weights,
+            num_experts=self.n_routed_experts,
+            layer_id=self.layer_id,
+            expert_dispatcher=self.expert_dispatcher,
+        ).view(*orig_shape)
+        hidden_states = hidden_states + self.shared_experts(residuals)
+        return hidden_states
 
 
 __all__ = [

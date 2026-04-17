@@ -91,13 +91,21 @@ class HFConfigParsingTest(unittest.TestCase):
 
     def test_mixtral_packed_tensor_expands_to_synthetic_expert_entries(self):
         cfg = MixtralConfig(num_hidden_layers=2, num_local_experts=4, num_experts_per_tok=2, hidden_size=16, intermediate_size=8)
-        tensor = torch.arange(4 * 10 * 16, dtype=torch.float32).reshape(4, 10, 16)
-        entries = expand_tensor_for_offload("layers.1.mlp.experts.gate_up_proj", tensor, cfg)
-        self.assertEqual(len(entries), 4)
-        self.assertEqual(entries[0].name, "layers.1.mlp.experts.0.gate_up_proj")
-        self.assertEqual(entries[3].name, "layers.1.mlp.experts.3.gate_up_proj")
-        self.assertTrue(torch.equal(entries[2].tensor, tensor[2]))
-        self.assertEqual(parse_expert_id(entries[1].name, cfg), (1, 1))
+        gate_up = torch.arange(4 * 10 * 16, dtype=torch.float32).reshape(4, 10, 16)
+        entries = expand_tensor_for_offload("layers.1.mlp.experts.gate_up_proj", gate_up, cfg)
+        self.assertEqual(len(entries), 8)
+        self.assertEqual(entries[0].name, "layers.1.mlp.experts.0.w1.weight")
+        self.assertEqual(entries[1].name, "layers.1.mlp.experts.0.w3.weight")
+        self.assertEqual(entries[6].name, "layers.1.mlp.experts.3.w1.weight")
+        self.assertEqual(entries[7].name, "layers.1.mlp.experts.3.w3.weight")
+        self.assertTrue(torch.equal(entries[2].tensor, gate_up[1].chunk(2, dim=0)[0]))
+        self.assertEqual(parse_expert_id(entries[2].name, cfg), (1, 1))
+
+        down = torch.arange(4 * 16 * 5, dtype=torch.float32).reshape(4, 16, 5)
+        down_entries = expand_tensor_for_offload("layers.1.mlp.experts.down_proj", down, cfg)
+        self.assertEqual(len(down_entries), 4)
+        self.assertEqual(down_entries[0].name, "layers.1.mlp.experts.0.w2.weight")
+        self.assertTrue(torch.equal(down_entries[3].tensor, down[3]))
 
     def test_deepseek_shared_tensor_is_kept_as_single_entry(self):
         cfg = DeepseekV2Config(

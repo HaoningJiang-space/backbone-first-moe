@@ -22,6 +22,9 @@ from finemoe.models import (
     Qwen2MoeMLP,
     SyncOlmoeSparseMoeBlock,
     OlmoeMLP,
+    SyncMixtralSparseMoeBlock,
+    SyncDeepseekV2Moe,
+    SyncDeepseekV3MoE,
 )
 from finemoe.utils import ArcherConfig
 from finemoe.utils.arguments import copy_args_to_device, copy_kwargs_to_device
@@ -46,6 +49,9 @@ from transformers import (
 from transformers.modeling_utils import PreTrainedModel, PretrainedConfig
 import transformers
 from typing import Callable
+from transformers.models.mixtral.modeling_mixtral import MixtralExperts
+from transformers.models.deepseek_v2.modeling_deepseek_v2 import DeepseekV2Experts
+from transformers.models.deepseek_v3.modeling_deepseek_v3 import DeepseekV3NaiveMoe
 
 from safetensors import safe_open
 
@@ -355,6 +361,55 @@ class OffloadEngine(object):
             prefetch_distance=self.prefetch_distance,
         )
 
+    def _is_packed_layout(self):
+        return parse_expert_layout(self.config) == "packed"
+
+    @staticmethod
+    def _packed_role_order(param_name):
+        if ".w1.weight" in param_name:
+            return 0
+        if ".w2.weight" in param_name:
+            return 1
+        if ".w3.weight" in param_name:
+            return 2
+        return 99
+
+    def _build_packed_expert_groups(self):
+        expert_groups = {}
+        for name, tensor_id in self.name_id_map.items():
+            try:
+                layer_id, expert_id = parse_expert_id(name, self.config)
+            except RuntimeError:
+                continue
+            if expert_id is None:
+                continue
+            expert_groups.setdefault((layer_id, expert_id), []).append((name, tensor_id))
+
+        self.expert_tensor_groups = {}
+        self.expert_tensor_map = {}
+        for key, entries in expert_groups.items():
+            ordered = [
+                tensor_id
+                for _, tensor_id in sorted(entries, key=lambda item: self._packed_role_order(item[0]))
+            ]
+            self.expert_tensor_groups[key] = ordered
+            if ordered:
+                self.expert_tensor_map[key] = ordered[0]
+
+    def _get_packed_expert_topology(self):
+        expert_layers = {}
+        for (layer_id, expert_id), tensor_ids in self.expert_tensor_groups.items():
+            expert_layers.setdefault(layer_id, {})[expert_id] = tensor_ids
+
+        topology = []
+        for layer_id in sorted(expert_layers):
+            expert_entries = expert_layers[layer_id]
+            stage = []
+            for expert_id in sorted(expert_entries):
+                stage.append(expert_entries[expert_id])
+            topology.append((f"layers.{layer_id}.mlp.experts", stage))
+        return topology
+
     def _load_resident_expert_ids(self):
         resident_file = getattr(self.archer_config, "resident_expert_ids_file", "")
         if not resident_file:
@@ -409,6 +464,23 @@ class OffloadEngine(object):
         # Collect tensor_ids (C++ node ids) for all resident experts
         # 收集所有 resident expert 的 tensor_id（C++ 节点 id）
         node_ids = []
+        if self._is_packed_layout():
+            for layer_id, expert_id in resident_expert_ids:
+                tensor_ids = self.expert_tensor_groups.get((layer_id, expert_id))
+                if tensor_ids is None:
+                    raise KeyError(
+                        f"Could not find packed tensor ids for resident expert ({layer_id}, {expert_id})"
+                    )
+                node_ids.extend(tensor_ids)
+            self.archer_engine.pin_resident_nodes(node_ids)
+            self.resident_expert_ids = resident_expert_ids
+            print(
+                f"Pinned {len(resident_expert_ids)} resident experts "
+                f"({len(node_ids)} tensors) on {self.device}",
+                flush=True,
+            )
+            return
+
         for layer_id, expert_id in resident_expert_ids:
             if not (0 <= layer_id < len(self.moe_layers)):
                 raise IndexError(
@@ -665,6 +737,24 @@ class OffloadEngine(object):
         finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
             SyncOlmoeSparseMoeBlock
         )
+        transformers.models.mixtral.modeling_mixtral._old_sparse_mlp = (
+            transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock
+        )
+        transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
+            SyncMixtralSparseMoeBlock
+        )
+        transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp = (
+            transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe
+        )
+        transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
+            SyncDeepseekV2Moe
+        )
+        transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp = (
+            transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE
+        )
+        transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
+            SyncDeepseekV3MoE
+        )
 
         def from_pretrained_decorator(orig_from_pretrained: Callable) -> Callable:
 
@@ -800,11 +890,16 @@ class OffloadEngine(object):
                     model.model.encoder.embed_tokens.weight.ar_id = 0
                     model.model.decoder.embed_tokens.weight.ar_id = 0
 
-                self.expert_tensor_map = dict()
-                for name, id in self.name_id_map.items():
-                    layer_id, expert_id = parse_expert_id(name, self.config)
-                    if expert_id is not None:
-                        self.expert_tensor_map[(layer_id, expert_id)] = id
+                if self._is_packed_layout():
+                    self._build_packed_expert_groups()
+                else:
+                    self.expert_tensor_map = dict()
+                    self.expert_tensor_groups = {}
+                    for name, id in self.name_id_map.items():
+                        layer_id, expert_id = parse_expert_id(name, self.config)
+                        if expert_id is not None:
+                            self.expert_tensor_map[(layer_id, expert_id)] = id
+                            self.expert_tensor_groups[(layer_id, expert_id)] = [id]
 
                 self.expert_prefetcher.expert_tensor_map = self.expert_tensor_map
 
@@ -826,13 +921,20 @@ class OffloadEngine(object):
                 self.expert_layer_modules = []
                 for module in model.modules():
                     if isinstance(
-                        module, (SyncQwen2MoeSparseMoeBlock, SyncOlmoeSparseMoeBlock)
+                        module,
+                        (
+                            SyncQwen2MoeSparseMoeBlock,
+                            SyncOlmoeSparseMoeBlock,
+                            SyncMixtralSparseMoeBlock,
+                            SyncDeepseekV2Moe,
+                            SyncDeepseekV3MoE,
+                        ),
                     ):
                         # module.archer_prefetch = self.archer_prefetch
                         # module.archer_tracer = self.archer_tracer
                         module.archer_engine = self.archer_engine
                         module.archer_config = self.archer_config
-                        # module.expert_dispatcher = self.expert_dispatcher
+                        module.expert_dispatcher = self.expert_dispatcher
                         self.expert_modules.append(module)
                         # module.expert_executor = self.expert_executor
                         module.expert_prefetcher = self.expert_prefetcher
@@ -907,6 +1009,22 @@ class OffloadEngine(object):
 
             if hasattr(module, "reset_parameters"):
                 module.reset_parameters = module._old_reset_parameters
+
+        finemoe.models.modeling_qwen.modeling_qwen2_moe.Qwen2MoeSparseMoeBlock = (
+            finemoe.models.modeling_qwen.modeling_qwen2_moe._old_sparse_mlp
+        )
+        finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
+            finemoe.models.modeling_olmoe.modeling_olmoe._old_sparse_mlp
+        )
+        transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
+            transformers.models.mixtral.modeling_mixtral._old_sparse_mlp
+        )
+        transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
+            transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp
+        )
+        transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
+            transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp
+        )
 
     def get_topology(self, model):
         name_lst = []
@@ -1015,6 +1133,8 @@ class OffloadEngine(object):
                 ret_dict[i] = list(ret_dict[i].values())
 
         topology = list(ret_dict.items())
+        if self._is_packed_layout():
+            topology.extend(self._get_packed_expert_topology())
         return topology
 
     def setup_archer_hooks(self, model):
@@ -1090,23 +1210,23 @@ class OffloadEngine(object):
 
             if "expert" in key:
                 for expert_idx, expert_tensors in enumerate(tensors):
-                    if self.config.model_type in ("qwen2_moe", "olmoe"):
-                        expert_key = f"{key}.{expert_idx}"
-                    else:
-                        expert_key = f"{key}.expert_{expert_idx}"
-                    input_device_index = self.archer_engine.get_node_default_device(
-                        expert_tensors
-                    )
-                    gen_args_hook(
-                        expert_key,
-                        input_device_index,
-                        output_device_index,
-                        expert_tensors,
-                    )
-
                     self.expert_dispatcher.register_expert(
                         expert_layer_id, expert_idx, expert_tensors
                     )
+                    if not self._is_packed_layout():
+                        if self.config.model_type in ("qwen2_moe", "olmoe"):
+                            expert_key = f"{key}.{expert_idx}"
+                        else:
+                            expert_key = f"{key}.expert_{expert_idx}"
+                        input_device_index = self.archer_engine.get_node_default_device(
+                            expert_tensors
+                        )
+                        gen_args_hook(
+                            expert_key,
+                            input_device_index,
+                            output_device_index,
+                            expert_tensors,
+                        )
                 expert_layer_id += 1
             else:
                 input_device_index = self.archer_engine.get_node_default_device(
@@ -1165,6 +1285,11 @@ class OffloadEngine(object):
     def _register_hooks_recursively(self, module, count=[0]):
         my_count = count[0]
         module.id = my_count
+
+        if self._is_packed_layout() and isinstance(
+            module, (MixtralExperts, DeepseekV2Experts, DeepseekV3NaiveMoe)
+        ):
+            return
 
         for child in module.children():
             count[0] = count[0] + 1
@@ -1254,6 +1379,4 @@ class OffloadEngine(object):
 
     # clean runtime hooks
     def clean_up(self):
-        finemoe.models.modeling_mixtral.SyncQwen2MoeSparseMoeBlock = (
-            finemoe.models.modeling_mixtral._old_sparse_mlp
-        )
+        self.__exit__(None, None, None)

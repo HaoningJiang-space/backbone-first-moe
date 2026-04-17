@@ -120,7 +120,7 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
         else:
             return None, None
     elif parse_expert_layout(config) == "packed":
-        routed = re.findall(r"layers\.(\d+)\.mlp\.experts\.(\d+)\.(gate_up_proj|down_proj)$", param_name)
+        routed = re.findall(r"layers\.(\d+)\.mlp\.experts\.(\d+)\.(w[123])\.weight$", param_name)
         if routed:
             layer_id, expert_id, _ = routed[0]
             return int(layer_id), int(expert_id)

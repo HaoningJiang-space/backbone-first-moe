@@ -74,11 +74,10 @@ class MoE:
         self.expert_layout = parse_expert_layout(model_config)
         model_cls = MODEL_MAPPING_NAMES[arch]
 
-        if self.expert_layout != "modulelist":
+        if self.expert_layout == "packed" and self.prefetch_distance > 0:
             raise NotImplementedError(
-                f"Runtime offload for packed-expert architecture {arch} is not implemented yet. "
-                "Current runtime support is limited to modulelist layouts (Qwen/OLMoE). "
-                "Use trace/simulation flows for Mixtral/DeepSeek until the slice-based runtime path lands."
+                f"Packed-expert runtime for {arch} currently supports demand/backbone execution only "
+                "(prefetch_distance=0). Prefetch/tracing paths are not implemented yet."
             )
         if os.path.exists(model_name_or_path):
             checkpoint_paths = get_checkpoint_paths(model_name_or_path)

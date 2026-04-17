@@ -54,28 +54,58 @@ def expand_tensor_for_offload(
             raise RuntimeError(
                 f"Packed routed tensor {param_name!r} expected first dim {num_experts}, got {tuple(tensor.shape)}"
             )
-        return [
-            SyntheticTensorEntry(
-                name=f"layers.{layer_id}.mlp.experts.{expert_idx}.{tensor_role}",
-                tensor=tensor[expert_idx],
-                layer_id=layer_id,
-                expert_idx=expert_idx,
-                expert_group=expert_group,
-                tensor_role=tensor_role,
-                source_name=param_name,
-            )
-            for expert_idx in range(num_experts)
-        ]
-
-    synthetic_name = param_name
-    if expert_group == "router":
-        synthetic_name = f"layers.{layer_id}.mlp.router.{tensor_role}.weight"
-    elif expert_group == "shared_experts":
-        synthetic_name = f"layers.{layer_id}.mlp.shared_experts.{tensor_role}.weight"
+        entries: List[SyntheticTensorEntry] = []
+        for expert_idx in range(num_experts):
+            expert_tensor = tensor[expert_idx]
+            if tensor_role == "gate_up_proj":
+                if expert_tensor.shape[0] % 2 != 0:
+                    raise RuntimeError(
+                        f"Packed gate_up tensor {param_name!r} must split evenly into w1/w3, got shape {tuple(expert_tensor.shape)}"
+                    )
+                w1, w3 = expert_tensor.chunk(2, dim=0)
+                entries.extend(
+                    [
+                        SyntheticTensorEntry(
+                            name=f"layers.{layer_id}.mlp.experts.{expert_idx}.w1.weight",
+                            tensor=w1,
+                            layer_id=layer_id,
+                            expert_idx=expert_idx,
+                            expert_group=expert_group,
+                            tensor_role="w1",
+                            source_name=param_name,
+                        ),
+                        SyntheticTensorEntry(
+                            name=f"layers.{layer_id}.mlp.experts.{expert_idx}.w3.weight",
+                            tensor=w3,
+                            layer_id=layer_id,
+                            expert_idx=expert_idx,
+                            expert_group=expert_group,
+                            tensor_role="w3",
+                            source_name=param_name,
+                        ),
+                    ]
+                )
+            elif tensor_role == "down_proj":
+                entries.append(
+                    SyntheticTensorEntry(
+                        name=f"layers.{layer_id}.mlp.experts.{expert_idx}.w2.weight",
+                        tensor=expert_tensor,
+                        layer_id=layer_id,
+                        expert_idx=expert_idx,
+                        expert_group=expert_group,
+                        tensor_role="w2",
+                        source_name=param_name,
+                    )
+                )
+            else:
+                raise RuntimeError(
+                    f"Unsupported routed packed tensor role {tensor_role!r} for {param_name!r}"
+                )
+        return entries
 
     return [
         SyntheticTensorEntry(
-            name=synthetic_name,
+            name=param_name,
             tensor=tensor,
             layer_id=layer_id,
             expert_idx=None,
