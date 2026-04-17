@@ -16,8 +16,10 @@
 #include "utils/archer_logger.h"
 
 ArcherPrefetchHandle::ArcherPrefetchHandle(const std::string& prefix,
-                                           const double device_memory_ratio)
-    : prefix_(prefix), last_layer_id_(0), has_cleaned_up_resources_(false)
+                                           const double device_memory_ratio,
+                                           const torch::Device& default_device)
+    : prefix_(prefix), last_layer_id_(0), has_cleaned_up_resources_(false),
+      default_device_(default_device)
 {
     InitLogger();
     kTensorIndex = std::make_unique<ArcherTensorIndex>();
@@ -373,9 +375,11 @@ void ArcherPrefetchHandle::TraceRequest(const std::uint64_t request_id, const Te
 }
 
 void ArcherPrefetchHandle::SetTopology(
-    const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>& topology)
+    const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>& topology,
+    const torch::Device& default_device)
 {
     kTopologyHandle->InitializeTopology(topology);
+    kTopologyHandle->SetDefaultDeviceForSparseNodes(default_device);
 }
 
 bool ArcherPrefetchHandle::IsTensorOffloaded(const std::uint32_t tensor_id)

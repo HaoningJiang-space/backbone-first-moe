@@ -10,7 +10,9 @@
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     py::class_<ArcherPrefetchHandle>(m, "prefetch_handle")
-        .def(py::init<const std::string&, const double>())
+        .def(py::init<const std::string&, const double, const torch::Device&>(),
+             py::arg("prefix"), py::arg("device_memory_ratio"),
+             py::arg("default_device") = torch::Device(torch::kCUDA, 0))
 
         .def("offload", &ArcherPrefetchHandle::OffloadTensor)
         .def("register",
@@ -54,7 +56,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         //             ArcherPrefetchHandle::TraceRequest)
         .def("set_topology",
              (void(ArcherPrefetchHandle::*)(
-                 const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>&)) &
+                 const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>&,
+                 const torch::Device&)) &
                  ArcherPrefetchHandle::SetTopology)
         .def("update_tensor_map",
              (void(ArcherPrefetchHandle::*)(std::uint64_t, std::uint64_t)) &

@@ -157,6 +157,7 @@ public:
 
     void InitializeTopology(
         const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>& topology);
+    void SetDefaultDeviceForSparseNodes(const torch::Device& device);
 
     void EnableTrace() noexcept { trace_enabled_ = true; }
     void DisableTrace() noexcept { trace_enabled_ = false; }

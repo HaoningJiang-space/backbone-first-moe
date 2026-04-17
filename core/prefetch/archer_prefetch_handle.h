@@ -11,7 +11,8 @@
 
 class ArcherPrefetchHandle {
 public:
-    ArcherPrefetchHandle(const std::string& prefix, const double device_memory_ratio);
+    ArcherPrefetchHandle(const std::string& prefix, const double device_memory_ratio,
+                         const torch::Device& default_device = torch::Device(torch::kCUDA, 0));
     ~ArcherPrefetchHandle();
 
     bool IsTensorOffloaded(const std::uint32_t tensor_id);
@@ -43,7 +44,8 @@ public:
     void SetTrace(const torch::Tensor& trace);
     void TraceRequest(const std::uint64_t request_id, const TensorID tensor_id);
     void SetTopology(
-        const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>& topology);
+        const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>& topology,
+        const torch::Device& default_device);
     void UpdateTensorMap(std::uint64_t old_ptr, std::uint64_t new_ptr);
     bool IsTensorIndexInitialized() const;
     bool IsTensorOnDevice(const torch::Tensor& tensor) const;
@@ -64,6 +66,7 @@ private:
     uint64_t last_layer_id_;
     NodePtr last_node_;
     bool has_cleaned_up_resources_;
+    torch::Device default_device_;
 
     std::unordered_map<std::uint64_t, std::unordered_set<NodePtr>> request_id_to_nodes_;
 

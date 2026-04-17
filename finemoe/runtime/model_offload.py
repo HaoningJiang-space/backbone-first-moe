@@ -500,6 +500,7 @@ class OffloadEngine(object):
         self.archer_engine = self.prefetch_lib.prefetch_handle(
             self.checkpoint,
             _archer_config.device_memory_ratio,
+            self.device,
         )
 
         self.archer_config = _archer_config
@@ -1019,7 +1020,7 @@ class OffloadEngine(object):
             self.offload_set.add(buffer.data.data_ptr())
 
         topo = self.get_topology(model)
-        self.archer_engine.set_topology(topo)
+        self.archer_engine.set_topology(topo, self.device)
 
         @torch.no_grad()
         def _pre_forward_input_hook(module, input, kwargs, device, tensors):
