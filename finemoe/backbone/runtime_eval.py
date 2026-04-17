@@ -1,7 +1,7 @@
 import json
 import random
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import torch
@@ -44,6 +44,66 @@ def load_prompts(prompt_file):
         else:
             prompts.append(str(item))
     return prompts
+
+
+def load_resident_metadata(resident_expert_ids_file):
+    if not resident_expert_ids_file:
+        return {}
+    path = Path(resident_expert_ids_file)
+    if not path.exists():
+        return {}
+    with path.open("r") as f:
+        payload = json.load(f)
+    return payload if isinstance(payload, dict) else {}
+
+
+def infer_moe_top_k(model_path):
+    config = transformers.AutoConfig.from_pretrained(
+        model_path,
+        trust_remote_code=True,
+    )
+    for attr in ("num_experts_per_tok", "num_experts_per_token", "top_k"):
+        value = getattr(config, attr, None)
+        if value is not None:
+            return int(value)
+    raise ValueError(
+        f"Could not infer MoE top-k from config for model: {model_path}"
+    )
+
+
+def derive_resident_slack_experts(
+    runtime_cfg,
+    prompts,
+    tokenizer,
+    *,
+    resident_metadata=None,
+    top_k=None,
+):
+    requested = int(runtime_cfg.resident_slack_experts)
+    if requested >= 0 or not runtime_cfg.resident_expert_ids_file:
+        return requested
+
+    resident_metadata = resident_metadata or load_resident_metadata(
+        runtime_cfg.resident_expert_ids_file
+    )
+    speculative_capacity = int(resident_metadata.get("speculative_capacity", 0))
+
+    # Demand-only / backbone-only prefill can temporarily widen the tail
+    # working set. Reserve enough elastic slots to cover the longest profiled
+    # prompt's exact-demand frontier, rather than relying only on the simulator
+    # tail cache size.
+    tokenized = tokenizer(
+        prompts,
+        truncation=True,
+        padding=False,
+        max_length=runtime_cfg.max_length,
+        return_tensors=None,
+    )
+    prompt_lengths = [len(ids) for ids in tokenized["input_ids"]]
+    inferred_top_k = int(top_k) if top_k is not None else infer_moe_top_k(runtime_cfg.model_path)
+    prefill_frontier = inferred_top_k * max(prompt_lengths, default=1)
+
+    return max(1, speculative_capacity, prefill_frontier)
 
 
 def batched(items, batch_size):
@@ -96,8 +156,20 @@ def evaluate_runtime(runtime_cfg):
     random.Random(runtime_cfg.seed).shuffle(prompts)
     prompts = prompts[: runtime_cfg.num_prompts]
 
-    model = build_model(runtime_cfg)
     tokenizer = build_tokenizer(runtime_cfg)
+    resident_metadata = load_resident_metadata(runtime_cfg.resident_expert_ids_file)
+    effective_resident_slack = derive_resident_slack_experts(
+        runtime_cfg,
+        prompts,
+        tokenizer,
+        resident_metadata=resident_metadata,
+    )
+    effective_cfg = replace(
+        runtime_cfg,
+        resident_slack_experts=effective_resident_slack,
+    )
+
+    model = build_model(effective_cfg)
     generate_config = {"pad_token_id": tokenizer.pad_token_id}
 
     per_batch = []
@@ -176,6 +248,8 @@ def evaluate_runtime(runtime_cfg):
         "resident_count": len(getattr(model.engine, "resident_expert_ids", [])),
         "resident_requested_count": int(getattr(model.engine, "resident_requested_count", 0)),
         "resident_clipped": bool(getattr(model.engine, "resident_clipped", False)),
+        "resident_slack_experts_requested": int(runtime_cfg.resident_slack_experts),
+        "resident_slack_experts_effective": int(effective_resident_slack),
         "per_batch": per_batch,
     }
 
