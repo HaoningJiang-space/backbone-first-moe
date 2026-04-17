@@ -132,6 +132,10 @@ class MoE:
             finemoe.models.modeling_qwen.modeling_qwen2_moe.apply_rotary_pos_emb = (
                 apply_rotary_pos_emb
             )
+        elif self.arch == "olmoe":
+            finemoe.models.modeling_olmoe.modeling_olmoe.apply_rotary_pos_emb = (
+                apply_rotary_pos_emb
+            )
         else:
             raise ValueError(f"{self.arch} not supported")
 

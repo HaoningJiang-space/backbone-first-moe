@@ -2,13 +2,16 @@ from transformers import (
     PretrainedConfig,
 )
 from ..models.modeling_qwen.modeling_qwen2_moe import Qwen2MoeForCausalLM
+from ..models.modeling_olmoe import OlmoeForCausalLM
 
 MODEL_MAPPING_NAMES = {
     "qwen": Qwen2MoeForCausalLM,
+    "olmoe": OlmoeForCausalLM,
 }
 
 MODEL_MAPPING_TYPES = {
     "qwen": 4,
+    "olmoe": 4,
 }
 
 
