@@ -9,7 +9,13 @@ from accelerate import init_empty_weights
 from accelerate.utils.versions import is_torch_version
 from finemoe.common.constants import MODEL_MAPPING_NAMES
 from finemoe.runtime import OffloadEngine
-from finemoe.utils import get_checkpoint_paths, ArcherConfig, parse_moe_architecture, parse_expert_layout
+from finemoe.utils import (
+    get_checkpoint_paths,
+    ArcherConfig,
+    parse_moe_architecture,
+    parse_expert_layout,
+    normalize_runtime_config,
+)
 from finemoe.models import apply_rotary_pos_emb
 import finemoe
 
@@ -55,6 +61,7 @@ class MoE:
             model_name_or_path,
             trust_remote_code=True,
         )
+        model_config = normalize_runtime_config(model_config)
 
         self.prefetch_distance = config.pop('prefetch_distance')
         self.store_capacity = config.pop('store_capacity')

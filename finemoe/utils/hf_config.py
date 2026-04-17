@@ -49,6 +49,23 @@ def parse_moe_architecture(config: PretrainedConfig) -> str:
     raise RuntimeError(f"Unsupported architecture {_config_arch_string(config)}")
 
 
+def normalize_runtime_config(config: PretrainedConfig) -> PretrainedConfig:
+    arch = parse_moe_architecture(config)
+
+    if arch in {"deepseek_v2", "deepseek_v3"}:
+        if getattr(config, "head_dim", None) is None:
+            head_dim = getattr(config, "qk_rope_head_dim", None)
+            if head_dim is None:
+                head_dim = getattr(config, "hidden_size", 0) // max(
+                    1, getattr(config, "num_attention_heads", 1)
+                )
+            setattr(config, "head_dim", head_dim)
+        if getattr(config, "num_key_value_heads", None) is None:
+            setattr(config, "num_key_value_heads", getattr(config, "num_attention_heads", None))
+
+    return config
+
+
 def parse_expert_layout(config: PretrainedConfig) -> str:
     arch = parse_moe_architecture(config)
     if arch in {"qwen", "olmoe"}:

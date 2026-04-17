@@ -9,6 +9,7 @@ from finemoe.common.constants import MODEL_MAPPING_NAMES, parse_expert_type
 from finemoe.utils import (
     expand_tensor_for_offload,
     parse_expert_id,
+    normalize_runtime_config,
     parse_expert_layout,
     parse_moe_architecture,
     parse_moe_param,
@@ -166,6 +167,27 @@ class HFConfigParsingTest(unittest.TestCase):
         self.assertEqual(len(down_entries), 4)
         self.assertEqual(down_entries[0].name, "layers.0.mlp.experts.0.down_proj.weight")
         self.assertTrue(torch.equal(down_entries[3].tensor, down[3]))
+
+    def test_normalize_runtime_config_sets_deepseek_head_dim_alias(self):
+        cfg = DeepseekV2Config(
+            num_hidden_layers=2,
+            hidden_size=64,
+            num_attention_heads=8,
+            num_key_value_heads=8,
+            n_routed_experts=4,
+            num_experts_per_tok=2,
+            n_shared_experts=2,
+            q_lora_rank=1536,
+            kv_lora_rank=16,
+            qk_rope_head_dim=8,
+            v_head_dim=8,
+            qk_nope_head_dim=0,
+        )
+        delattr(cfg, "head_dim")
+        cfg.num_key_value_heads = None
+        normalized = normalize_runtime_config(cfg)
+        self.assertEqual(normalized.head_dim, 8)
+        self.assertEqual(normalized.num_key_value_heads, 8)
 
 
 if __name__ == "__main__":
