@@ -49,9 +49,6 @@ from transformers import (
 from transformers.modeling_utils import PreTrainedModel, PretrainedConfig
 import transformers
 from typing import Callable
-from transformers.models.mixtral.modeling_mixtral import MixtralExperts
-from transformers.models.deepseek_v2.modeling_deepseek_v2 import DeepseekV2Experts
-from transformers.models.deepseek_v3.modeling_deepseek_v3 import DeepseekV3NaiveMoe
 
 from safetensors import safe_open
 
@@ -363,6 +360,14 @@ class OffloadEngine(object):
 
     def _is_packed_layout(self):
         return parse_expert_layout(self.config) == "packed"
+
+    @staticmethod
+    def _is_packed_expert_container(module):
+        return module.__class__.__name__ in {
+            "MixtralExperts",
+            "DeepseekV2Experts",
+            "DeepseekV3NaiveMoe",
+        }
 
     @staticmethod
     def _packed_role_order(param_name):
@@ -737,24 +742,27 @@ class OffloadEngine(object):
         finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
             SyncOlmoeSparseMoeBlock
         )
-        transformers.models.mixtral.modeling_mixtral._old_sparse_mlp = (
-            transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock
-        )
-        transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
-            SyncMixtralSparseMoeBlock
-        )
-        transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp = (
-            transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe
-        )
-        transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
-            SyncDeepseekV2Moe
-        )
-        transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp = (
-            transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE
-        )
-        transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
-            SyncDeepseekV3MoE
-        )
+        if SyncMixtralSparseMoeBlock is not None:
+            transformers.models.mixtral.modeling_mixtral._old_sparse_mlp = (
+                transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock
+            )
+            transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
+                SyncMixtralSparseMoeBlock
+            )
+        if SyncDeepseekV2Moe is not None:
+            transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp = (
+                transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe
+            )
+            transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
+                SyncDeepseekV2Moe
+            )
+        if SyncDeepseekV3MoE is not None:
+            transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp = (
+                transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE
+            )
+            transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
+                SyncDeepseekV3MoE
+            )
 
         def from_pretrained_decorator(orig_from_pretrained: Callable) -> Callable:
 
@@ -920,16 +928,18 @@ class OffloadEngine(object):
                 module_idx = 0
                 self.expert_layer_modules = []
                 for module in model.modules():
-                    if isinstance(
-                        module,
-                        (
+                    sync_sparse_types = tuple(
+                        t
+                        for t in (
                             SyncQwen2MoeSparseMoeBlock,
                             SyncOlmoeSparseMoeBlock,
                             SyncMixtralSparseMoeBlock,
                             SyncDeepseekV2Moe,
                             SyncDeepseekV3MoE,
-                        ),
-                    ):
+                        )
+                        if t is not None
+                    )
+                    if isinstance(module, sync_sparse_types):
                         # module.archer_prefetch = self.archer_prefetch
                         # module.archer_tracer = self.archer_tracer
                         module.archer_engine = self.archer_engine
@@ -1016,15 +1026,18 @@ class OffloadEngine(object):
         finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
             finemoe.models.modeling_olmoe.modeling_olmoe._old_sparse_mlp
         )
-        transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
-            transformers.models.mixtral.modeling_mixtral._old_sparse_mlp
-        )
-        transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
-            transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp
-        )
-        transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
-            transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp
-        )
+        if hasattr(transformers.models.mixtral.modeling_mixtral, "_old_sparse_mlp"):
+            transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock = (
+                transformers.models.mixtral.modeling_mixtral._old_sparse_mlp
+            )
+        if hasattr(transformers.models.deepseek_v2.modeling_deepseek_v2, "_old_sparse_mlp"):
+            transformers.models.deepseek_v2.modeling_deepseek_v2.DeepseekV2Moe = (
+                transformers.models.deepseek_v2.modeling_deepseek_v2._old_sparse_mlp
+            )
+        if hasattr(transformers.models.deepseek_v3.modeling_deepseek_v3, "_old_sparse_mlp"):
+            transformers.models.deepseek_v3.modeling_deepseek_v3.DeepseekV3MoE = (
+                transformers.models.deepseek_v3.modeling_deepseek_v3._old_sparse_mlp
+            )
 
     def get_topology(self, model):
         name_lst = []
@@ -1286,9 +1299,7 @@ class OffloadEngine(object):
         my_count = count[0]
         module.id = my_count
 
-        if self._is_packed_layout() and isinstance(
-            module, (MixtralExperts, DeepseekV2Experts, DeepseekV3NaiveMoe)
-        ):
+        if self._is_packed_layout() and self._is_packed_expert_container(module):
             return
 
         for child in module.children():

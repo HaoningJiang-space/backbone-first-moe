@@ -1,7 +1,6 @@
 import torch
 
 from transformers.models.mixtral.modeling_mixtral import (
-    MixtralExperts,
     MixtralForCausalLM,
     MixtralModel,
     MixtralPreTrainedModel,
@@ -37,7 +36,6 @@ class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):
 
 
 __all__ = [
-    "MixtralExperts",
     "MixtralForCausalLM",
     "MixtralModel",
     "MixtralPreTrainedModel",
