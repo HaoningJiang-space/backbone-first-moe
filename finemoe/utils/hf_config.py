@@ -53,6 +53,14 @@ def normalize_runtime_config(config: PretrainedConfig) -> PretrainedConfig:
     arch = parse_moe_architecture(config)
 
     if arch in {"deepseek_v2", "deepseek_v3"}:
+        default_values = {
+            "attention_bias": False,
+            "mlp_bias": False,
+            "first_k_dense_replace": 0,
+        }
+        for key, value in default_values.items():
+            if not hasattr(config, key):
+                setattr(config, key, value)
         if getattr(config, "head_dim", None) is None:
             head_dim = getattr(config, "qk_rope_head_dim", None)
             if head_dim is None:

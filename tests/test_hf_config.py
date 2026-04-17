@@ -185,9 +185,13 @@ class HFConfigParsingTest(unittest.TestCase):
         )
         delattr(cfg, "head_dim")
         cfg.num_key_value_heads = None
+        delattr(cfg, "mlp_bias")
+        delattr(cfg, "attention_bias")
         normalized = normalize_runtime_config(cfg)
         self.assertEqual(normalized.head_dim, 8)
         self.assertEqual(normalized.num_key_value_heads, 8)
+        self.assertFalse(normalized.mlp_bias)
+        self.assertFalse(normalized.attention_bias)
 
 
 if __name__ == "__main__":
