@@ -1,5 +1,12 @@
 # Backbone-First MoE Serving: Complete Results
 
+> Archive note:
+> this file contains older sweep-era results and ablations.
+> The current stable claim in `README.md` and `docs/ROADMAP.md` is
+> `resident backbone + demand-only tail fallback` with a burst-aware
+> frontier-feasible resident prefix selector.
+> Use this file for historical comparison, not for the current paper claim.
+
 ## Model & Hardware
 - Model: Qwen1.5-MoE-A2.7B-Chat (24 layers, 60 experts, top-4 routing)
 - GPU: NVIDIA A800 80GB PCIe

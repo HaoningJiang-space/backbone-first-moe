@@ -273,65 +273,82 @@ Not major simulator engineering.
 
 ## 4. Final Paper Claim
 
-## 3.4 Real-hardware evidence (batch=8, native C++ pinning)
+## 3.4 Real-hardware evidence (current truth)
 
-### Main comparison table
+### Main validated runtime path
 
-All results on Qwen1.5-MoE-A2.7B-Chat, A800 80GB, batch=8, 16 prompts, 64 new tokens.
-`C_optimal` uses throughput-sweep backbone extraction (no manual ratio tuning).
-
-| Config | mem=0.05 | mem=0.07 | mem=0.10 | description |
-|---|---:|---:|---:|---|
-| A demand-only | 2.356 | 2.356 | 2.499 | LRU cache, no prefetch, no backbone |
-| B LRU+prefetch | -- | 1.691 | 1.702 | LRU cache + speculative prefetch |
-| C_knee backbone-only | -- | 2.426 | 2.568 | knee-selected backbone, no prefetch |
-| C_ratio09 backbone-only | -- | 2.578 | 3.040 | fixed ratio=0.9 backbone, no prefetch |
-| **C_optimal backbone-only** | **2.443** | **2.643** | **3.585** | **throughput-sweep backbone, no prefetch** |
-| D_ratio09 backbone+prefetch | -- | 1.771 | 1.878 | backbone + speculative prefetch |
-
-Unit: generated tokens/sec (higher is better).
-
-### What the table proves
-
-1. **Backbone pinning works**: `C_optimal > A` at all memory budgets (+3.7% to +43.5%)
-2. **Prefetch is harmful**: `B < A` everywhere; `D < C` everywhere
-3. **Throughput sweep beats hand-tuned ratio**: `C_optimal > C_ratio09` (+2.5% at mem=0.07, +18% at mem=0.10)
-4. **Optimal split adapts to memory budget**: ratio automatically varies from 0.63 (mem=0.05) to 0.96 (mem=0.10)
-
-### Throughput-sweep backbone extraction results
-
-| mem | cache | knee k (structural lower bound) | optimal k (throughput-maximizing) | optimal ratio | simulator tok/s |
-|---|---:|---:|---:|---:|---:|
-| 0.05 | 238 | 93 (0.39) | 149 (0.63) | 0.63 | 104.2 |
-| 0.07 | 333 | 122 (0.37) | 276 (0.83) | 0.83 | 188.5 |
-| 0.10 | 476 | 152 (0.32) | 456 (0.96) | 0.96 | 324.3 |
-
-The knee defines the structural backbone core (~1/3 of cache).
-The throughput sweep finds that pinning well beyond the knee is optimal, because in the demand-only tail regime every additional pinned expert eliminates one H2D transfer.
-The optimal ratio is NOT a fixed constant; it increases with budget because the minimum demand buffer is approximately constant (~30-50 slots).
-
-### Why prefetch hurts in batch=8
-
-The per-sequence prefetch control path scales linearly with batch size:
-- 8 embed_prefetch calls per token step
-- 8 x 24 = 192 traj_prefetch calls per token step
-- each call does cosine similarity matching, priority sorting, and H2D enqueue
-- all on CPU, in Python, sequentially
-
-This creates three compounding costs:
-1. CPU scheduling overhead x batch_size
-2. H2D bandwidth contention between speculative and demand transfers
-3. Cache pollution across sequences in the same batch
-
-### Design conclusion
-
-The strongest runtime configuration is:
+The runtime path that is actually validated today is:
 
 ```text
-resident backbone + demand fallback (no speculative prefetch)
+resident backbone + demand-only tail fallback
 ```
 
-This is simpler than the earlier three-way hierarchy (resident + speculative + fallback) and is directly supported by hardware evidence.
+`prefetch_distance=0` is not a placeholder here. It is the intended critical path.
+Legacy speculative-prefetch results remain useful only as negative evidence.
+
+### Same-GPU real-hardware results
+
+Qwen1.5-MoE-A2.7B-Chat, A800 80GB, batch=8, 16 prompts, 64 new tokens, same GPU (`cuda:0`):
+
+| Config | mem=0.07 | mem=0.10 | description |
+|---|---:|---:|---|
+| A demand-only | 2.9266 | 3.0946 | demand fallback only |
+| C backbone-only | 3.2331 | 3.6162 | burst-aware frontier prefix |
+
+Backbone-only improves generation throughput by:
+- `+10.5%` at `mem=0.07`
+- `+16.9%` at `mem=0.10`
+
+OLMoE-1B-7B-0924, same GPU (`cuda:0`), 2 prompts, 8 new tokens:
+
+| Config | mem=0.07 | mem=0.10 | description |
+|---|---:|---:|---|
+| A demand-only | 0.3067 | 0.3157 | demand fallback only |
+| C backbone-only | 2.5799 | 1.7778 | resident backbone + demand fallback |
+
+These are strong positive cases. They justify the serving abstraction itself.
+
+### What the current table proves
+
+1. **Backbone pinning works on real hardware** under the current runtime path.
+2. **The main system does not require speculative prefetch** to achieve gains.
+3. **The selector should be evaluated as a feasibility rule**, not as a throughput sweep over ratios.
+
+### Applicability, not universality
+
+The paper should not claim that every MoE benefits equally from resident backbones.
+
+The right question is:
+
+```text
+when does a model expose
+1. a compact resident core, and
+2. enough budget slack to serve the residual tail?
+```
+
+This naturally leads to a two-part diagnostic:
+
+1. **backbone concentration**
+   - e.g. stall/access top-k coverage
+   - knee/core fraction
+
+2. **budget sufficiency**
+   - cache capacity
+   - residual frontier after pinning the resident prefix
+   - slack utilization = frontier / remaining slack
+
+Positive cases should enter the main runtime table.
+Weak cases should be written up as **boundary conditions**, not hidden or over-claimed.
+
+### Packed-MoE status
+
+`Mixtral`, `DeepSeek-V2`, and `DeepSeek-V3` are now runtime-enabled on the packed path,
+but only via tiny end-to-end validation so far.
+
+That means:
+- the packed runtime path is real
+- these models are no longer "unsupported"
+- but they should enter the main paper table only after applicability diagnostics justify them
 
 ---
 
@@ -817,59 +834,59 @@ This is a more fundamental formulation than tuning `resident_ratio`.
 
 ### Non-incremental formulation (now implemented)
 
-The backbone extraction method has two stages, both fully data-driven:
+The backbone extraction method should be presented as a feasibility rule, not a sweep:
 
 ```text
-Stage 1: RANK experts by profiling-prefix frequency (or stall contribution)
-Stage 2: SWEEP resident capacity k from the utility-curve knee to cache capacity,
-         evaluate simulated throughput at each point, select the k that maximizes throughput
+Stage 1: RANK experts by profiling-prefix utility
+Stage 2: BUILD the residual demand frontier F_H(k) from the routed trace
+Stage 3: CHOOSE the largest feasible resident prefix k*
+         such that k + F_H(k) <= B
 ```
 
-This is equivalent to solving:
+Where:
+- `k` is the resident prefix length
+- `F_H(k)` is the burst-aware residual demand frontier after pinning top-`k`
+- `B` is total expert-cache capacity
+
+This is the right problem definition because the real tradeoff is:
 
 ```text
-maximize    throughput(k)
-subject to  knee <= k <= cache_capacity
+pin more backbone experts
+vs.
+leave enough elastic slack for the tail burst
 ```
 
-where `throughput(k)` is evaluated by the simulator with the top-k experts pinned and the remaining `cache_capacity - k` slots used for demand cache.
+Not "which ratio should we tune".
 
-The sweep takes ~20 points and runs in seconds (simulator only, no GPU needed).
+### Role of the knee
 
-### Why this works
+The knee still matters, but only as a **structural diagnostic**:
 
-In the demand-only tail regime (no prefetch):
-- each pinned expert eliminates one potential H2D transfer
-- the only cost of pinning more is shrinking the demand cache
-- the demand cache only needs enough slots for the per-step tail working set (~30-50 experts)
+- it estimates how compact the backbone core is
+- it does **not** by itself decide the final resident size
 
-So the optimal split is where marginal pinning benefit equals marginal demand-cache cost.
-At high memory budgets, this pushes the ratio near 1.0 (pin almost everything).
-At low memory budgets, more demand buffer is needed, pulling the ratio down.
+This is the key distinction:
+- **knee/core fraction** tells us whether a compact backbone exists
+- **frontier feasibility** tells us how much of that ranking can be pinned under a real budget
 
-### Empirical results (already validated)
+### Applicability diagnosis
 
-| mem | knee k (structural core) | optimal k (throughput sweep) | optimal ratio |
-|---|---:|---:|---:|
-| 0.05 | 93 (0.39) | 149 (0.63) | 0.63 |
-| 0.07 | 122 (0.37) | 276 (0.83) | 0.83 |
-| 0.10 | 152 (0.32) | 456 (0.96) | 0.96 |
+The paper should explicitly separate:
 
-The knee defines "which experts matter" (structural boundary).
-The throughput sweep decides "how many to pin" (budget allocation).
-Both are workload-adaptive with zero manual tuning.
+1. **concentration**
+   - top-k stall/access coverage
+   - knee/core fraction
 
-### Relationship to fixed ratio=0.9
+2. **budget pressure**
+   - frontier capacity
+   - remaining slack
+   - slack utilization
 
-The old `resident_ratio=0.9` was a hand-tuned heuristic.
-The throughput sweep produces a ratio that:
-- matches 0.9 approximately at high memory (0.96 at mem=0.10)
-- automatically lowers at low memory (0.63 at mem=0.05)
-- beats the fixed 0.9 on real hardware (+18% at mem=0.10 because it pins slightly more)
+This gives a principled explanation for why some models are:
+- positive runtime examples
+- weak or boundary cases
 
-So `ratio=0.9` is now superseded. The paper should present the throughput sweep as the method.
-
-This is where BDMS or the final system name belongs.
+without resorting to post-hoc threshold tuning.
 
 ## Section 5: Evaluation
 
@@ -900,10 +917,11 @@ Discuss:
 | 2 | `mem=0.07` backbone generalization: strongly positive | PASS (retained 0.877 +/- 0.091) |
 | 3 | Oracle funnel: low novel-rate in stable regimes | PASS (novel_rate = 0.013 at mem >= 0.10) |
 | 4 | Per-expert stall concentration: non-uniform | PASS (top 20% = 45%, Gini = 0.4, predictor-independent) |
-| 5 | Real hardware: `C_optimal > A > B` in batched regime | PASS (3.585 > 2.499 > 1.702 at mem=0.10, batch=8) |
-| 6 | Throughput sweep: automatic, beats hand-tuned ratio | PASS (3.585 vs 3.040 = +18% over ratio=0.9) |
-| 7 | Runtime-native C++ pinning: no shape mismatch | PASS (is_resident flag, all mem points work) |
-| 8 | Paper reads as structural systems result, not heuristic | ON TRACK |
+| 5 | Real hardware: `C > A` on same-GPU Qwen path | PASS (`3.2331 > 2.9266` at mem=0.07; `3.6162 > 3.0946` at mem=0.10) |
+| 6 | Real hardware: `C > A` on OLMoE path | PASS (`2.5799 > 0.3067` at mem=0.07; `1.7778 > 0.3157` at mem=0.10) |
+| 7 | Runtime-native C++ pinning: no shape mismatch | PASS (`is_resident` path stable on Qwen + OLMoE) |
+| 8 | Packed-MoE runtime can execute `A/C` tiny paths | PASS (Mixtral, DeepSeek-V2, DeepSeek-V3 tiny runs on `172`) |
+| 9 | Paper reads as structural systems result, not heuristic | ON TRACK |
 
 ---
 
@@ -913,23 +931,24 @@ The project has completed its core experimental validation:
 
 - **Structural evidence** (Section 3): backbone exists, generalizes, tail is low-value
 - **System design** (Section 4): resident backbone + demand fallback, no prefetch needed
-- **Algorithm** (Section 4): two-stage throughput-sweep extraction, zero manual tuning
-- **Runtime** (Phase B): C++ native `is_resident` flag, eviction exemption
-- **Real hardware** (Section 5): `C_optimal` beats all baselines at all memory budgets
+- **Algorithm** (Section 4): frontier-feasible resident prefix, not ratio tuning
+- **Runtime** (Phase B): C++ native `is_resident` flag and resident pinning
+- **Real hardware** (Section 5): Qwen and OLMoE are validated positive cases
 
 The main remaining work is:
 
-1. **Write the paper** -- all data exists, just needs to be written up
-2. **Batch=1 C configs** -- confirm backbone-only wins at batch=1 too
-3. **Second model** (optional) -- DeepSeek-V2-Lite for generality
+1. **Write the paper** around the current truth, not the archived sweep/prefetch story
+2. **Applicability plots** -- concentration + budget-pressure diagnostics across models
+3. **Packed-model positioning** -- decide which packed models are positive cases vs. boundary cases
 4. **Section 3 formal plots** -- n=64 CV bar plots, funnel figure, Lorenz curve
 
 The project thesis is:
 
 ```text
 MoE serving decomposes into a stable resident backbone and a demand-only tail.
-The backbone is extracted automatically via throughput-sweep selection.
-Speculative prefetch is unnecessary and harmful in the current runtime.
+The backbone should be selected as the largest burst-feasible resident prefix under the routed trace.
+The main question is not whether speculative prefetch can be tuned better,
+but whether the model exposes a compact backbone under the available budget.
 ```
 
 This is a structural systems contribution, not a heuristic improvement.

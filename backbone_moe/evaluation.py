@@ -373,3 +373,91 @@ def select_feasible_resident_prefix(
 
 def best_by_throughput(rows):
     return max(rows, key=lambda row: row["throughput_tokens_per_sec"])
+
+
+def cache_capacity_for_mem_ratio(mem_ratio, expert_size_mb, total_gpu_memory_mb=80 * 1024):
+    available_memory_mb = float(total_gpu_memory_mb) * float(mem_ratio)
+    if expert_size_mb <= 0:
+        return 0
+    return max(0, int(available_memory_mb / float(expert_size_mb)))
+
+
+def rank_resident_candidates(
+    analyzer,
+    cache_capacity,
+    resident_policy,
+    resident_profile_ratio,
+    resident_depth_power=1.0,
+    reset_mode="shared",
+):
+    if resident_policy == "oracle_freq":
+        scores = dict(analyzer.expert_access_count)
+    elif resident_policy == "profile_freq":
+        scores = analyzer._count_expert_accesses(resident_profile_ratio, score_mode="freq")
+    elif resident_policy == "profile_depth_freq":
+        scores = analyzer._count_expert_accesses(
+            resident_profile_ratio,
+            score_mode="depth_freq",
+            depth_power=resident_depth_power,
+        )
+    elif resident_policy == "profile_miss_stall":
+        scores = analyzer._profile_miss_stall_scores(
+            resident_profile_ratio,
+            cache_capacity,
+            0,
+            reset_mode,
+        )
+    else:
+        raise ValueError(f"Unsupported resident_policy: {resident_policy}")
+
+    return sorted(
+        scores.items(),
+        key=lambda item: (-item[1], item[0][0], item[0][1]),
+    )
+
+
+def summarize_resident_applicability(
+    ranked,
+    access_sequence,
+    cache_capacity,
+    frontier_percentile=1.0,
+    frontier_horizon=1,
+):
+    knee_capacity = compute_capacity_knee(ranked, cache_capacity)
+    selected = select_feasible_resident_prefix(
+        ranked=ranked,
+        access_sequence=access_sequence,
+        cache_capacity=cache_capacity,
+        frontier_percentile=frontier_percentile,
+        frontier_horizon=frontier_horizon,
+    )
+    frontier_curve = list(selected["frontier_curve"])
+    frontier_at_knee = int(frontier_curve[knee_capacity]) if knee_capacity < len(frontier_curve) else 0
+    knee_slack_capacity = max(0, cache_capacity - knee_capacity)
+    feasible_slack_capacity = max(0, cache_capacity - int(selected["resident_capacity"]))
+    knee_slack_utilization = (
+        float(frontier_at_knee) / float(knee_slack_capacity)
+        if knee_slack_capacity > 0
+        else (math.inf if frontier_at_knee > 0 else 0.0)
+    )
+    feasible_slack_utilization = (
+        float(selected["frontier_capacity"]) / float(feasible_slack_capacity)
+        if feasible_slack_capacity > 0
+        else (math.inf if int(selected["frontier_capacity"]) > 0 else 0.0)
+    )
+    return {
+        "cache_capacity": int(cache_capacity),
+        "knee_capacity": int(knee_capacity),
+        "knee_ratio": float(knee_capacity / cache_capacity) if cache_capacity > 0 else 0.0,
+        "knee_frontier_capacity": int(frontier_at_knee),
+        "knee_slack_capacity": int(knee_slack_capacity),
+        "knee_slack_utilization": float(knee_slack_utilization),
+        "frontier_selected_capacity": int(selected["resident_capacity"]),
+        "frontier_selected_ratio": float(selected["resident_ratio"]),
+        "frontier_selected_capacity_tail": int(selected["frontier_capacity"]),
+        "frontier_selected_slack_capacity": int(feasible_slack_capacity),
+        "frontier_selected_slack_utilization": float(feasible_slack_utilization),
+        "frontier_horizon": int(selected["frontier_horizon"]),
+        "frontier_percentile": float(selected["frontier_percentile"]),
+        "frontier_curve": frontier_curve,
+    }

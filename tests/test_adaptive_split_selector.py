@@ -2,14 +2,20 @@ import unittest
 
 from backbone_moe.evaluation import (
     build_batch_union_demand_steps,
+    cache_capacity_for_mem_ratio,
     compute_capacity_knee,
     compute_residual_demand_frontier_curve,
     infer_frontier_horizon,
+    rank_resident_candidates,
     select_feasible_resident_prefix,
+    summarize_resident_applicability,
 )
 
 
 class AdaptiveSplitSelectorTest(unittest.TestCase):
+    def test_cache_capacity_for_mem_ratio(self):
+        self.assertEqual(cache_capacity_for_mem_ratio(0.10, 17.2), 476)
+
     def test_compute_capacity_knee_returns_internal_cutoff(self):
         ranked = [((0, idx), float(100 - idx)) for idx in range(100)]
         knee = compute_capacity_knee(ranked, cache_capacity=100)
@@ -130,6 +136,37 @@ class AdaptiveSplitSelectorTest(unittest.TestCase):
         )
         self.assertEqual(single_step["resident_capacity"], 4)
         self.assertEqual(burst["resident_capacity"], 3)
+
+    def test_summarize_resident_applicability_reports_knee_and_frontier(self):
+        ranked = [((0, idx), float(10 - idx)) for idx in range(6)]
+        access_sequence = [
+            {"iter_idx": 0, "layer_experts": [[(0, 0), (0, 4)]]},
+            {"iter_idx": 1, "layer_experts": [[(0, 1), (0, 5)]]},
+        ]
+        summary = summarize_resident_applicability(
+            ranked=ranked,
+            access_sequence=access_sequence,
+            cache_capacity=5,
+            frontier_horizon=2,
+        )
+        self.assertIn("knee_capacity", summary)
+        self.assertIn("frontier_selected_capacity", summary)
+        self.assertEqual(summary["frontier_selected_capacity"], 3)
+        self.assertEqual(summary["frontier_selected_capacity_tail"], 2)
+        self.assertEqual(summary["frontier_selected_slack_capacity"], 2)
+
+    def test_rank_resident_candidates_orders_by_score(self):
+        class DummyAnalyzer:
+            def _count_expert_accesses(self, resident_profile_ratio, score_mode="freq", depth_power=1.0):
+                return {(0, 1): 3.0, (0, 0): 5.0}
+
+        ranked = rank_resident_candidates(
+            analyzer=DummyAnalyzer(),
+            cache_capacity=8,
+            resident_policy="profile_freq",
+            resident_profile_ratio=0.2,
+        )
+        self.assertEqual(ranked[0][0], (0, 0))
 
 
 if __name__ == "__main__":

@@ -5,11 +5,13 @@ from pathlib import Path
 
 from backbone_moe.evaluation import (
     best_by_throughput,
+    cache_capacity_for_mem_ratio,
     compute_capacity_knee,
     evaluate_with_fixed_resident_layout,
     infer_frontier_horizon,
     parse_float_list,
     parse_int_list,
+    rank_resident_candidates,
     select_feasible_resident_prefix,
 )
 from backbone_moe.workload import load_state_dict, save_subset_state
@@ -44,39 +46,6 @@ def build_analyzer(state_file, args, resident_ratio):
     )
 
 
-def cache_capacity_for_mem_ratio(mem_ratio, expert_size_mb):
-    total_gpu_memory_mb = 80 * 1024
-    available_memory_mb = total_gpu_memory_mb * mem_ratio
-    return int(available_memory_mb / expert_size_mb)
-
-
-def rank_resident_candidates(analyzer, cache_capacity, args):
-    if args.resident_policy == "oracle_freq":
-        scores = dict(analyzer.expert_access_count)
-    elif args.resident_policy == "profile_freq":
-        scores = analyzer._count_expert_accesses(args.resident_profile_ratio, score_mode="freq")
-    elif args.resident_policy == "profile_depth_freq":
-        scores = analyzer._count_expert_accesses(
-            args.resident_profile_ratio,
-            score_mode="depth_freq",
-        )
-    elif args.resident_policy == "profile_miss_stall":
-        scores = analyzer._profile_miss_stall_scores(
-            args.resident_profile_ratio,
-            cache_capacity,
-            0,
-            args.reset_mode,
-        )
-    else:
-        raise ValueError(f"Unsupported resident_policy: {args.resident_policy}")
-
-    ranked = sorted(
-        scores.items(),
-        key=lambda item: (-item[1], item[0][0], item[0][1]),
-    )
-    return ranked
-
-
 def select_frontier_prefix(profile_state_file, mem_ratio, args):
     """
     Select the resident size by trace-level feasibility, not throughput sweep.
@@ -88,7 +57,14 @@ def select_frontier_prefix(profile_state_file, mem_ratio, args):
     """
     cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
     profile_analyzer = build_analyzer(profile_state_file, args, resident_ratio=0.5)
-    ranked = rank_resident_candidates(profile_analyzer, cache_capacity, args)
+    ranked = rank_resident_candidates(
+        analyzer=profile_analyzer,
+        cache_capacity=cache_capacity,
+        resident_policy=args.resident_policy,
+        resident_profile_ratio=args.resident_profile_ratio,
+        resident_depth_power=args.resident_depth_power,
+        reset_mode=args.reset_mode,
+    )
     knee_capacity = compute_capacity_knee(ranked, cache_capacity)
     selected = select_feasible_resident_prefix(
         ranked=ranked,
@@ -150,7 +126,14 @@ def search_best_capacity(profile_state_file, mem_ratio, args):
     """
     cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
     profile_analyzer = build_analyzer(profile_state_file, args, resident_ratio=0.5)
-    ranked = rank_resident_candidates(profile_analyzer, cache_capacity, args)
+    ranked = rank_resident_candidates(
+        analyzer=profile_analyzer,
+        cache_capacity=cache_capacity,
+        resident_policy=args.resident_policy,
+        resident_profile_ratio=args.resident_profile_ratio,
+        resident_depth_power=args.resident_depth_power,
+        reset_mode=args.reset_mode,
+    )
 
     knee_capacity = compute_capacity_knee(ranked, cache_capacity)
     ranked_experts = [expert_key for expert_key, _ in ranked[:cache_capacity]]
@@ -237,7 +220,14 @@ def export_selected_resident_set(full_state_file, mem_ratio, best_ratio, args, b
         return analyzer.get_resident_set(mem_ratio, reset_mode=args.reset_mode)
 
     cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
-    ranked = rank_resident_candidates(analyzer, cache_capacity, args)
+    ranked = rank_resident_candidates(
+        analyzer=analyzer,
+        cache_capacity=cache_capacity,
+        resident_policy=args.resident_policy,
+        resident_profile_ratio=args.resident_profile_ratio,
+        resident_depth_power=args.resident_depth_power,
+        reset_mode=args.reset_mode,
+    )
     resident_prefix = ranked[:best_capacity]
     resident_order = [
         {"layer": int(expert_key[0]), "expert": int(expert_key[1])}

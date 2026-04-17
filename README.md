@@ -25,6 +25,11 @@ k + F_H(k) <= B
 
 where `F_H(k)` is the burst-aware residual demand frontier after pinning the top-`k` resident experts, computed directly from the routed trace.
 
+This also means the project should not be read as "every MoE should benefit equally".
+The right applicability questions are:
+- does the model expose a compact resident core?
+- does the available budget leave enough tail slack after pinning that core?
+
 ## Validated Real-Hardware Results
 
 Qwen1.5-MoE-A2.7B-Chat, `batch=8`, same GPU (`cuda:0`), `prefetch_distance=0`, 16 prompts, 64 new tokens.
@@ -50,6 +55,32 @@ OLMoE-1B-7B-0924, same GPU (`cuda:0`), `prefetch_distance=0`, 2 prompts, 8 new t
 Backbone-only improves generation throughput by:
 - `+741.2%` at `mem=0.07`
 - `+463.2%` at `mem=0.10`
+
+## Applicability and Boundary Cases
+
+Positive runtime cases should satisfy both:
+- **concentration**: a compact backbone core exists
+- **budget sufficiency**: the residual tail frontier fits in the remaining slack
+
+The repository now includes an explicit applicability diagnostic:
+
+```bash
+python experiments/simulation/analyze_applicability.py \
+  --state-file data/your_trace.pkl \
+  --output-dir results/applicability \
+  --memory-ratios 0.07,0.10 \
+  --resident-policy profile_freq \
+  --resident-profile-ratio 0.2 \
+  --frontier-percentile 1.0
+```
+
+This outputs, for each memory budget:
+- stall/access top-k coverage
+- knee/core fraction
+- burst-aware frontier size
+- slack utilization under the frontier-feasible resident prefix
+
+Packed-MoE architectures (`Mixtral`, `DeepSeek-V2`, `DeepSeek-V3`) are runtime-enabled on the `multi-model-runtime` branch and currently validated via tiny end-to-end smokes. They should enter the formal runtime table only if the applicability diagnostics indicate a compact backbone under the target budget.
 
 ## Method Summary
 
