@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,7 +122,9 @@ def run_runtime_config(python_bin, eval_script, label, cli_args, output_dir):
     print(f"Running: {label}")
     print(f"  output: {output_path}")
     print(f"{'=' * 60}", flush=True)
-    result = subprocess.run(cmd, capture_output=False, text=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).parent.parent.parent)
+    result = subprocess.run(cmd, capture_output=False, text=True, env=env)
     if result.returncode != 0:
         print(f"ERROR: {label} failed with return code {result.returncode}")
         return None
