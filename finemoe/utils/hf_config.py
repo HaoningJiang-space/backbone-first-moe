@@ -183,7 +183,17 @@ def parse_expert_id(param_name: str, config: PretrainedConfig) -> Tuple[Optional
         )
         if routed:
             layer_id, expert_id, _ = routed[0]
-            return int(layer_id), int(expert_id)
+            layer_id = int(layer_id)
+            expert_id = int(expert_id)
+            if arch in {"deepseek_v2", "deepseek_v3"}:
+                dense_prefix = int(getattr(config, "first_k_dense_replace", 0) or 0)
+                if layer_id < dense_prefix:
+                    raise RuntimeError(
+                        f"Packed expert tensor {param_name!r} resolved to dense-only layer {layer_id} "
+                        f"with first_k_dense_replace={dense_prefix}."
+                    )
+                layer_id -= dense_prefix
+            return layer_id, expert_id
         layer_id, expert_group, tensor_role = parse_packed_expert_tensor(param_name, config)
         raise RuntimeError(
             f"Packed-expert architecture {arch} does not expose per-expert tensor ids via parameter names; "

@@ -65,6 +65,7 @@ class HFConfigParsingTest(unittest.TestCase):
             n_routed_experts=64,
             num_experts_per_tok=6,
             n_shared_experts=2,
+            first_k_dense_replace=1,
             q_lora_rank=1536,
             kv_lora_rank=512,
             qk_rope_head_dim=64,
@@ -86,15 +87,15 @@ class HFConfigParsingTest(unittest.TestCase):
             parse_expert_id("layers.5.mlp.experts.gate_up_proj", cfg)
         self.assertEqual(
             parse_expert_id("layers.5.mlp.experts.3.gate_proj.weight", cfg),
-            (5, 3),
+            (4, 3),
         )
         self.assertEqual(
             parse_expert_id("layers.5.mlp.experts.3.up_proj.weight", cfg),
-            (5, 3),
+            (4, 3),
         )
         self.assertEqual(
             parse_expert_id("layers.5.mlp.experts.3.down_proj.weight", cfg),
-            (5, 3),
+            (4, 3),
         )
 
     def test_model_registry_includes_packed_architectures(self):
