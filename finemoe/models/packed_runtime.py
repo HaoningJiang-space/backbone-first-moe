@@ -56,7 +56,7 @@ def dispatch_packed_experts(
     expert_dispatcher.set_expected_queue(len(active_experts))
 
     for expert_idx in active_experts:
-        expert_dispatcher.enqueue_expert(layer_id, int(expert_idx))
+        expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), -1, False)
 
     results = expert_dispatcher.wait_expert()
     final_hidden_states = torch.zeros(

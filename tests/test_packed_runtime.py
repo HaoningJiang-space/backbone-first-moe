@@ -26,7 +26,7 @@ class FakePackedDispatcher:
     def set_expected_queue(self, n):
         return None
 
-    def enqueue_expert(self, layer_id, expert_idx):
+    def enqueue_expert(self, layer_id, expert_idx, gpu_id=-1, remote=False):
         self.queue.append((layer_id, expert_idx))
 
     def wait_expert(self):
