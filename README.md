@@ -82,6 +82,14 @@ This outputs, for each memory budget:
 
 Packed-MoE architectures (`Mixtral`, `DeepSeek-V2`, `DeepSeek-V3`) are runtime-enabled on the `multi-model-runtime` branch and currently validated via tiny end-to-end smokes. They should enter the formal runtime table only if the applicability diagnostics indicate a compact backbone under the target budget.
 
+Current examples from the applicability diagnostics:
+- `Qwen1.5-MoE-A2.7B-Chat`: positive case
+  - top-20% access coverage `~0.77`
+  - burst-feasible resident ratio `~0.83-0.91`
+- `DeepSeek-V2-Lite`: boundary case under current budgets
+  - top-20% access coverage `~0.37`
+  - burst-feasible resident ratio `0.0` at `mem=0.05/0.07/0.10`
+
 ## Method Summary
 
 1. Rank experts by profiling-prefix utility.

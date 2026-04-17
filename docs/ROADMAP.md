@@ -348,6 +348,29 @@ This naturally leads to a two-part diagnostic:
 Positive cases should enter the main runtime table.
 Weak cases should be written up as **boundary conditions**, not hidden or over-claimed.
 
+### Current applicability examples
+
+The current diagnostics already separate a positive case from a boundary case:
+
+- **Qwen1.5-MoE-A2.7B-Chat**
+  - top-20% access coverage: `~0.77`
+  - knee/core ratio: `~0.28-0.37`
+  - burst-feasible selected ratio: `~0.83-0.91`
+  - interpretation: compact backbone + sufficient slack
+  - status: main-table positive case
+
+- **DeepSeek-V2-Lite**
+  - top-20% access coverage: `~0.37`
+  - knee/core ratio: `~0.35-0.38`
+  - burst frontier: `648` experts across the tested budgets
+  - selected ratio: `0.0` at `mem=0.05/0.07/0.10`
+  - interpretation: no feasible resident prefix under current burst pressure
+  - status: boundary case, not a formal positive runtime example
+
+This is exactly why the project should not overclaim "all MoEs benefit".
+The correct claim is that the method is **predictively applicable**:
+the diagnostics tell us in advance whether a model should enter the main runtime table.
+
 ### Packed-MoE status
 
 `Mixtral`, `DeepSeek-V2`, and `DeepSeek-V3` are now runtime-enabled on the packed path,
