@@ -20,6 +20,8 @@ from finemoe.ops.op_builder.prefetch import PrefetchBuilder
 from finemoe.models import (
     SyncQwen2MoeSparseMoeBlock,
     Qwen2MoeMLP,
+    SyncOlmoeSparseMoeBlock,
+    OlmoeMLP,
 )
 from finemoe.utils import ArcherConfig
 from finemoe.utils.arguments import copy_args_to_device, copy_kwargs_to_device
@@ -500,6 +502,7 @@ class OffloadEngine(object):
         self.archer_engine = self.prefetch_lib.prefetch_handle(
             self.checkpoint,
             _archer_config.device_memory_ratio,
+            self.device,
         )
 
         self.archer_config = _archer_config
@@ -651,6 +654,12 @@ class OffloadEngine(object):
         )
         finemoe.models.modeling_qwen.modeling_qwen2_moe.Qwen2MoeSparseMoeBlock = (
             SyncQwen2MoeSparseMoeBlock
+        )
+        finemoe.models.modeling_olmoe.modeling_olmoe._old_sparse_mlp = (
+            finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock
+        )
+        finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
+            SyncOlmoeSparseMoeBlock
         )
 
         def from_pretrained_decorator(orig_from_pretrained: Callable) -> Callable:
@@ -812,7 +821,7 @@ class OffloadEngine(object):
                 module_idx = 0
                 self.expert_layer_modules = []
                 for module in model.modules():
-                    if isinstance(module, SyncQwen2MoeSparseMoeBlock):
+                    if isinstance(module, (SyncQwen2MoeSparseMoeBlock, SyncOlmoeSparseMoeBlock)):
                         # module.archer_prefetch = self.archer_prefetch
                         # module.archer_tracer = self.archer_tracer
                         module.archer_engine = self.archer_engine
@@ -836,7 +845,7 @@ class OffloadEngine(object):
                         self.moe_layers.append(module)
                         module.moe_layers = self.moe_layers
 
-                    if isinstance(module, Qwen2MoeMLP):
+                    if isinstance(module, (Qwen2MoeMLP, OlmoeMLP)):
                         module.offload_engine = self
 
                 self.setup_archer_hooks(model)
@@ -1019,7 +1028,7 @@ class OffloadEngine(object):
             self.offload_set.add(buffer.data.data_ptr())
 
         topo = self.get_topology(model)
-        self.archer_engine.set_topology(topo)
+        self.archer_engine.set_topology(topo, self.device)
 
         @torch.no_grad()
         def _pre_forward_input_hook(module, input, kwargs, device, tensors):
@@ -1232,6 +1241,9 @@ class OffloadEngine(object):
 
     # clean runtime hooks
     def clean_up(self):
-        finemoe.models.modeling_mixtral.SyncQwen2MoeSparseMoeBlock = (
-            finemoe.models.modeling_mixtral._old_sparse_mlp
+        finemoe.models.modeling_qwen.modeling_qwen2_moe.Qwen2MoeSparseMoeBlock = (
+            finemoe.models.modeling_qwen.modeling_qwen2_moe._old_sparse_mlp
+        )
+        finemoe.models.modeling_olmoe.modeling_olmoe.OlmoeSparseMoeBlock = (
+            finemoe.models.modeling_olmoe.modeling_olmoe._old_sparse_mlp
         )

@@ -529,6 +529,17 @@ void ArcherTopologyHandle::InitializeTopology(
     EnableTrace();
 }
 
+void ArcherTopologyHandle::SetDefaultDeviceForSparseNodes(const torch::Device& device)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto sparse_nodes = GetSparseNodes();
+    for (auto& node_ptr : sparse_nodes) {
+        node_ptr->default_device = device;
+    }
+    ARCHER_LOG_INFO("Set default_device for {} sparse nodes to {}",
+                     sparse_nodes.size(), device.index());
+}
+
 NodePtr ArcherTopologyHandle::GetNodeFromTensorID(const TensorID& tensor_id)
 {
     std::lock_guard<std::mutex> lock(mutex_);

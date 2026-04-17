@@ -158,6 +158,12 @@ public:
     void InitializeTopology(
         const std::vector<std::tuple<std::string, std::vector<std::vector<TensorID>>>>& topology);
 
+    // Set default_device for all sparse (expert) nodes to the specified device.
+    // This ensures all expert weights are loaded to the same GPU that Python uses.
+    // 设置所有稀疏（expert）节点的 default_device 为指定设备。
+    // 确保所有 expert 权重加载到 Python 使用的同一个 GPU。
+    void SetDefaultDeviceForSparseNodes(const torch::Device& device);
+
     void EnableTrace() noexcept { trace_enabled_ = true; }
     void DisableTrace() noexcept { trace_enabled_ = false; }
 

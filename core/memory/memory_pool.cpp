@@ -98,6 +98,14 @@ void* DeviceMemoryPool::AllocateMemory(const std::size_t key,
         ARCHER_LOG_ERROR("PreAllocateMemory failed, already allocated ", key);
         return allocated_id_[device_id][key];
     }
+    // Enforce memory ratio limit: reject allocation if it would exceed capacity
+    if (free_memory_[device_id] < size) {
+        ARCHER_LOG_ERROR("DeviceMemoryPool OOM on device ", device_id,
+                         ": requested ", size, " bytes but only ",
+                         free_memory_[device_id], " bytes available (capacity=",
+                         memory_capacity_[device_id], ")");
+        return nullptr;
+    }
     cudaSetDevice(device_id);
     at::Allocator* allocator = c10::cuda::CUDACachingAllocator::get();
     auto data_ptr = allocator->raw_allocate(size);
@@ -136,7 +144,7 @@ DeviceMemoryPool::DeviceMemoryPool()
     for (int i = 0; i < device_count; ++i) {
         std::unordered_map<std::uint64_t, void*> allocated_id;
         allocated_id_.emplace_back(allocated_id);
-        free_memory_.emplace_back(GetTotalDeviceMemory(i));
+        free_memory_.emplace_back(GetFreeDeviceMemory(i));
         memory_capacity_.emplace_back(free_memory_[i]);
     }
 }
@@ -160,7 +168,10 @@ void DeviceMemoryPool::SetMemoryRatio(const double ratio)
     cudaGetDeviceCount(&device_count);
 
     for (int i = 0; i < device_count; ++i) {
-        free_memory_[i] = GetTotalDeviceMemory(i) * ratio;
+        // Use ACTUAL free memory instead of total memory.
+        // This correctly accounts for memory already allocated by PyTorch
+        // before the prefetch engine was initialized.
+        free_memory_[i] = GetFreeDeviceMemory(i) * ratio;
         memory_capacity_[i] = free_memory_[i];
     }
 }
