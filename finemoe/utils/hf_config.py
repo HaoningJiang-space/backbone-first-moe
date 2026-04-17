@@ -1,6 +1,6 @@
-from transformers import PretrainedConfig
 from typing import Tuple
 import re
+
 import torch
 from transformers import PretrainedConfig
 
@@ -10,6 +10,17 @@ def parse_expert_dtype(config: PretrainedConfig) -> torch.dtype:
     if dtype is None:
         return torch.float32
     return dtype
+
+
+def parse_expert_dtype_id(config: PretrainedConfig) -> int:
+    dtype = parse_expert_dtype(config)
+    if dtype == torch.bfloat16:
+        return 0
+    if dtype == torch.float32:
+        return 1
+    if dtype == torch.float16:
+        return 2
+    raise RuntimeError(f"Unsupported expert dtype {dtype}")
 
 
 def parse_moe_param(config: PretrainedConfig) -> Tuple[int, int, int]:
