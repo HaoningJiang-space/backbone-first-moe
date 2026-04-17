@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 from transformers.models.mixtral.modeling_mixtral import (
     MixtralForCausalLM,
@@ -20,18 +21,45 @@ class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):
                 1.0 - self.jitter_noise, 1.0 + self.jitter_noise
             )
         flat_states = hidden_states.view(-1, hidden_states.shape[-1])
-        _, top_k_weights, top_k_index = self.gate(flat_states)
+        gate_output = self.gate(flat_states)
+        return_router_logits = not isinstance(gate_output, tuple)
+        if isinstance(gate_output, tuple):
+            if len(gate_output) == 3:
+                _, top_k_weights, top_k_index = gate_output
+            elif len(gate_output) == 2:
+                top_k_weights, top_k_index = gate_output
+            else:
+                raise RuntimeError(
+                    f"Unexpected Mixtral gate output tuple length: {len(gate_output)}"
+                )
+            router_logits = None
+        else:
+            router_logits = gate_output
+            routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
+            top_k_weights, top_k_index = torch.topk(
+                routing_weights, self.top_k, dim=-1
+            )
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)
+            top_k_weights = top_k_weights.to(flat_states.dtype)
+
+        num_experts = getattr(self, "num_experts", None)
+        if num_experts is None:
+            num_experts = getattr(self.experts, "num_experts", None)
+        if num_experts is None:
+            num_experts = len(self.experts)
         final_hidden_states = dispatch_packed_experts(
             hidden_states=flat_states,
             top_k_index=top_k_index,
             top_k_weights=top_k_weights,
-            num_experts=self.experts.num_experts,
+            num_experts=num_experts,
             layer_id=self.layer_id,
             expert_dispatcher=self.expert_dispatcher,
         )
         final_hidden_states = final_hidden_states.reshape(
             batch_size, sequence_length, hidden_dim
         )
+        if return_router_logits:
+            return final_hidden_states, router_logits
         return final_hidden_states
 
 
