@@ -2,7 +2,7 @@
 
 Resident backbone extraction and demand-only tail for MoE expert offloading.
 
-This project builds on top of [FineMoE](https://github.com/IntelliSys-Lab/FineMoE-EuroSys26) and adds a runtime-native resident backbone path. The current stable release candidate is the `v0.3.0-stable` branch.
+This project builds on top of [FineMoE](https://github.com/IntelliSys-Lab/FineMoE-EuroSys26) and adds a runtime-native resident backbone path. The current stable line is the `v0.3.0-stable` branch.
 
 ## What This Repository Claims
 
@@ -10,6 +10,10 @@ The serving path that is currently validated is:
 - resident backbone
 - demand-only tail fallback
 - no speculative prefetch on the critical path
+
+Runtime support that is validated today:
+- `Qwen1.5-MoE-A2.7B-Chat`
+- `OLMoE-1B-7B-0924`
 
 The selector is not a ratio sweep. It ranks experts by profiling utility, then chooses the largest resident prefix that remains feasible under a burst-aware tail frontier constraint.
 
@@ -35,6 +39,17 @@ Backbone-only improves generation throughput by:
 - `+16.9%` at `mem=0.10`
 
 These numbers were validated on real hardware after fixing sparse-node default-device propagation.
+
+OLMoE-1B-7B-0924, same GPU (`cuda:0`), `prefetch_distance=0`, 2 prompts, 8 new tokens.
+
+| Config | mem=0.07 | mem=0.10 | Notes |
+|---|---:|---:|---|
+| A demand-only | 0.3067 | 0.3157 | No resident backbone |
+| C backbone-only | 2.5799 | 1.7778 | Resident set from offline adaptive selector |
+
+Backbone-only improves generation throughput by:
+- `+741.2%` at `mem=0.07`
+- `+463.2%` at `mem=0.10`
 
 ## Method Summary
 
@@ -75,6 +90,10 @@ python experiments/simulation/select_adaptive_resident_set.py \
 This produces one resident JSON per memory budget plus a summary JSON.
 
 ## Reproducing Real-Hardware Runtime Evaluation
+
+Supported runtime models:
+- `Qwen1.5-MoE-A2.7B-Chat`
+- `OLMoE-1B-7B-0924`
 
 Backbone-only (`C`) example:
 
@@ -152,7 +171,8 @@ Before tagging a release, this repository should satisfy all of the following:
 - evaluation helper tests pass
 - fresh clone supports `pip install -e .`
 - selector CLI runs from a clean checkout
-- runtime smoke runs from a clean checkout
+- `Qwen` runtime smoke runs from a clean checkout
+- `OLMoE` runtime smoke runs from a clean checkout
 
 ## Base Runtime Modifications vs FineMoE
 
