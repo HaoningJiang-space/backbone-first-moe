@@ -1,9 +1,11 @@
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_MODEL_PATH = "Qwen/Qwen1.5-MoE-A2.7B-Chat"
 DEFAULT_OFFLOAD_PATH = "/data/jiangjunmin/jhn/FineMoE-EuroSys26/demo/offloads/Qwen1.5-MoE-A2.7B-Chat"
@@ -11,8 +13,8 @@ DEFAULT_PROMPT_FILE = "/data/jiangjunmin/jhn/FineMoE-EuroSys26/demo/states/lmsys
 DEFAULT_STORE_PREFIX = "/data/jiangjunmin/jhn/FineMoE-EuroSys26/demo/states/Qwen1.5-MoE-A2.7B-Chat~lmsys-chat-1m-shuffled64-seed42"
 DEFAULT_RESIDENT_DIR = "/data/jiangjunmin/jhn/FineMoE-EuroSys26/demo/experiments/experiments/results"
 DEFAULT_OUTPUT_DIR = "/data/jiangjunmin/jhn/FineMoE-EuroSys26/demo/experiments/experiments/results/section5_sweep"
-DEFAULT_PYTHON = "/data/jiangjunmin/conda/envs/finemoe/bin/python"
-DEFAULT_EVAL_SCRIPT = "/data/jiangjunmin/jhn/FineMoE-EuroSys26/demo/experiments/run_runtime_eval.py"
+DEFAULT_PYTHON = sys.executable
+DEFAULT_EVAL_SCRIPT = str(REPO_ROOT / "demo" / "experiments" / "run_runtime_eval.py")
 
 
 @dataclass
