@@ -20,6 +20,8 @@ from finemoe.ops.op_builder.prefetch import PrefetchBuilder
 from finemoe.models import (
     SyncQwen2MoeSparseMoeBlock,
     Qwen2MoeMLP,
+    SyncOlmoeSparseMoeBlock,
+    OlmoeMLP,
 )
 from finemoe.utils import ArcherConfig
 from finemoe.utils.arguments import copy_args_to_device, copy_kwargs_to_device
@@ -814,7 +816,9 @@ class OffloadEngine(object):
                 module_idx = 0
                 self.expert_layer_modules = []
                 for module in model.modules():
-                    if isinstance(module, SyncQwen2MoeSparseMoeBlock):
+                    if isinstance(
+                        module, (SyncQwen2MoeSparseMoeBlock, SyncOlmoeSparseMoeBlock)
+                    ):
                         # module.archer_prefetch = self.archer_prefetch
                         # module.archer_tracer = self.archer_tracer
                         module.archer_engine = self.archer_engine
@@ -838,7 +842,7 @@ class OffloadEngine(object):
                         self.moe_layers.append(module)
                         module.moe_layers = self.moe_layers
 
-                    if isinstance(module, Qwen2MoeMLP):
+                    if isinstance(module, (Qwen2MoeMLP, OlmoeMLP)):
                         module.offload_engine = self
 
                 self.setup_archer_hooks(model)
@@ -1077,11 +1081,10 @@ class OffloadEngine(object):
 
             if "expert" in key:
                 for expert_idx, expert_tensors in enumerate(tensors):
-                    expert_key = (
-                        f"{key}.expert_{expert_idx}"
-                        if self.config.model_type != "qwen2_moe"
-                        else f"{key}.{expert_idx}"
-                    )
+                    if self.config.model_type in ("qwen2_moe", "olmoe"):
+                        expert_key = f"{key}.{expert_idx}"
+                    else:
+                        expert_key = f"{key}.expert_{expert_idx}"
                     input_device_index = self.archer_engine.get_node_default_device(
                         expert_tensors
                     )
