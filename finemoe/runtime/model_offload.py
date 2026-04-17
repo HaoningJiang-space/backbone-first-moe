@@ -343,6 +343,7 @@ class OffloadEngine(object):
             capacity, config, self.expert_map_store, eval_mode, device)
 
         self.quant_method = None
+        self.packed_uses_synthetic_slices = False
 
         self.prefetch_distance = prefetch_distance
         self.device = torch.device(device)
@@ -402,6 +403,8 @@ class OffloadEngine(object):
                 self.expert_tensor_map[key] = ordered[0]
 
     def _get_packed_expert_topology(self):
+        if not self.packed_uses_synthetic_slices:
+            return []
         expert_layers = {}
         for (layer_id, expert_id), tensor_ids in self.expert_tensor_groups.items():
             expert_layers.setdefault(layer_id, {})[expert_id] = tensor_ids
@@ -1273,12 +1276,30 @@ class OffloadEngine(object):
         empty_state_dict: Dict[str, torch.Tensor],
     ) -> None:
         if parse_expert_layout(self.config) == "packed":
-            for entry in expand_state_dict_for_offload(state_dict, self.config):
-                tensor_id = self._generate_param_id()
-                self.name_id_map[entry.name] = tensor_id
-                self.synthetic_name_map[entry.name] = entry.source_name
-                if not self.archer_engine.is_tensor_offloaded(tensor_id):
-                    self.archer_engine.offload(entry.tensor, tensor_id)
+            already_expanded = False
+            for param_name in state_dict.keys():
+                try:
+                    _, expert_id = parse_expert_id(param_name, self.config)
+                except RuntimeError:
+                    continue
+                if expert_id is not None:
+                    already_expanded = True
+                    break
+
+            self.packed_uses_synthetic_slices = not already_expanded
+            if already_expanded:
+                for param_name, tensor in state_dict.items():
+                    tensor_id = self._generate_param_id()
+                    self.name_id_map[param_name] = tensor_id
+                    if not self.archer_engine.is_tensor_offloaded(tensor_id):
+                        self.archer_engine.offload(tensor, tensor_id)
+            else:
+                for entry in expand_state_dict_for_offload(state_dict, self.config):
+                    tensor_id = self._generate_param_id()
+                    self.name_id_map[entry.name] = tensor_id
+                    self.synthetic_name_map[entry.name] = entry.source_name
+                    if not self.archer_engine.is_tensor_offloaded(tensor_id):
+                        self.archer_engine.offload(entry.tensor, tensor_id)
         else:
             param_names = list(state_dict.keys())
 
