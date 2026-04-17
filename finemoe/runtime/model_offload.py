@@ -37,6 +37,7 @@ from finemoe.utils import (
     parse_expert_id,
     parse_expert_dtype,
     parse_expert_dtype_id,
+    parse_packed_expert_tensor,
     expand_state_dict_for_offload,
 )
 from finemoe.common import parse_expert_type
