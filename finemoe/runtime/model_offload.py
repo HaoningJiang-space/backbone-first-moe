@@ -350,6 +350,7 @@ class OffloadEngine(object):
         self.resident_requested_count = 0
         self.resident_clipped = False
         self._resident_ids_are_ordered = False
+        self._resident_speculative_capacity = None
 
     def init_expert_map_matcher(self):
         self.expert_map_matcher = ExpertMapMatcher(
@@ -374,6 +375,8 @@ class OffloadEngine(object):
 
         resident_ordered = False
         if isinstance(payload, dict):
+            if "speculative_capacity" in payload:
+                self._resident_speculative_capacity = int(payload["speculative_capacity"])
             if "resident_selection_order" in payload:
                 payload = payload["resident_selection_order"]
                 resident_ordered = True
@@ -407,6 +410,8 @@ class OffloadEngine(object):
         configured = int(getattr(self.archer_config, "resident_slack_experts", -1))
         if configured >= 0:
             return configured
+        if self._resident_speculative_capacity is not None:
+            return max(1, int(self._resident_speculative_capacity))
         return max(1, int(self.top_k) * max(1, int(self.eval_batch_size)))
 
     def pin_resident_experts(self, model, resident_expert_ids):
