@@ -54,9 +54,10 @@ def dispatch_packed_experts(
 
     expert_dispatcher.set_inputs(hidden_states, router_mask)
     expert_dispatcher.set_expected_queue(len(active_experts))
+    gpu_id = hidden_states.device.index if hidden_states.is_cuda else -1
 
     for expert_idx in active_experts:
-        expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), -1, False)
+        expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), gpu_id, False)
 
     results = expert_dispatcher.wait_expert()
     final_hidden_states = torch.zeros(
