@@ -839,6 +839,9 @@ class OlmoeModel(OlmoePreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
+        if past_key_values is not None and not isinstance(past_key_values, Cache):
+            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+
         # === Expert tracing hooks for prefetch ===
         prefetch_enabled = (
             getattr(self, "prefetch_distance", 0) > 0
