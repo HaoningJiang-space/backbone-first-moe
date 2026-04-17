@@ -213,6 +213,20 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
 
+def _get_past_seen_tokens(past_key_values) -> int:
+    if past_key_values is None:
+        return 0
+    if hasattr(past_key_values, "get_seq_length"):
+        return past_key_values.get_seq_length()
+    if isinstance(past_key_values, tuple) and past_key_values:
+        first_layer = past_key_values[0]
+        if isinstance(first_layer, (tuple, list)) and first_layer:
+            key_states = first_layer[0]
+            if isinstance(key_states, torch.Tensor) and key_states.ndim >= 2:
+                return key_states.shape[-2]
+    return 0
+
+
 # ========================
 # MLP
 # ========================
@@ -838,7 +852,7 @@ class OlmoeModel(OlmoePreTrainedModel):
                 self.expert_map_matcher.embed_prefetch(seq_id, embeds)
 
         if cache_position is None:
-            past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
+            past_seen_tokens = _get_past_seen_tokens(past_key_values)
             cache_position = torch.arange(
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
             )
@@ -934,7 +948,7 @@ class OlmoeModel(OlmoePreTrainedModel):
         dtype, device = input_tensor.dtype, input_tensor.device
         min_dtype = torch.finfo(dtype).min
         sequence_length = input_tensor.shape[1]
-        past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
+        past_seen_tokens = _get_past_seen_tokens(past_key_values)
         using_static_cache = isinstance(past_key_values, StaticCache)
 
         if using_static_cache:
