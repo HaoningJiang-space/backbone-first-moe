@@ -424,6 +424,7 @@ class OffloadEngine(object):
         requested_count = len(resident_expert_ids)
         available_pool_bytes = int(self.archer_engine.get_device_free_memory(self.device))
         capacity_pool_bytes = int(self.archer_engine.get_device_memory_capacity(self.device))
+        sparse_cache_limit = int(self.archer_engine.get_sparse_cache_limit(self.device))
         slack_experts = self._resident_slack_experts()
         resident_bytes = []
         for layer_id, expert_id in resident_expert_ids:
@@ -451,20 +452,22 @@ class OffloadEngine(object):
         reserve_bytes = slack_experts * max(resident_bytes) if resident_bytes else 0
         selected_count = requested_count
         selected_bytes = sum(resident_bytes)
-        if selected_bytes + reserve_bytes > available_pool_bytes:
+        effective_budget_bytes = min(available_pool_bytes, sparse_cache_limit)
+        if selected_bytes + reserve_bytes > effective_budget_bytes:
             if not self._resident_ids_are_ordered:
                 raise RuntimeError(
                     "Resident set exceeds runtime sparse-pool budget, but the resident file "
                     "does not preserve ranked order for safe prefix clipping. "
                     f"requested={requested_count}, reserve_experts={slack_experts}, "
                     f"selected_bytes={selected_bytes}, reserve_bytes={reserve_bytes}, "
-                    f"pool_free_bytes={available_pool_bytes}, pool_capacity_bytes={capacity_pool_bytes}. "
+                    f"pool_free_bytes={available_pool_bytes}, pool_capacity_bytes={capacity_pool_bytes}, "
+                    f"sparse_cache_limit={sparse_cache_limit}. "
                     "Regenerate the resident file with resident_selection_order metadata."
                 )
             running_bytes = 0
             selected_count = 0
             for expert_bytes in resident_bytes:
-                if running_bytes + expert_bytes + reserve_bytes > available_pool_bytes:
+                if running_bytes + expert_bytes + reserve_bytes > effective_budget_bytes:
                     break
                 running_bytes += expert_bytes
                 selected_count += 1
@@ -472,7 +475,8 @@ class OffloadEngine(object):
                 raise RuntimeError(
                     "Runtime sparse-pool budget is too small to pin any resident experts "
                     f"while reserving {slack_experts} demand-slack experts. "
-                    f"pool_free_bytes={available_pool_bytes}, reserve_bytes={reserve_bytes}"
+                    f"pool_free_bytes={available_pool_bytes}, sparse_cache_limit={sparse_cache_limit}, "
+                    f"reserve_bytes={reserve_bytes}"
                 )
             resident_expert_ids = resident_expert_ids[:selected_count]
             resident_bytes = resident_bytes[:selected_count]
@@ -482,7 +486,7 @@ class OffloadEngine(object):
                 "Clipped resident set to preserve demand slack: "
                 f"requested={requested_count}, effective={selected_count}, "
                 f"slack_experts={slack_experts}, selected_bytes={selected_bytes}, "
-                f"pool_free_bytes={available_pool_bytes}",
+                f"pool_free_bytes={available_pool_bytes}, sparse_cache_limit={sparse_cache_limit}",
                 flush=True,
             )
         else:
