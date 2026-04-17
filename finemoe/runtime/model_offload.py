@@ -406,6 +406,25 @@ class OffloadEngine(object):
             if ordered:
                 self.expert_tensor_map[key] = ordered[0]
 
+    def _sync_packed_runtime_mode(self, model):
+        if not self._is_packed_layout():
+            return
+
+        model_has_packed_routed_tensors = False
+        for name, _ in model.named_parameters(recurse=True):
+            _, expert_group, _ = parse_packed_expert_tensor(name, self.config)
+            if expert_group == "routed_experts":
+                model_has_packed_routed_tensors = True
+                break
+
+        self.packed_uses_synthetic_slices = model_has_packed_routed_tensors
+        if self.packed_uses_synthetic_slices and not self.expert_tensor_groups:
+            raise RuntimeError(
+                "Packed runtime detected routed packed tensors in the model, "
+                "but the offload index does not contain synthetic expert slices. "
+                "Remove the existing offload_path and rebuild it with the current runtime."
+            )
+
     def _get_packed_expert_topology(self):
         if not self.packed_uses_synthetic_slices:
             return []
@@ -907,6 +926,7 @@ class OffloadEngine(object):
 
                 if self._is_packed_layout():
                     self._build_packed_expert_groups()
+                    self._sync_packed_runtime_mode(model)
                 else:
                     self.expert_tensor_map = dict()
                     self.expert_tensor_groups = {}

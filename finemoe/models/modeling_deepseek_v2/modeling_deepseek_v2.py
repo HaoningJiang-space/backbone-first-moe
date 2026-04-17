@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 
 from transformers.models.deepseek_v2.modeling_deepseek_v2 import (
     DeepseekV2Experts,
@@ -19,10 +18,7 @@ class SyncDeepseekV2Moe(DeepseekV2Moe):
 
         residuals = hidden_states
         orig_shape = hidden_states.shape
-        router_logits = nn.functional.linear(
-            hidden_states.type(torch.float32),
-            self.gate.weight.type(torch.float32),
-        )
+        router_logits = self.gate(hidden_states.type(torch.float32))
         topk_indices, topk_weights = self.route_tokens_to_experts(router_logits)
         flat_states = hidden_states.view(-1, hidden_states.shape[-1])
         hidden_states = dispatch_packed_experts(
