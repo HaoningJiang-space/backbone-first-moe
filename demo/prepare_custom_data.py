@@ -6,9 +6,11 @@ import sys
 import warnings
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+DEMO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = DEMO_ROOT.parent
+for path in (DEMO_ROOT, REPO_ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 import transformers
 
@@ -30,6 +32,10 @@ from configs.datasets.config_lmsys import (
 )
 
 warnings.filterwarnings("ignore")
+
+
+def resolve_moe_name(resolved_model_path: str) -> str:
+    return Path(resolved_model_path.rstrip("/")).name
 
 
 def load_prompts(prompt_file):
@@ -98,7 +104,7 @@ def main():
     print("**********")
     print("")
 
-    moe_name = model_path.split("/")[-1]
+    moe_name = resolve_moe_name(resolved_model_path)
 
     model = MoE(
         resolved_model_path,
