@@ -23,6 +23,7 @@ install_runtime_device_property = PACKED_RUNTIME.install_runtime_device_property
 dispatch_packed_experts = PACKED_RUNTIME.dispatch_packed_experts
 _run_packed_resident_expert = PACKED_RUNTIME._run_packed_resident_expert
 _infer_module_device = PACKED_RUNTIME._infer_module_device
+_supports_packed_resident_fastpath = PACKED_RUNTIME._supports_packed_resident_fastpath
 
 
 class FakePackedDispatcher:
@@ -232,6 +233,20 @@ class PackedRuntimeForwardTest(unittest.TestCase):
     def test_infer_module_device_returns_none_for_mixed_devices(self):
         expert = _MixedDeviceExpert()
         self.assertIsNone(_infer_module_device(expert))
+
+    def test_packed_fastpath_requires_weights_on_execution_device(self):
+        cfg = MixtralConfig(
+            num_hidden_layers=1,
+            hidden_size=32,
+            intermediate_size=16,
+            num_local_experts=4,
+            num_experts_per_tok=2,
+            num_attention_heads=4,
+            num_key_value_heads=4,
+        )
+        block = SyncMixtralSparseMoeBlock(cfg)
+        self.assertTrue(_supports_packed_resident_fastpath(block.experts, torch.device("cpu")))
+        self.assertFalse(_supports_packed_resident_fastpath(block.experts, torch.device("cuda:0")))
 
     def test_dispatch_packed_experts_supports_resident_fast_path(self):
         torch.manual_seed(0)

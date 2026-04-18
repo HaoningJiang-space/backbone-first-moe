@@ -72,6 +72,8 @@ def dispatch_packed_experts(
     )
 
     resident_fastpath_expert_ids = set(resident_fastpath_expert_ids or ())
+    if not _supports_packed_resident_fastpath(experts_module, hidden_states.device):
+        resident_fastpath_expert_ids = set()
     resident_active: list[int] = []
     demand_active: list[int] = []
     for expert_idx in active_experts:
@@ -179,6 +181,12 @@ def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, exp
     if experts_module is None:
         raise RuntimeError("experts_module is required for packed resident fast path")
     if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
+        if not _supports_packed_resident_fastpath(experts_module, hidden_states.device):
+            raise RuntimeError(
+                "Packed resident fast path requires gate_up_proj/down_proj to be materialized on the "
+                f"execution device {hidden_states.device}, but found "
+                f"{experts_module.gate_up_proj.device} / {experts_module.down_proj.device}."
+            )
         gate_up_proj = experts_module.gate_up_proj[expert_idx]
         down_proj = experts_module.down_proj[expert_idx]
         gate_up = F.linear(hidden_states, gate_up_proj)
@@ -223,6 +231,12 @@ def _run_grouped_packed_resident_experts(
     route_weights = torch.cat(weight_parts, dim=0)
 
     if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
+        if not _supports_packed_resident_fastpath(experts_module, hidden_states.device):
+            raise RuntimeError(
+                "Packed resident fast path requires gate_up_proj/down_proj to be materialized on the "
+                f"execution device {hidden_states.device}, but found "
+                f"{experts_module.gate_up_proj.device} / {experts_module.down_proj.device}."
+            )
         expert_device = experts_module.gate_up_proj.device
         current_states = hidden_states[token_idx]
         if current_states.device != expert_device:
@@ -275,3 +289,17 @@ def _infer_module_device(module) -> torch.device | None:
     if any(device != first for device in devices[1:]):
         return None
     return first
+
+
+def _supports_packed_resident_fastpath(experts_module, execution_device: torch.device) -> bool:
+    if experts_module is None:
+        return False
+    if not (hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj")):
+        return False
+    gate_device = getattr(experts_module.gate_up_proj, "device", None)
+    down_device = getattr(experts_module.down_proj, "device", None)
+    if gate_device is None or down_device is None:
+        return False
+    if gate_device != down_device:
+        return False
+    return gate_device == execution_device

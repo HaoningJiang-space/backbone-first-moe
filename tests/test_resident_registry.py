@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import torch
 import torch.nn as nn
 from finemoe.models.modeling_qwen.configuration_qwen2_moe import Qwen2MoeConfig
 
@@ -133,11 +134,12 @@ class ResidentRegistryTest(unittest.TestCase):
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
         engine = self._build_engine_stub()
         engine.config.model_type = "mixtral"
+        engine.device = "cpu"
 
         class _PackedExperts:
             def __init__(self):
-                self.gate_up_proj = object()
-                self.down_proj = object()
+                self.gate_up_proj = torch.nn.Parameter(torch.randn(2, 4, 4))
+                self.down_proj = torch.nn.Parameter(torch.randn(2, 2, 2))
 
         packed_module = SimpleNamespace(layer_id=0, experts=_PackedExperts())
         modulelist_module = SimpleNamespace(layer_id=1, experts=nn.ModuleList([nn.Linear(2, 2)]))
@@ -161,6 +163,36 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(modulelist_module.resident_fastpath_local_expert_ids, set())
         registry = OffloadEngine.get_resident_registry(engine)
         self.assertEqual(registry["fast_path_expert_count"], 2)
+
+    def test_activate_registry_disables_packed_fastpath_when_weights_stay_on_cpu(self):
+        engine = self._build_engine_stub()
+        engine.config.model_type = "mixtral"
+        engine.device = "cuda:0"
+
+        class _PackedExperts:
+            def __init__(self):
+                self.gate_up_proj = torch.nn.Parameter(torch.randn(2, 4, 4))
+                self.down_proj = torch.nn.Parameter(torch.randn(2, 2, 2))
+
+        packed_module = SimpleNamespace(layer_id=0, experts=_PackedExperts())
+        engine.expert_layer_modules = [packed_module]
+
+        OffloadEngine._record_requested_residents(
+            engine,
+            resident_file="/tmp/resident.json",
+            resident_expert_ids=[(0, 0), (0, 1)],
+            selection_rule="frontier_prefix",
+        )
+        OffloadEngine._activate_resident_registry(
+            engine,
+            resident_expert_ids=[(0, 0), (0, 1)],
+            node_ids=[10, 11],
+        )
+
+        self.assertEqual(packed_module.resident_local_expert_ids, {0, 1})
+        self.assertEqual(packed_module.resident_fastpath_local_expert_ids, set())
+        registry = OffloadEngine.get_resident_registry(engine)
+        self.assertEqual(registry["fast_path_expert_count"], 0)
 
 
 if __name__ == "__main__":

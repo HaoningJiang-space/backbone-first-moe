@@ -651,7 +651,12 @@ class OffloadEngine(object):
         if experts is None:
             return set()
         if hasattr(experts, "gate_up_proj") and hasattr(experts, "down_proj"):
-            return set(resident_local_ids)
+            target_device = torch.device(self.device)
+            gate_device = getattr(experts.gate_up_proj, "device", None)
+            down_device = getattr(experts.down_proj, "device", None)
+            if gate_device == target_device and down_device == target_device:
+                return set(resident_local_ids)
+            return set()
         return set()
 
     def get_resident_registry(self):
