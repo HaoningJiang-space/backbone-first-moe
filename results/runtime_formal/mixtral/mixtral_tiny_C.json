@@ -1,5 +1,5 @@
 {
-  "tag": "mixtral_tiny_C_resfast2",
+  "tag": "mixtral_tiny_C_contract",
   "model_path": "/data/ziheng/mixtral_tiny_runtime/model",
   "offload_path": "/data/ziheng/mixtral_tiny_runtime/offload",
   "resident_file": "/data/ziheng/mixtral_tiny_runtime/resident_one.json",
@@ -11,11 +11,11 @@
   "seed": 42,
   "total_prompt_tokens": 8,
   "total_generated_tokens": 4,
-  "generated_tokens_per_sec": 8.803107886195455,
-  "end_to_end_tokens_per_sec": 26.409323658586366,
-  "total_elapsed_sec": 0.4543849799083546,
+  "generated_tokens_per_sec": 7.738523897042285,
+  "end_to_end_tokens_per_sec": 23.215571691126854,
+  "total_elapsed_sec": 0.5168944430770352,
   "resident_count": 1,
-  "peak_memory_mb": 17.4111328125,
+  "peak_memory_mb": 16.98681640625,
   "input_shape": [
     1,
     8

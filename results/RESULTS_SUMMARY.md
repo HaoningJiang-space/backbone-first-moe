@@ -58,7 +58,7 @@ DeepSeek-V2-Lite, same GPU, sequential `A/C`, `batch=2`, 2 prompts, 8 new tokens
   - transferable hotspots exist
   - `C > A` on real hardware
   - gains are materially smaller than `Qwen/OLMoE`
-- `Mixtral` currently has positive tiny packed-runtime evidence (`A 8.52 -> C 8.80 gen tok/s`, `+3.3%` after packed-path cleanup), but it should still remain an applicability/boundary model until a formal full-model packed-runtime evaluation is available.
+- `Mixtral` currently has a tiny packed-runtime probe that is essentially at parity (`A 7.73 -> C 7.74 gen tok/s`, `+0.1%`), so it should remain an applicability/boundary model until a formal full-model packed-runtime evaluation is available.
 
 ## Model & Hardware
 - Model: Qwen1.5-MoE-A2.7B-Chat (24 layers, 60 experts, top-4 routing)
