@@ -19,6 +19,11 @@ from backbone_moe.workload import load_state_dict, save_subset_state
 from backbone_moe.simulator import SystemBottleneckAnalyzer
 
 
+def format_mem_tag(mem_ratio: float) -> str:
+    text = f"{mem_ratio:.6f}".rstrip("0").rstrip(".")
+    return text.replace(".", "p")
+
+
 def build_profile_subset(state_file, profile_fraction, temp_dir):
     state_dict = load_state_dict(state_file)
     seq_keys = list(state_dict.keys())
@@ -322,7 +327,7 @@ def main():
                     args,
                 )
 
-            mem_tag = f"{mem_ratio:.2f}".replace(".", "p")
+            mem_tag = format_mem_tag(mem_ratio)
             resident_path = args.output_dir / f"{args.output_prefix}_mem{mem_tag}.json"
             resident_payload = {
                 **resident_info,
@@ -358,7 +363,7 @@ def main():
             knee_k = best_row.get("knee_capacity", best_row["resident_capacity"])
             knee_r = best_row.get("knee_ratio", best_row["resident_ratio"])
             print(
-                f"mem={mem_ratio:.2f}: "
+                f"mem={mem_ratio:g}: "
                 f"frontier_k={best_row['resident_capacity']} (ratio={best_row['resident_ratio']:.2f}), "
                 f"frontier={best_row.get('frontier_capacity', 0)}, "
                 f"horizon={best_row.get('frontier_horizon', args.frontier_horizon)}, "

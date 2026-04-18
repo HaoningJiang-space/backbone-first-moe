@@ -10,9 +10,16 @@ from backbone_moe.evaluation import (
     select_feasible_resident_prefix,
     summarize_resident_applicability,
 )
+from experiments.simulation.select_adaptive_resident_set import format_mem_tag
 
 
 class AdaptiveSplitSelectorTest(unittest.TestCase):
+    def test_format_mem_tag_preserves_small_ratio_precision(self):
+        self.assertEqual(format_mem_tag(0.006), "0p006")
+        self.assertEqual(format_mem_tag(0.008), "0p008")
+        self.assertEqual(format_mem_tag(0.01), "0p01")
+        self.assertEqual(format_mem_tag(0.012), "0p012")
+
     def test_cache_capacity_for_mem_ratio(self):
         self.assertEqual(cache_capacity_for_mem_ratio(0.10, 17.2), 476)
 
