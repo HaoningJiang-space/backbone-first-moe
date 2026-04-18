@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 plot = ["matplotlib"]
-runtime = ["transformers>=4.40"]
+runtime = ["transformers>=5.5.0"]
 
 [tool.setuptools.packages.find]
 include = ["backbone_moe*", "finemoe*"]

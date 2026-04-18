@@ -35,15 +35,17 @@ MODEL_MAPPING_TYPES = {arch: 4 for arch in MODEL_MAPPING_NAMES}
 RUNTIME_BACKEND_HINTS = {
     "deepseek_v2": (
         "DeepSeek-V2 requires a transformers backend that provides "
-        "`transformers.models.deepseek_v2`. On `multi-model-runtime`, either install "
-        "a DeepSeek-capable transformers build or prepend it to `PYTHONPATH` before the repo path. "
+        "`transformers.models.deepseek_v2`. On `multi-model-runtime`, install the runtime extra "
+        "(`pip install -e \".[runtime]\"`, which requires `transformers>=5.5.0`) or prepend a "
+        "DeepSeek-capable backend to `PYTHONPATH` before the repo path. "
         "On host `10.16.52.172`, use "
         "`PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH`."
     ),
     "deepseek_v3": (
         "DeepSeek-V3 requires a transformers backend that provides "
-        "`transformers.models.deepseek_v3`. On `multi-model-runtime`, either install "
-        "a DeepSeek-capable transformers build or prepend it to `PYTHONPATH` before the repo path. "
+        "`transformers.models.deepseek_v3`. On `multi-model-runtime`, install the runtime extra "
+        "(`pip install -e \".[runtime]\"`, which requires `transformers>=5.5.0`) or prepend a "
+        "DeepSeek-capable backend to `PYTHONPATH` before the repo path. "
         "On host `10.16.52.172`, use "
         "`PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH`."
     ),
