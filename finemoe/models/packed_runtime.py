@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, List
+from typing import Dict, Tuple
 
 import torch
 
@@ -30,21 +30,12 @@ def dispatch_packed_experts(
     expert_dispatcher,
 ) -> torch.Tensor:
     tokens, hidden_dim = hidden_states.shape
-    router_mask = torch.zeros(
-        (tokens, num_experts),
-        dtype=torch.bool,
+    router_mask, active_experts, assignment_map = _build_packed_expert_assignments(
+        top_k_index=top_k_index,
+        top_k_weights=top_k_weights,
+        num_experts=num_experts,
         device=hidden_states.device,
     )
-    router_mask.scatter_(1, top_k_index, True)
-
-    token_weights = torch.zeros(
-        (tokens, num_experts),
-        dtype=top_k_weights.dtype,
-        device=top_k_weights.device,
-    )
-    token_weights.scatter_add_(1, top_k_index, top_k_weights)
-
-    active_experts = torch.nonzero(router_mask.any(dim=0), as_tuple=False).flatten().tolist()
     if not active_experts:
         return torch.zeros(
             (tokens, hidden_dim),
@@ -68,11 +59,62 @@ def dispatch_packed_experts(
 
     for output_tensor, _, expert_idx, _ in results:
         expert_idx = int(expert_idx)
-        token_idx = torch.where(router_mask[:, expert_idx])[0]
+        token_idx, weights = assignment_map[expert_idx]
         weighted = output_tensor.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
-        ) * token_weights[token_idx, expert_idx].to(final_hidden_states.dtype).unsqueeze(-1)
+        ) * weights.to(
+            device=final_hidden_states.device,
+            dtype=final_hidden_states.dtype,
+        ).unsqueeze(-1)
         final_hidden_states.index_add_(0, token_idx, weighted)
 
     return final_hidden_states
+
+
+def _build_packed_expert_assignments(
+    *,
+    top_k_index: torch.Tensor,
+    top_k_weights: torch.Tensor,
+    num_experts: int,
+    device: torch.device,
+) -> Tuple[torch.Tensor, list[int], Dict[int, Tuple[torch.Tensor, torch.Tensor]]]:
+    tokens, top_k = top_k_index.shape
+    router_mask = torch.zeros(
+        (tokens, num_experts),
+        dtype=torch.bool,
+        device=device,
+    )
+    if tokens == 0 or top_k == 0:
+        return router_mask, [], {}
+
+    router_mask.scatter_(1, top_k_index, True)
+    token_indices = torch.arange(tokens, device=top_k_index.device).repeat_interleave(top_k)
+    flat_experts = top_k_index.reshape(-1)
+    flat_weights = top_k_weights.reshape(-1)
+    sort_order = torch.argsort(flat_experts)
+    sorted_experts = flat_experts[sort_order]
+    sorted_tokens = token_indices[sort_order]
+    sorted_weights = flat_weights[sort_order]
+
+    block_starts = torch.ones(sorted_experts.numel(), dtype=torch.bool, device=sorted_experts.device)
+    block_starts[1:] = sorted_experts[1:] != sorted_experts[:-1]
+    start_positions = torch.nonzero(block_starts, as_tuple=False).flatten()
+    end_positions = torch.cat(
+        (
+            start_positions[1:],
+            torch.tensor([sorted_experts.numel()], device=sorted_experts.device),
+        )
+    )
+
+    active_experts: list[int] = []
+    assignment_map: Dict[int, Tuple[torch.Tensor, torch.Tensor]] = {}
+    for start, end in zip(start_positions.tolist(), end_positions.tolist()):
+        expert_idx = int(sorted_experts[start])
+        active_experts.append(expert_idx)
+        assignment_map[expert_idx] = (
+            sorted_tokens[start:end],
+            sorted_weights[start:end],
+        )
+
+    return router_mask, active_experts, assignment_map

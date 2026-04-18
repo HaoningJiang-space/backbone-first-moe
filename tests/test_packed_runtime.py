@@ -1,4 +1,6 @@
 import unittest
+import importlib.util
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -9,6 +11,14 @@ from transformers.models.deepseek_v3.modeling_deepseek_v3 import DeepseekV3Confi
 from finemoe.models.modeling_mixtral.modeling_mixtral import SyncMixtralSparseMoeBlock
 from finemoe.models.modeling_deepseek_v2.modeling_deepseek_v2 import SyncDeepseekV2Moe
 from finemoe.models.modeling_deepseek_v3.modeling_deepseek_v3 import SyncDeepseekV3MoE
+
+PACKED_RUNTIME_PATH = Path(__file__).resolve().parents[1] / "finemoe" / "models" / "packed_runtime.py"
+PACKED_SPEC = importlib.util.spec_from_file_location("packed_runtime_local", PACKED_RUNTIME_PATH)
+PACKED_RUNTIME = importlib.util.module_from_spec(PACKED_SPEC)
+assert PACKED_SPEC.loader is not None
+PACKED_SPEC.loader.exec_module(PACKED_RUNTIME)
+
+_build_packed_expert_assignments = PACKED_RUNTIME._build_packed_expert_assignments
 
 
 class FakePackedDispatcher:
@@ -132,6 +142,26 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         sync_block = SyncDeepseekV3MoE(cfg)
         hidden_states = torch.randn(2, 3, cfg.hidden_size)
         self._assert_runtime_equivalent(ref_block, sync_block, hidden_states)
+
+    def test_build_packed_expert_assignments_groups_tokens(self):
+        top_k_index = torch.tensor([[2, 0], [1, 2], [2, 1]], dtype=torch.long)
+        top_k_weights = torch.tensor(
+            [[0.7, 0.3], [0.6, 0.4], [0.8, 0.2]],
+            dtype=torch.float32,
+        )
+        router_mask, active_experts, assignment_map = _build_packed_expert_assignments(
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=4,
+            device=torch.device("cpu"),
+        )
+
+        self.assertEqual(active_experts, [0, 1, 2])
+        self.assertTrue(router_mask[0, 0])
+        self.assertTrue(router_mask[0, 2])
+        token_idx, weights = assignment_map[2]
+        self.assertTrue(torch.equal(token_idx, torch.tensor([0, 1, 2])))
+        self.assertTrue(torch.allclose(weights, torch.tensor([0.7, 0.4, 0.8])))
 
 
 if __name__ == "__main__":
