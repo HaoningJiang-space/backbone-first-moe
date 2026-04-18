@@ -47,9 +47,21 @@ pip install -e ".[runtime]"
 pytest -q
 ```
 
+DeepSeek note for `multi-model-runtime`:
+- `DeepSeek-V2` / `DeepSeek-V3` are **not** fully vendored inside this repo.
+- The local wrappers still require a transformers backend that provides:
+  - `transformers.models.deepseek_v2`
+  - `transformers.models.deepseek_v3`
+- If your installed transformers build does not include those modules, `Qwen`, `OLMoE`, and `Mixtral` can still run, but `DeepSeek` will not.
+- On host `10.16.52.172`, use:
+
+```bash
+export PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH
+```
+
 Fresh-clone validation that has already been exercised:
 - `v0.3.1`: local fresh clone install + full unit test pass + `Qwen/OLMoE` runtime smoke on `10.16.52.172`
-- `multi-model-runtime`: local fresh clone install + full unit test pass + `DeepSeek-V2-Lite` full-model `A/C` probes plus `Mixtral` tiny packed-runtime `A/C` probe on `10.16.52.172`
+- `multi-model-runtime`: local fresh clone install + full unit test pass; `DeepSeek-V2-Lite` full-model probes additionally require a DeepSeek-capable transformers backend; `Mixtral` tiny packed-runtime `A/C` probe has been validated on `10.16.52.172`
 
 ## What This Repository Claims
 
@@ -65,7 +77,7 @@ Runtime support that is validated today depends on the branch:
 - `multi-model-runtime`
   - `Qwen1.5-MoE-A2.7B-Chat`
   - `OLMoE-1B-7B-0924`
-  - `DeepSeek-V2-Lite`
+  - `DeepSeek-V2-Lite` with a DeepSeek-capable transformers backend
   - `Mixtral` / `DeepSeek-V3` packed runtime tiny probes
 
 The selector is not a ratio sweep. It ranks experts by profiling utility, then chooses the largest resident prefix that remains feasible under a burst-aware tail frontier constraint.
@@ -247,7 +259,19 @@ Supported runtime models:
 - `multi-model-runtime`
   - `Qwen1.5-MoE-A2.7B-Chat`
   - `OLMoE-1B-7B-0924`
-  - `DeepSeek-V2-Lite`
+  - `DeepSeek-V2-Lite` with a DeepSeek-capable transformers backend
+
+For `DeepSeek` on `multi-model-runtime`, set your environment so that the DeepSeek-enabled transformers package appears before the repo path on `PYTHONPATH`. On `10.16.52.172`, the validated prefix is:
+
+```bash
+source /home/ziheng/miniconda3/bin/activate mxmoe
+export PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH
+export TMPDIR=/data/ziheng/tmp
+export TMP=/data/ziheng/tmp
+export TEMP=/data/ziheng/tmp
+export TORCH_EXTENSIONS_DIR=/data/ziheng/torch_ext_deepseek_v2
+export CUDA_VISIBLE_DEVICES=0
+```
 
 Backbone-only (`C`) example:
 

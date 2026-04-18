@@ -7,7 +7,7 @@ from huggingface_hub import snapshot_download
 from accelerate import init_empty_weights
 
 from accelerate.utils.versions import is_torch_version
-from finemoe.common.constants import MODEL_MAPPING_NAMES
+from finemoe.common.constants import MODEL_MAPPING_NAMES, raise_unsupported_architecture
 from finemoe.runtime import OffloadEngine
 from finemoe.utils import (
     get_checkpoint_paths,
@@ -72,11 +72,7 @@ class MoE:
 
         arch = parse_moe_architecture(model_config)
         if arch not in MODEL_MAPPING_NAMES:
-            raise RuntimeError(
-                f"The `load_checkpoint_and_dispatch` function does not support the architecture {arch}. "
-                f"Please provide a model that is supported by the function. "
-                f"Supported architectures are {list(MODEL_MAPPING_NAMES.keys())}."
-            )
+            raise_unsupported_architecture(arch)
         self.arch = arch
         self.expert_layout = parse_expert_layout(model_config)
         model_cls = MODEL_MAPPING_NAMES[arch]

@@ -5,7 +5,12 @@ from transformers import AutoConfig, MixtralConfig, DeepseekV2Config
 
 from finemoe.models.modeling_olmoe import OlmoeConfig
 from finemoe.models.modeling_qwen.configuration_qwen2_moe import Qwen2MoeConfig
-from finemoe.common.constants import MODEL_MAPPING_NAMES, parse_expert_type
+from finemoe.common.constants import (
+    MODEL_MAPPING_NAMES,
+    get_runtime_backend_hint,
+    parse_expert_type,
+    raise_unsupported_architecture,
+)
 from finemoe.utils import (
     expand_tensor_for_offload,
     parse_expert_id,
@@ -114,6 +119,15 @@ class HFConfigParsingTest(unittest.TestCase):
     def test_local_auto_config_registration_covers_deepseek(self):
         cfg = AutoConfig.for_model("deepseek_v2")
         self.assertIsInstance(cfg, DeepseekV2Config)
+
+    def test_deepseek_backend_hint_is_explicit(self):
+        hint = get_runtime_backend_hint("deepseek_v2")
+        self.assertIn("transformers.models.deepseek_v2", hint)
+        self.assertIn("PYTHONPATH", hint)
+
+    def test_unsupported_architecture_error_includes_backend_hint(self):
+        with self.assertRaisesRegex(RuntimeError, "transformers.models.deepseek_v2"):
+            raise_unsupported_architecture("deepseek_v2")
 
     def test_mixtral_packed_tensor_expands_to_synthetic_expert_entries(self):
         cfg = MixtralConfig(num_hidden_layers=2, num_local_experts=4, num_experts_per_tok=2, hidden_size=16, intermediate_size=8)
