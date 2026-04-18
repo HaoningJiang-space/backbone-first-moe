@@ -36,6 +36,8 @@
           "gain_percent": 16.855718057798242
         }
       },
+      "fair_runtime": null,
+      "fairness_note": null,
       "applicability": {
         "0.07": {
           "top20_access_coverage": 0.7706523986765922,
@@ -94,6 +96,75 @@
           "gain_percent": 463.1700755367774
         }
       },
+      "fair_runtime": {
+        "0.012": {
+          "A": {
+            "generated_tokens_per_sec": 0.33315518421350726,
+            "end_to_end_tokens_per_sec": 10.99412107904574,
+            "resident_count": 0,
+            "path": "results/runtime_formal/olmoe_fair/olmoe_A_mem0p012.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 0.49878819885578535,
+            "end_to_end_tokens_per_sec": 16.460010562240917,
+            "resident_count": 316,
+            "path": "results/runtime_formal/olmoe_fair/olmoe_C_mem0p012.json"
+          },
+          "gain_percent": 49.71647523159353,
+          "selector": {
+            "selected_resident_ratio": 0.8040712468193384,
+            "selected_resident_capacity": 316,
+            "cache_capacity": 393,
+            "frontier_capacity": 77,
+            "summary_path": "results/runtime_formal/olmoe_fair/olmoe_fair_summary.json"
+          }
+        },
+        "0.014": {
+          "A": {
+            "generated_tokens_per_sec": 0.33357460786812665,
+            "end_to_end_tokens_per_sec": 11.007962059648179,
+            "resident_count": 0,
+            "path": "results/runtime_formal/olmoe_fair/olmoe_A_mem0p014.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 0.546874885961876,
+            "end_to_end_tokens_per_sec": 18.046871236741907,
+            "resident_count": 388,
+            "path": "results/runtime_formal/olmoe_fair/olmoe_C_mem0p014.json"
+          },
+          "gain_percent": 63.943799396767666,
+          "selector": {
+            "selected_resident_ratio": 0.8471615720524017,
+            "selected_resident_capacity": 388,
+            "cache_capacity": 458,
+            "frontier_capacity": 70,
+            "summary_path": "results/runtime_formal/olmoe_fair/olmoe_fair_summary.json"
+          }
+        },
+        "0.016": {
+          "A": {
+            "generated_tokens_per_sec": 0.3339337268484487,
+            "end_to_end_tokens_per_sec": 11.019812985998806,
+            "resident_count": 0,
+            "path": "results/runtime_formal/olmoe_fair/olmoe_A_mem0p016.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 0.6053093516043482,
+            "end_to_end_tokens_per_sec": 19.97520860294349,
+            "resident_count": 462,
+            "path": "results/runtime_formal/olmoe_fair/olmoe_C_mem0p016.json"
+          },
+          "gain_percent": 81.26631212637581,
+          "selector": {
+            "selected_resident_ratio": 0.8816793893129771,
+            "selected_resident_capacity": 462,
+            "cache_capacity": 524,
+            "frontier_capacity": 62,
+            "summary_path": "results/runtime_formal/olmoe_fair/olmoe_fair_summary.json"
+          }
+        }
+      },
+      "fairness_note": "Fixed mem-ratio places OLMoE in a near-full-fit regime because experts are much smaller. Use fair_runtime for cross-model comparisons.",
       "applicability": null,
       "boundary": null
     },
@@ -133,6 +204,8 @@
           "gain_percent": 12.190155017580873
         }
       },
+      "fair_runtime": null,
+      "fairness_note": null,
       "applicability": {
         "0.05": {
           "top20_access_coverage": 0.3650080374104925,
@@ -169,6 +242,8 @@
       "title": "Mixtral-8x7B",
       "role": "applicability_boundary",
       "runtime": {},
+      "fair_runtime": null,
+      "fairness_note": null,
       "applicability": null,
       "boundary": {
         "generalization": {

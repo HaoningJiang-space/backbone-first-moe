@@ -1,0 +1,55 @@
+{
+  "tag": "runtime_eval",
+  "model_path": "/data/ziheng/models/OLMoE-1B-7B-0924",
+  "prompt_file": "/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-chat-1m~eval_prompts.json",
+  "offload_path": "/data/finemoe_offloads/OLMoE-1B-7B-0924",
+  "store_prefix": "",
+  "resident_expert_ids_file": "/data/ziheng/backbone-first-moe_lb/results/olmoe_fair_tests/residents/olmoe_fair_mem0p016.json",
+  "device_memory_ratio": 0.016,
+  "prefetch_distance": 0,
+  "num_prompts": 2,
+  "batch_size": 2,
+  "max_new_tokens": 8,
+  "total_elapsed_sec": 26.4327652589418,
+  "total_prompt_tokens": 512,
+  "total_generated_tokens": 16,
+  "generated_tokens_per_sec": 0.6053093516043482,
+  "end_to_end_tokens_per_sec": 19.97520860294349,
+  "peak_memory_mb": 6723.65576171875,
+  "resident_count": 462,
+  "resident_requested_count": 462,
+  "resident_admitted_count": 462,
+  "resident_clipped": false,
+  "resident_registry": {
+    "enabled": true,
+    "source_file": "/data/ziheng/backbone-first-moe_lb/results/olmoe_fair_tests/residents/olmoe_fair_mem0p016.json",
+    "selection_rule": "frontier_prefix",
+    "layout": "modulelist",
+    "requested_count": 462,
+    "admitted_count": 462,
+    "requested_node_count": 462,
+    "admitted_node_count": 462,
+    "requested_tensor_count": 1386,
+    "admitted_tensor_count": 1386,
+    "requested_bytes": 5813305344,
+    "admitted_bytes": 5813305344,
+    "fast_path_modules": 2310,
+    "fast_path_expert_count": 0,
+    "clipped": false
+  },
+  "per_batch": [
+    {
+      "batch_size": 2,
+      "elapsed_sec": 26.4327652589418,
+      "prompt_tokens": [
+        256,
+        256
+      ],
+      "generated_tokens": [
+        8,
+        8
+      ],
+      "tokens_per_sec": 0.6053093516043482
+    }
+  ]
+}

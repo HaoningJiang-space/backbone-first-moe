@@ -43,6 +43,19 @@ OLMoE-1B-7B-0924, same GPU, `prefetch_distance=0`, 2 prompts, 8 new tokens:
 | 0.07 | 0.3067 | 2.5799 | +741.2% |
 | 0.10 | 0.3157 | 1.7778 | +463.2% |
 
+OLMoE fairness note:
+- fixed `device_memory_ratio` is not cross-model fair for `OLMoE`
+- its experts are much smaller, so `0.07/0.10` falls into a near-full-fit regime
+- keep these numbers as the system-budget view, but use the coverage-matched sweep below for cross-model comparison
+
+OLMoE-1B-7B-0924, coverage-matched fair sweep, same GPU, `prefetch_distance=0`, 2 prompts, 8 new tokens:
+
+| mem | A gen tok/s | C gen tok/s | gain |
+|---|---:|---:|---:|
+| 0.012 | 0.3332 | 0.4988 | +49.7% |
+| 0.014 | 0.3336 | 0.5469 | +63.9% |
+| 0.016 | 0.3339 | 0.6053 | +81.3% |
+
 DeepSeek-V2-Lite, same GPU, sequential `A/C`, `batch=2`, 2 prompts, 8 new tokens:
 
 Runtime precondition:
@@ -59,6 +72,7 @@ Runtime precondition:
 
 - `Qwen` is the primary positive case: compact backbone, meaningful throughput gain, stable resident prefix.
 - `OLMoE` is also a strong positive case, but with a different regime: small experts make resident pinning especially effective.
+- for cross-model fairness, `OLMoE` should be compared using the coverage-matched `0.012/0.014/0.016` sweep rather than the inflated `0.07/0.10` near-full-fit points.
 - `DeepSeek-V2-Lite` is not a negative case. It is a weak positive / boundary case:
   - transferable hotspots exist
   - `C > A` on real hardware

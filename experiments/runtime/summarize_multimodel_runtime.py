@@ -35,6 +35,21 @@ MODEL_MANIFEST = {
                 "C": RESULTS_DIR / "olmoe" / "olmoe_C_mem0p10.json",
             },
         },
+        "fair_runtime": {
+            "0.012": {
+                "A": RESULTS_DIR / "olmoe_fair" / "olmoe_A_mem0p012.json",
+                "C": RESULTS_DIR / "olmoe_fair" / "olmoe_C_mem0p012.json",
+            },
+            "0.014": {
+                "A": RESULTS_DIR / "olmoe_fair" / "olmoe_A_mem0p014.json",
+                "C": RESULTS_DIR / "olmoe_fair" / "olmoe_C_mem0p014.json",
+            },
+            "0.016": {
+                "A": RESULTS_DIR / "olmoe_fair" / "olmoe_A_mem0p016.json",
+                "C": RESULTS_DIR / "olmoe_fair" / "olmoe_C_mem0p016.json",
+            },
+        },
+        "fair_selector_summary": RESULTS_DIR / "olmoe_fair" / "olmoe_fair_summary.json",
         "applicability": None,
     },
     "deepseek_v2_lite": {
@@ -93,6 +108,28 @@ def summarize_runtime_pair(a_path: Path, c_path: Path):
         },
         "gain_percent": gain,
     }
+
+
+def summarize_olmoe_fair_runtime(runtime_spec: dict | None, selector_summary_path: Path | None):
+    if not runtime_spec:
+        return None
+    selector_summary = load_json(selector_summary_path) if selector_summary_path else {"results": []}
+    selector_rows = {
+        f"{float(row['device_memory_ratio']):.3f}": row for row in selector_summary.get("results", [])
+    }
+    fair = {}
+    for mem, pair in runtime_spec.items():
+        row = summarize_runtime_pair(pair["A"], pair["C"])
+        selector_row = selector_rows.get(mem, {})
+        row["selector"] = {
+            "selected_resident_ratio": float(selector_row.get("selected_resident_ratio", 0.0)),
+            "selected_resident_capacity": int(selector_row.get("selected_resident_capacity", row["C"]["resident_count"])),
+            "cache_capacity": int(selector_row.get("cache_capacity", 0)),
+            "frontier_capacity": int(selector_row.get("frontier_capacity", 0)),
+            "summary_path": str(selector_summary_path.relative_to(ROOT)) if selector_summary_path else "",
+        }
+        fair[mem] = row
+    return fair
 
 
 def summarize_applicability(path: Path | None):
@@ -181,6 +218,15 @@ def build_summary():
                 "title": spec["title"],
                 "role": spec["role"],
                 "runtime": runtime,
+                "fair_runtime": summarize_olmoe_fair_runtime(
+                    spec.get("fair_runtime"),
+                    spec.get("fair_selector_summary"),
+                ),
+                "fairness_note": (
+                    "Fixed mem-ratio places OLMoE in a near-full-fit regime because experts are much smaller. Use fair_runtime for cross-model comparisons."
+                    if model_id == "olmoe"
+                    else None
+                ),
                 "applicability": summarize_applicability(spec["applicability"]),
                 "boundary": summarize_mixtral_boundary(spec.get("boundary_assets")),
             }
@@ -232,6 +278,24 @@ def render_markdown(summary):
                 f"{row['slack_utilization']:.3f} |"
             )
     lines.append("")
+    olmoe = next((m for m in summary["models"] if m["model_id"] == "olmoe"), None)
+    if olmoe and olmoe.get("fair_runtime"):
+        lines.append("## OLMoE Coverage-Matched Fairness Check")
+        lines.append("")
+        lines.append("Fixed `device_memory_ratio` is not cross-model fair for `OLMoE`, because its experts are much smaller and `0.07/0.10` falls into a near-full-fit regime.")
+        lines.append("")
+        lines.append("| Model | mem | A gen tok/s | C gen tok/s | gain | C resident | C resident ratio |")
+        lines.append("|---|---:|---:|---:|---:|---:|---:|")
+        for mem, row in sorted(olmoe["fair_runtime"].items(), key=lambda item: float(item[0])):
+            lines.append(
+                f"| {olmoe['title']} | {float(mem):.3f} | "
+                f"{row['A']['generated_tokens_per_sec']:.4f} | "
+                f"{row['C']['generated_tokens_per_sec']:.4f} | "
+                f"{row['gain_percent']:+.1f}% | "
+                f"{row['C']['resident_count']} | "
+                f"{row['selector']['selected_resident_ratio']:.3f} |"
+            )
+        lines.append("")
     lines.append("## Mixtral Boundary Summary")
     lines.append("")
     lines.append("| mem | retained | Jaccard | adaptive ratio | adaptive k | profile tput |")
@@ -265,6 +329,7 @@ def render_markdown(summary):
     lines.append("")
     lines.append("- `Qwen` remains the clearest compact-backbone positive case.")
     lines.append("- `OLMoE` is also strongly positive, but mainly because resident pinning dominates under the current small-expert regime.")
+    lines.append("- for cross-model fairness, `OLMoE` should be compared using the coverage-matched fair sweep (`0.012/0.014/0.016`) rather than the inflated fixed-mem `0.07/0.10` points.")
     lines.append("- `DeepSeek-V2-Lite` is not a negative case: `C > A` on real hardware, but the gains stay modest, so it should be framed as a weak positive / boundary case.")
     lines.append("- `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`) and a positive tiny packed-runtime probe, but without a full-model runtime asset it should still stay as an applicability / boundary model rather than a formal positive runtime case.")
     lines.append("")

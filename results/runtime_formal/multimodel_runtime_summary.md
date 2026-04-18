@@ -5,12 +5,6 @@ Current paper-facing split:
 - `DeepSeek-V2-Lite`: weak positive / boundary case
 - `Mixtral`: applicability / boundary case; tiny packed-runtime probe is positive, but full-model runtime is still missing
 
-DeepSeek runtime precondition:
-- `DeepSeek-V2` / `DeepSeek-V3` are not fully vendored in this repo
-- `multi-model-runtime` requires a transformers backend that provides `transformers.models.deepseek_v2` / `deepseek_v3`
-- on `10.16.52.172`, the validated prefix is:
-  `PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH`
-
 ## Runtime Table
 
 | Model | Role | mem | A gen tok/s | C gen tok/s | gain | C resident |
@@ -32,6 +26,16 @@ DeepSeek runtime precondition:
 | DeepSeek-V2-Lite | 0.07 | 0.365 | 0.324 | 0.378 | 0.000 | 14 | 1.946 |
 | DeepSeek-V2-Lite | 0.10 | 0.365 | 0.314 | 0.366 | 0.000 | 14 | 1.361 |
 
+## OLMoE Coverage-Matched Fairness Check
+
+Fixed `device_memory_ratio` is not cross-model fair for `OLMoE`, because its experts are much smaller and `0.07/0.10` falls into a near-full-fit regime.
+
+| Model | mem | A gen tok/s | C gen tok/s | gain | C resident | C resident ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| OLMoE-1B-7B-0924 | 0.012 | 0.3332 | 0.4988 | +49.7% | 316 | 0.804 |
+| OLMoE-1B-7B-0924 | 0.014 | 0.3336 | 0.5469 | +63.9% | 388 | 0.847 |
+| OLMoE-1B-7B-0924 | 0.016 | 0.3339 | 0.6053 | +81.3% | 462 | 0.882 |
+
 ## Mixtral Boundary Summary
 
 | mem | retained | Jaccard | adaptive ratio | adaptive k | profile tput |
@@ -49,5 +53,7 @@ Tiny packed-runtime probe:
 
 - `Qwen` remains the clearest compact-backbone positive case.
 - `OLMoE` is also strongly positive, but mainly because resident pinning dominates under the current small-expert regime.
+- for cross-model fairness, `OLMoE` should be compared using the coverage-matched fair sweep (`0.012/0.014/0.016`) rather than the inflated fixed-mem `0.07/0.10` points.
 - `DeepSeek-V2-Lite` is not a negative case: `C > A` on real hardware, but the gains stay modest, so it should be framed as a weak positive / boundary case.
 - `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`) and a positive tiny packed-runtime probe, but without a full-model runtime asset it should still stay as an applicability / boundary model rather than a formal positive runtime case.
+

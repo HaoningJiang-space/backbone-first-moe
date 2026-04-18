@@ -122,6 +122,22 @@ Backbone-only improves generation throughput by:
 - `+741.2%` at `mem=0.07`
 - `+463.2%` at `mem=0.10`
 
+Fairness note:
+- `OLMoE` experts are much smaller than `Qwen/DeepSeek`, so fixed `device_memory_ratio` places `OLMoE` in a near-full-fit regime.
+- Keep the fixed-mem numbers for the system-budget view, but use the coverage-matched fair sweep below for cross-model comparison.
+
+OLMoE-1B-7B-0924, coverage-matched fair sweep, same GPU (`cuda:0`), `prefetch_distance=0`, 2 prompts, 8 new tokens.
+
+| Config | mem=0.012 | mem=0.014 | mem=0.016 | Notes |
+|---|---:|---:|---:|---|
+| A demand-only | 0.3332 | 0.3336 | 0.3339 | Fair low-budget baseline |
+| C backbone-only | 0.4988 | 0.5469 | 0.6053 | Frontier-selected resident backbone |
+
+Coverage-matched backbone-only improves generation throughput by:
+- `+49.7%` at `mem=0.012`
+- `+63.9%` at `mem=0.014`
+- `+81.3%` at `mem=0.016`
+
 DeepSeek-V2-Lite, same GPU (`cuda:0`), `prefetch_distance=0`, 2 prompts, 8 new tokens. These numbers are currently validated on `multi-model-runtime`.
 
 | Config | mem=0.07 | mem=0.10 | Notes |
