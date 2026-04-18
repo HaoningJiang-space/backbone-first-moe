@@ -23,6 +23,9 @@ The current positive/runtime boundary split is:
 | DeepSeek-V2-Lite | validated with DeepSeek-capable transformers backend | weak positive / boundary | transferable hotspots exist, but gains are modest |
 | Mixtral | packed runtime tiny-probe only | boundary / applicability case | packed runtime is enabled and tiny `C > A`, but not yet a formal full-model positive case |
 
+For the compact paper-facing cross-model table, use:
+- [results/runtime_formal/paper_runtime_table.md](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/paper_runtime_table.md)
+
 ### Cross-Model Runtime Summary
 
 All numbers below compare:

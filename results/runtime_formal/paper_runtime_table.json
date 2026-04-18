@@ -1,0 +1,98 @@
+{
+  "rows": [
+    {
+      "model_id": "qwen",
+      "title": "Qwen1.5-MoE-A2.7B-Chat",
+      "role": "strong_positive",
+      "view": "runtime",
+      "mem": "0.07",
+      "A_gen_tok_s": 2.9265763734370425,
+      "C_gen_tok_s": 3.2330965511563856,
+      "gain_percent": 10.473677724643093,
+      "resident_count": 275,
+      "A_path": "results/runtime_formal/qwen/qwen_A_mem0p07.json",
+      "C_path": "results/runtime_formal/qwen/qwen_C_mem0p07.json"
+    },
+    {
+      "model_id": "qwen",
+      "title": "Qwen1.5-MoE-A2.7B-Chat",
+      "role": "strong_positive",
+      "view": "runtime",
+      "mem": "0.10",
+      "A_gen_tok_s": 3.0946195556544454,
+      "C_gen_tok_s": 3.616239902917047,
+      "gain_percent": 16.855718057798242,
+      "resident_count": 464,
+      "A_path": "results/runtime_formal/qwen/qwen_A_mem0p10.json",
+      "C_path": "results/runtime_formal/qwen/qwen_C_mem0p10.json"
+    },
+    {
+      "model_id": "olmoe",
+      "title": "OLMoE-1B-7B-0924",
+      "role": "strong_positive",
+      "view": "fair_runtime",
+      "mem": "0.012",
+      "A_gen_tok_s": 0.33315518421350726,
+      "C_gen_tok_s": 0.49878819885578535,
+      "gain_percent": 49.71647523159353,
+      "resident_count": 316,
+      "A_path": "results/runtime_formal/olmoe_fair/olmoe_A_mem0p012.json",
+      "C_path": "results/runtime_formal/olmoe_fair/olmoe_C_mem0p012.json"
+    },
+    {
+      "model_id": "olmoe",
+      "title": "OLMoE-1B-7B-0924",
+      "role": "strong_positive",
+      "view": "fair_runtime",
+      "mem": "0.014",
+      "A_gen_tok_s": 0.33357460786812665,
+      "C_gen_tok_s": 0.546874885961876,
+      "gain_percent": 63.943799396767666,
+      "resident_count": 388,
+      "A_path": "results/runtime_formal/olmoe_fair/olmoe_A_mem0p014.json",
+      "C_path": "results/runtime_formal/olmoe_fair/olmoe_C_mem0p014.json"
+    },
+    {
+      "model_id": "olmoe",
+      "title": "OLMoE-1B-7B-0924",
+      "role": "strong_positive",
+      "view": "fair_runtime",
+      "mem": "0.016",
+      "A_gen_tok_s": 0.3339337268484487,
+      "C_gen_tok_s": 0.6053093516043482,
+      "gain_percent": 81.26631212637581,
+      "resident_count": 462,
+      "A_path": "results/runtime_formal/olmoe_fair/olmoe_A_mem0p016.json",
+      "C_path": "results/runtime_formal/olmoe_fair/olmoe_C_mem0p016.json"
+    },
+    {
+      "model_id": "deepseek_v2_lite",
+      "title": "DeepSeek-V2-Lite",
+      "role": "weak_positive_boundary",
+      "view": "runtime",
+      "mem": "0.07",
+      "A_gen_tok_s": 0.1596684169371653,
+      "C_gen_tok_s": 0.1781505466542565,
+      "gain_percent": 11.575319697924048,
+      "resident_count": 186,
+      "A_path": "results/runtime_formal/deepseek/deepseek_v2_A_mem0p07.json",
+      "C_path": "results/runtime_formal/deepseek/deepseek_v2_C_mem0p07.json"
+    },
+    {
+      "model_id": "deepseek_v2_lite",
+      "title": "DeepSeek-V2-Lite",
+      "role": "weak_positive_boundary",
+      "view": "runtime",
+      "mem": "0.10",
+      "A_gen_tok_s": 0.15829760003976712,
+      "C_gen_tok_s": 0.1775943228737249,
+      "gain_percent": 12.190155017580873,
+      "resident_count": 174,
+      "A_path": "results/runtime_formal/deepseek/deepseek_v2_A_mem0p10.json",
+      "C_path": "results/runtime_formal/deepseek/deepseek_v2_C_mem0p10.json"
+    }
+  ],
+  "notes": [
+    "OLMoE-1B-7B-0924: use coverage-matched fair runtime points for cross-model comparison because fixed mem-ratio is near-full-fit."
+  ]
+}

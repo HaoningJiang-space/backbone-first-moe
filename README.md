@@ -96,6 +96,9 @@ The right applicability questions are:
 - does the model expose a compact resident core?
 - does the available budget leave enough tail slack after pinning that core?
 
+For a paper-facing runtime table that already resolves the `OLMoE` fairness issue, see:
+- [results/runtime_formal/paper_runtime_table.md](results/runtime_formal/paper_runtime_table.md)
+
 ## Validated Real-Hardware Results
 
 Qwen1.5-MoE-A2.7B-Chat, `batch=8`, same GPU (`cuda:0`), `prefetch_distance=0`, 16 prompts, 64 new tokens.
