@@ -170,13 +170,19 @@ def _build_packed_expert_assignments(
 def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, expert_idx: int) -> torch.Tensor:
     if experts_module is None:
         raise RuntimeError("experts_module is required for packed resident fast path")
+    if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
+        gate_up_proj = experts_module.gate_up_proj[expert_idx]
+        down_proj = experts_module.down_proj[expert_idx]
+        gate_up = F.linear(hidden_states, gate_up_proj)
+        if getattr(experts_module, "has_gate", True):
+            gate, up = gate_up.chunk(2, dim=-1)
+            current_hidden_states = experts_module.act_fn(gate) * up
+        else:
+            current_hidden_states = experts_module.act_fn(gate_up)
+        return F.linear(current_hidden_states, down_proj)
+    if isinstance(experts_module, torch.nn.ModuleList):
+        return experts_module[expert_idx](hidden_states)
 
-    gate_up_proj = experts_module.gate_up_proj[expert_idx]
-    down_proj = experts_module.down_proj[expert_idx]
-    gate_up = F.linear(hidden_states, gate_up_proj)
-    if getattr(experts_module, "has_gate", True):
-        gate, up = gate_up.chunk(2, dim=-1)
-        current_hidden_states = experts_module.act_fn(gate) * up
-    else:
-        current_hidden_states = experts_module.act_fn(gate_up)
-    return F.linear(current_hidden_states, down_proj)
+    raise RuntimeError(
+        f"Unsupported packed resident expert container type: {type(experts_module)!r}"
+    )

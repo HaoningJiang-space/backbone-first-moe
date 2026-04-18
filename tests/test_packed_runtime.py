@@ -21,6 +21,7 @@ PACKED_SPEC.loader.exec_module(PACKED_RUNTIME)
 _build_packed_expert_assignments = PACKED_RUNTIME._build_packed_expert_assignments
 install_runtime_device_property = PACKED_RUNTIME.install_runtime_device_property
 dispatch_packed_experts = PACKED_RUNTIME.dispatch_packed_experts
+_run_packed_resident_expert = PACKED_RUNTIME._run_packed_resident_expert
 
 
 class FakePackedDispatcher:
@@ -56,6 +57,16 @@ class FakePackedDispatcher:
             results.append((current_hidden_states, layer_id, expert_idx, 0))
         self.queue = []
         return results
+
+
+class _AffineExpert(torch.nn.Module):
+    def __init__(self, scale: float, bias: float):
+        super().__init__()
+        self.scale = scale
+        self.bias = bias
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x * self.scale + self.bias
 
 
 class PackedRuntimeForwardTest(unittest.TestCase):
@@ -179,6 +190,18 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         self.assertEqual(model.device, torch.device("cpu"))
         model._device = "cuda:0"
         self.assertEqual(model.device, torch.device("cuda:0"))
+
+    def test_run_packed_resident_expert_supports_modulelist_container(self):
+        experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=1.0),
+                _AffineExpert(scale=-1.0, bias=0.5),
+            ]
+        )
+        hidden_states = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
+        actual = _run_packed_resident_expert(experts, hidden_states, 1)
+        expected = experts[1](hidden_states)
+        self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
 
     def test_dispatch_packed_experts_supports_resident_fast_path(self):
         torch.manual_seed(0)
