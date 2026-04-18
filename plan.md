@@ -17,6 +17,9 @@
 - Added a modulelist resident fast path:
   - resident expert subtrees are marked once after pinning
   - generic pre/post hook bookkeeping now bypasses those marked resident subtrees
+- Added grouped modulelist expert dispatch:
+  - `Qwen` and `OLMoE` now dispatch active experts by sorted expert blocks
+  - removed the hot-path `one_hot + torch.where` loop from modulelist MoE execution
 
 ## Next
 
@@ -40,8 +43,8 @@ Goal:
 - Keep `demand-only tail fallback`, but make it cheaper under batch traffic.
 
 Concrete work:
-- Coalesce duplicate tail expert service within the same batch-step.
-- Group modulelist expert execution by active expert blocks instead of `one_hot + torch.where`.
+- Extend grouped demand service beyond modulelist experts to packed expert slices.
+- Reuse grouped demand metadata across repeated warm-path decode steps when possible.
 - Reuse warm-path artifacts to reduce repeated setup cost.
 
 Why:
