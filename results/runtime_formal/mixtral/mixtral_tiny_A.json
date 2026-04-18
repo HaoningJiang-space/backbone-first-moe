@@ -1,0 +1,30 @@
+{
+  "tag": "mixtral_tiny_A",
+  "resident_file": "",
+  "input_shape": [
+    1,
+    8
+  ],
+  "output_shape": [
+    1,
+    12
+  ],
+  "resident_count": 0,
+  "peak_memory_mb": 17.408203125,
+  "output_ids": [
+    [
+      146,
+      6,
+      142,
+      28,
+      166,
+      10,
+      103,
+      128,
+      253,
+      210,
+      149,
+      120
+    ]
+  ]
+}

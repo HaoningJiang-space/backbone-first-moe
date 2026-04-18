@@ -1,0 +1,30 @@
+{
+  "tag": "mixtral_tiny_C",
+  "resident_file": "/data/ziheng/mixtral_tiny_runtime/resident_one.json",
+  "input_shape": [
+    1,
+    8
+  ],
+  "output_shape": [
+    1,
+    12
+  ],
+  "resident_count": 1,
+  "peak_memory_mb": 17.4091796875,
+  "output_ids": [
+    [
+      130,
+      61,
+      19,
+      234,
+      162,
+      83,
+      139,
+      40,
+      52,
+      171,
+      112,
+      31
+    ]
+  ]
+}

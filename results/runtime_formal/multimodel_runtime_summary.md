@@ -26,10 +26,22 @@ Current paper-facing split:
 | DeepSeek-V2-Lite | 0.07 | 0.365 | 0.324 | 0.378 | 0.000 | 14 | 1.946 |
 | DeepSeek-V2-Lite | 0.10 | 0.365 | 0.314 | 0.366 | 0.000 | 14 | 1.361 |
 
+## Mixtral Boundary Summary
+
+| mem | retained | Jaccard | adaptive ratio | adaptive k | profile tput |
+|---:|---:|---:|---:|---:|---:|
+| 0.05 | 3.986 | 0.315 | 0.963 | 78 | 7.7 |
+| 0.07 | 0.962 | 0.355 | 0.518 | 59 | 10.3 |
+| 0.10 | 0.974 | 0.531 | 0.534 | 87 | 15.8 |
+
+Tiny packed-runtime enablement:
+- `A` tiny smoke resident_count=0
+- `C` tiny smoke resident_count=1
+
 ## Interpretation
 
 - `Qwen` remains the clearest compact-backbone positive case.
 - `OLMoE` is also strongly positive, but mainly because resident pinning dominates under the current small-expert regime.
 - `DeepSeek-V2-Lite` is not a negative case: `C > A` on real hardware, but the gains stay modest, so it should be framed as a weak positive / boundary case.
-- `Mixtral` should stay outside the formal positive table until a full packed-runtime probe shows a clear resident-backbone gain.
+- `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`), but without full-model runtime assets it should stay as an applicability / boundary model rather than a formal positive runtime case.
 

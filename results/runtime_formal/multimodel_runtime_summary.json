@@ -55,7 +55,8 @@
           "slack_utilization": 0.0,
           "path": "results/runtime_formal/applicability/qwen_applicability.json"
         }
-      }
+      },
+      "boundary": null
     },
     {
       "model_id": "olmoe",
@@ -93,7 +94,8 @@
           "gain_percent": 463.1700755367774
         }
       },
-      "applicability": null
+      "applicability": null,
+      "boundary": null
     },
     {
       "model_id": "deepseek_v2_lite",
@@ -158,6 +160,62 @@
           "frontier_horizon": 14,
           "slack_utilization": 1.361344537815126,
           "path": "results/runtime_formal/applicability/deepseek_v2_lite_applicability.json"
+        }
+      },
+      "boundary": null
+    },
+    {
+      "model_id": "mixtral",
+      "title": "Mixtral-8x7B",
+      "role": "applicability_boundary",
+      "runtime": {},
+      "applicability": null,
+      "boundary": {
+        "generalization": {
+          "0.05": {
+            "jaccard": 0.3153153153153153,
+            "retained_gain_fraction": 3.9861105127088226,
+            "single_tput": 7.799535755990197,
+            "native_tput": 33.48451910208975
+          },
+          "0.07": {
+            "jaccard": 0.35526315789473684,
+            "retained_gain_fraction": 0.961709605131034,
+            "single_tput": 9.8165369644853,
+            "native_tput": 142.9121493882767
+          },
+          "0.10": {
+            "jaccard": 0.53125,
+            "retained_gain_fraction": 0.974144197457787,
+            "single_tput": 15.4917470979352,
+            "native_tput": 422.71668923340053
+          }
+        },
+        "adaptive": {
+          "0.05": {
+            "selected_resident_ratio": 0.9629629629629629,
+            "selected_resident_capacity": 78,
+            "profile_tput": 7.702617743116502,
+            "cache_capacity": 81
+          },
+          "0.07": {
+            "selected_resident_ratio": 0.5175438596491229,
+            "selected_resident_capacity": 59,
+            "profile_tput": 10.293583080701055,
+            "cache_capacity": 114
+          },
+          "0.10": {
+            "selected_resident_ratio": 0.5337423312883436,
+            "selected_resident_capacity": 87,
+            "profile_tput": 15.818706776868728,
+            "cache_capacity": 163
+          }
+        },
+        "tiny_runtime": {
+          "A_resident_count": 0,
+          "C_resident_count": 1,
+          "A_path": "results/runtime_formal/mixtral/mixtral_tiny_A.json",
+          "C_path": "results/runtime_formal/mixtral/mixtral_tiny_C.json"
         }
       }
     }
