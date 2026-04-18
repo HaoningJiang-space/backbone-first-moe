@@ -30,10 +30,32 @@
   - runtime now assigns `resident_fastpath_local_expert_ids` per layer
   - packed execution consumes that explicit set instead of guessing from container type
   - `ModuleList`-backed packed paths now safely fall back to demand execution
+- Resident admission is now clipped by real sparse-budget bytes:
+  - runtime asks the native topology for `sparse_cache_limit`
+  - resident prefixes are admitted in file order until the real node-byte budget is exhausted
+  - result JSON now records `budget_bytes` alongside requested/admitted bytes
+- Simulation-side resident selection can now infer routed-expert size from `--model-path`:
+  - `select_adaptive_resident_set.py` and `analyze_applicability.py` accept `--model-path`
+  - if `--expert-size-mb` is omitted, they derive expert size from the model config
+  - output JSON now records both `expert_size_mb` and its source
 
 ## Next
 
-### 1. Resident Fast Path
+### 1. Fairness Revalidation
+
+Goal:
+- Re-run the models whose earlier results predate byte-clipped resident admission and confirm the fair-budget story with the current runtime.
+
+Concrete work:
+- Re-run `Mixtral full` with regenerated resident files using config-derived expert size.
+- Re-run at least one representative `Qwen` and `DeepSeek` point on the current branch so their JSON includes `budget_bytes`.
+- Keep `OLMoE` on the fair coverage-matched regime for cross-model comparison.
+
+Why:
+- Fixed-mem CLI parity is not enough; the runtime must now prove that admitted resident bytes stay inside one sparse budget.
+- This turns “same ratio” into an actually defensible fairness claim.
+
+### 2. Resident Fast Path
 
 Goal:
 - Make resident experts a true runtime fast path instead of letting them share as much bookkeeping as ordinary offloaded experts.
@@ -47,7 +69,7 @@ Why:
 - The story stays the same: resident backbone is the main source of throughput gain.
 - This is a runtime realization improvement, not a new selector heuristic.
 
-### 2. Demand Tail Coalescing
+### 3. Demand Tail Coalescing
 
 Goal:
 - Keep `demand-only tail fallback`, but make it cheaper under batch traffic.
@@ -60,7 +82,7 @@ Why:
 - This improves throughput without bringing speculative prefetch back into the critical path.
 - It matches the current paper story and EuroSys positioning.
 
-### 3. Resident Admission in Core Runtime
+### 4. Resident Admission in Core Runtime
 
 Goal:
 - Move requested/admitted/clipped/slack semantics closer to the core runtime and eventually expose them from C++.
@@ -74,7 +96,7 @@ Why:
 - This is the right C++ work for the current stage.
 - It strengthens the system abstraction instead of adding controller logic.
 
-### 4. Packed Runtime Cleanup
+### 5. Packed Runtime Cleanup
 
 Goal:
 - Reduce overhead on packed MoE paths (`Mixtral`, `DeepSeek`) without changing the serving abstraction.

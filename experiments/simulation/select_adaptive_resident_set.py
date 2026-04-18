@@ -3,6 +3,8 @@ import json
 import tempfile
 from pathlib import Path
 
+from transformers import AutoConfig
+
 from backbone_moe.evaluation import (
     best_by_throughput,
     cache_capacity_for_mem_ratio,
@@ -14,6 +16,7 @@ from backbone_moe.evaluation import (
     rank_resident_candidates,
     select_feasible_resident_prefix,
 )
+from finemoe.utils import infer_routed_expert_size_mb, normalize_runtime_config
 from backbone_moe.workload import load_state_dict, save_subset_state
 
 from backbone_moe.simulator import SystemBottleneckAnalyzer
@@ -22,6 +25,16 @@ from backbone_moe.simulator import SystemBottleneckAnalyzer
 def format_mem_tag(mem_ratio: float) -> str:
     text = f"{mem_ratio:.6f}".rstrip("0").rstrip(".")
     return text.replace(".", "p")
+
+
+def resolve_expert_size_mb(args):
+    if args.expert_size_mb is not None:
+        return float(args.expert_size_mb), "cli"
+    if args.model_path:
+        config = AutoConfig.from_pretrained(args.model_path, trust_remote_code=True)
+        config = normalize_runtime_config(config)
+        return float(infer_routed_expert_size_mb(config)), f"model:{args.model_path}"
+    return 17.2, "default"
 
 
 def build_profile_subset(state_file, profile_fraction, temp_dir):
@@ -275,10 +288,12 @@ def main():
     parser.add_argument("--resident-profile-ratio", type=float, default=0.2)
     parser.add_argument("--resident-depth-power", type=float, default=1.0)
     parser.add_argument("--reset-mode", type=str, default="shared", choices=["shared", "per_sequence"])
-    parser.add_argument("--expert-size-mb", type=float, default=17.2)
+    parser.add_argument("--model-path", type=str, default="")
+    parser.add_argument("--expert-size-mb", type=float, default=None)
     parser.add_argument("--h2d-bandwidth-gbps", type=float, default=16.0)
     parser.add_argument("--gpu-compute-time-ms", type=float, default=2.0)
     args = parser.parse_args()
+    args.expert_size_mb, expert_size_source = resolve_expert_size_mb(args)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summary = {
@@ -287,6 +302,8 @@ def main():
         "resident_policy": args.resident_policy,
         "resident_profile_ratio": float(args.resident_profile_ratio),
         "selection_method": args.selection_method,
+        "expert_size_mb": float(args.expert_size_mb),
+        "expert_size_source": expert_size_source,
         "frontier_percentile": float(args.frontier_percentile),
         "frontier_horizon": int(args.frontier_horizon),
         "candidate_ratios": [float(x) for x in args.candidate_ratios],
@@ -340,6 +357,8 @@ def main():
                 "selection_frontier_percentile": float(best_row.get("frontier_percentile", args.frontier_percentile)),
                 "selection_frontier_horizon": int(best_row.get("frontier_horizon", args.frontier_horizon)),
                 "selection_knee_capacity": int(best_row.get("knee_capacity", 0)),
+                "expert_size_mb": float(args.expert_size_mb),
+                "expert_size_source": expert_size_source,
                 "selection_candidates": candidates,
             }
             resident_path.write_text(json.dumps(resident_payload, indent=2))

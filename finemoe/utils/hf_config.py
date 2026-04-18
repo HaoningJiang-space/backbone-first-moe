@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import re
 
 import torch
-from transformers import PretrainedConfig
+from transformers import AutoConfig, PretrainedConfig
 
 
 _PACKED_MOE_PREFIX = r"(?:model\.)?layers\.(\d+)\.(?:mlp|block_sparse_moe)"
@@ -108,6 +108,69 @@ def parse_expert_dtype_id(config: PretrainedConfig) -> int:
     if dtype == torch.float16:
         return 2
     raise RuntimeError(f"Unsupported expert dtype {dtype}")
+
+
+def dtype_nbytes(dtype: torch.dtype) -> int:
+    if dtype in {torch.float16, torch.bfloat16, torch.int16, torch.uint16}:
+        return 2
+    if dtype in {torch.float32, torch.int32, torch.uint32}:
+        return 4
+    if dtype in {torch.float64, torch.int64, torch.uint64}:
+        return 8
+    if dtype in {torch.int8, torch.uint8, torch.bool}:
+        return 1
+    raise RuntimeError(f"Unsupported dtype for byte-size inference: {dtype}")
+
+
+def infer_expert_intermediate_size(config: PretrainedConfig) -> int:
+    arch = parse_moe_architecture(config)
+    if arch == "qwen":
+        value = getattr(config, "moe_intermediate_size", None)
+        if value is None:
+            value = getattr(config, "intermediate_size", None)
+    elif arch in {"olmoe", "mixtral"}:
+        value = getattr(config, "intermediate_size", None)
+    elif arch in {"deepseek_v2", "deepseek_v3"}:
+        value = getattr(config, "moe_intermediate_size", None)
+        if value is None:
+            value = getattr(config, "intermediate_size", None)
+    else:
+        raise RuntimeError(f"Unsupported architecture {arch}")
+
+    if value is None or int(value) <= 0:
+        raise RuntimeError(
+            f"Could not infer expert intermediate size for architecture {arch}: "
+            f"got {value!r} from config."
+        )
+    return int(value)
+
+
+def infer_routed_expert_size_bytes(config: PretrainedConfig) -> int:
+    """
+    Estimate the routed-expert parameter footprint for one expert.
+
+    This models the routed MLP weights only:
+      - gate / w1
+      - up / w3
+      - down / w2
+
+    Biases are ignored because the dominant error mode we need to fix is the
+    multi-hundred-MB underestimate on packed MoE checkpoints.
+    """
+    config = normalize_runtime_config(config)
+    hidden_size = int(getattr(config, "hidden_size"))
+    intermediate_size = infer_expert_intermediate_size(config)
+    bytes_per_param = dtype_nbytes(parse_expert_dtype(config))
+    return 3 * hidden_size * intermediate_size * bytes_per_param
+
+
+def infer_routed_expert_size_mb(config: PretrainedConfig) -> float:
+    return float(infer_routed_expert_size_bytes(config) / (1024 ** 2))
+
+
+def load_config_and_infer_expert_size_mb(model_path: str) -> float:
+    config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
+    return infer_routed_expert_size_mb(config)
 
 
 def parse_moe_param(config: PretrainedConfig) -> Tuple[int, int, int, int, int]:

@@ -34,10 +34,11 @@ class ResidentRegistryTest(unittest.TestCase):
         return engine
 
     @staticmethod
-    def _fake_archer_engine(node_map):
+    def _fake_archer_engine(node_map, sparse_cache_limit=0):
         class _FakeArcherEngine:
-            def __init__(self, mapping):
+            def __init__(self, mapping, sparse_cache_limit=0):
                 self.mapping = mapping
+                self.sparse_cache_limit = sparse_cache_limit
 
             def get_node_id(self, tensor_ids):
                 return self.mapping[int(tensor_ids[0])][0]
@@ -45,7 +46,10 @@ class ResidentRegistryTest(unittest.TestCase):
             def get_node_byte_size(self, tensor_ids):
                 return self.mapping[int(tensor_ids[0])][1]
 
-        return _FakeArcherEngine(node_map)
+            def get_sparse_cache_limit(self, device):
+                return self.sparse_cache_limit
+
+        return _FakeArcherEngine(node_map, sparse_cache_limit=sparse_cache_limit)
 
     def test_load_resident_ids_preserves_order_and_records_registry(self):
         engine = self._build_engine_stub()
@@ -105,6 +109,7 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(registry["admitted_tensor_count"], 4)
         self.assertEqual(registry["requested_bytes"], 448)
         self.assertEqual(registry["admitted_bytes"], 448)
+        self.assertEqual(registry["budget_bytes"], 0)
         self.assertTrue(registry["clipped"])
 
     def test_collect_unique_node_stats_deduplicates_packed_tensor_ids(self):
@@ -193,6 +198,28 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(packed_module.resident_fastpath_local_expert_ids, set())
         registry = OffloadEngine.get_resident_registry(engine)
         self.assertEqual(registry["fast_path_expert_count"], 0)
+
+    def test_clip_resident_prefix_respects_sparse_budget(self):
+        engine = self._build_engine_stub()
+        engine.device = "cuda:0"
+        engine.archer_engine = self._fake_archer_engine(
+            {
+                10: (100, 128),
+                11: (101, 128),
+                12: (102, 128),
+            },
+            sparse_cache_limit=256,
+        )
+
+        admitted_experts, admitted_tensors = OffloadEngine._clip_resident_prefix_to_sparse_budget(
+            engine,
+            resident_expert_ids=[(0, 0), (0, 1), (0, 2)],
+            expert_tensor_ids=[[10], [11], [12]],
+        )
+
+        self.assertEqual(admitted_experts, [(0, 0), (0, 1)])
+        self.assertEqual(admitted_tensors, [10, 11])
+        self.assertEqual(engine.resident_registry.budget_bytes, 256)
 
 
 if __name__ == "__main__":

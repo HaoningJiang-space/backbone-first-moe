@@ -462,6 +462,11 @@ std::int64_t ArcherPrefetchHandle::GetNodeByteSize(std::vector<std::uint32_t> te
     return node->byte_size;
 }
 
+std::int64_t ArcherPrefetchHandle::GetSparseCacheLimit(const torch::Device& device) const
+{
+    return kTopologyHandle->GetSparseCacheLimit(device);
+}
+
 // void ArcherPrefetchHandle::SetNodeCachePriority(const std::uint32_t tensor_id, const float priority) {
 //     auto node = kTopologyHandle->GetNodeFromTensorID(tensor_id);
 //     node->cache_priority = priority;

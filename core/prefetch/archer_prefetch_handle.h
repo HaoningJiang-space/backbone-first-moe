@@ -34,6 +34,7 @@ public:
     int GetNodeDevice(std::vector<std::uint32_t> tensor_ids) const;
     std::size_t GetNodeId(std::vector<std::uint32_t> tensor_ids) const;
     std::int64_t GetNodeByteSize(std::vector<std::uint32_t> tensor_ids) const;
+    std::int64_t GetSparseCacheLimit(const torch::Device& device) const;
 
     void SetTensorDevice(torch::Tensor& tensor, torch::Device device) const;
 

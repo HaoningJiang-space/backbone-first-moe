@@ -334,6 +334,7 @@ class ResidentRegistry:
     admitted_tensor_count: int = 0
     requested_bytes: int = 0
     admitted_bytes: int = 0
+    budget_bytes: int = 0
     fast_path_modules: int = 0
     fast_path_expert_count: int = 0
     clipped: bool = False
@@ -352,6 +353,7 @@ class ResidentRegistry:
             "admitted_tensor_count": int(self.admitted_tensor_count),
             "requested_bytes": int(self.requested_bytes),
             "admitted_bytes": int(self.admitted_bytes),
+            "budget_bytes": int(self.budget_bytes),
             "fast_path_modules": int(self.fast_path_modules),
             "fast_path_expert_count": int(self.fast_path_expert_count),
             "clipped": bool(self.clipped),
@@ -575,6 +577,7 @@ class OffloadEngine(object):
         self.resident_registry.admitted_node_count = 0
         self.resident_registry.admitted_tensor_count = 0
         self.resident_registry.admitted_bytes = 0
+        self.resident_registry.budget_bytes = 0
         self.resident_registry.fast_path_modules = 0
         self.resident_registry.fast_path_expert_count = 0
         self.resident_registry.clipped = False
@@ -644,6 +647,50 @@ class OffloadEngine(object):
             total += int(self.archer_engine.get_node_byte_size([int(tensor_id)]))
         return unique_node_ids, total
 
+    def _get_sparse_budget_bytes(self):
+        if not hasattr(self, "archer_engine") or self.archer_engine is None:
+            return 0
+        getter = getattr(self.archer_engine, "get_sparse_cache_limit", None)
+        if getter is None:
+            return 0
+        return int(getter(torch.device(self.device)))
+
+    def _clip_resident_prefix_to_sparse_budget(self, resident_expert_ids, expert_tensor_ids):
+        budget_bytes = self._get_sparse_budget_bytes()
+        self.resident_registry.budget_bytes = budget_bytes
+        if budget_bytes <= 0:
+            tensor_ids = [tensor_id for group in expert_tensor_ids for tensor_id in group]
+            return list(resident_expert_ids), tensor_ids
+
+        admitted_expert_ids = []
+        admitted_tensor_ids = []
+        seen_node_ids = set()
+        admitted_bytes = 0
+
+        for resident_key, tensor_ids in zip(resident_expert_ids, expert_tensor_ids):
+            incremental_node_ids = []
+            incremental_bytes = 0
+            for tensor_id in tensor_ids:
+                node_id = int(self.archer_engine.get_node_id([int(tensor_id)]))
+                if node_id in seen_node_ids:
+                    continue
+                seen_node_ids.add(node_id)
+                incremental_node_ids.append(node_id)
+                incremental_bytes += int(self.archer_engine.get_node_byte_size([int(tensor_id)]))
+
+            if admitted_expert_ids and admitted_bytes + incremental_bytes > budget_bytes:
+                break
+            if not admitted_expert_ids and incremental_bytes > budget_bytes:
+                admitted_tensor_ids = []
+                admitted_expert_ids = []
+                break
+
+            admitted_expert_ids.append(resident_key)
+            admitted_tensor_ids.extend(tensor_ids)
+            admitted_bytes += incremental_bytes
+
+        return admitted_expert_ids, admitted_tensor_ids
+
     def _resolve_resident_fastpath_ids(self, module, resident_local_ids):
         if not resident_local_ids:
             return set()
@@ -691,20 +738,27 @@ class OffloadEngine(object):
         # 收集所有 resident expert 的 tensor_id（C++ 节点 id）
         node_ids = []
         if self._is_packed_layout():
+            expert_tensor_ids = []
             for layer_id, expert_id in resident_expert_ids:
                 tensor_ids = self.expert_tensor_groups.get((layer_id, expert_id))
                 if tensor_ids is None:
                     raise KeyError(
                         f"Could not find packed tensor ids for resident expert ({layer_id}, {expert_id})"
                     )
+                expert_tensor_ids.append(list(tensor_ids))
                 node_ids.extend(tensor_ids)
             requested_node_ids, requested_bytes = self._collect_unique_node_stats(node_ids)
             self.resident_registry.requested_node_ids = requested_node_ids
             self.resident_registry.requested_node_count = len(requested_node_ids)
             self.resident_registry.requested_tensor_count = len(node_ids)
             self.resident_registry.requested_bytes = requested_bytes
-            self.archer_engine.pin_resident_nodes(node_ids)
-            self._activate_resident_registry(resident_expert_ids, node_ids)
+            admitted_expert_ids, admitted_tensor_ids = self._clip_resident_prefix_to_sparse_budget(
+                resident_expert_ids,
+                expert_tensor_ids,
+            )
+            if admitted_tensor_ids:
+                self.archer_engine.pin_resident_nodes(admitted_tensor_ids)
+            self._activate_resident_registry(admitted_expert_ids, admitted_tensor_ids)
             print(
                 f"Pinned {self.resident_registry.admitted_count} resident experts "
                 f"({self.resident_registry.admitted_tensor_count} tensors) on {self.device}",
@@ -712,6 +766,7 @@ class OffloadEngine(object):
             )
             return
 
+        expert_tensor_ids = []
         for layer_id, expert_id in resident_expert_ids:
             if not (0 <= layer_id < len(self.moe_layers)):
                 raise IndexError(
@@ -732,16 +787,22 @@ class OffloadEngine(object):
                     f"Could not find tensor id for resident expert "
                     f"({layer_id}, {expert_id})"
                 )
+            expert_tensor_ids.append([tensor_id])
             node_ids.append(tensor_id)
         requested_node_ids, requested_bytes = self._collect_unique_node_stats(node_ids)
         self.resident_registry.requested_node_ids = requested_node_ids
         self.resident_registry.requested_node_count = len(requested_node_ids)
         self.resident_registry.requested_tensor_count = len(node_ids)
         self.resident_registry.requested_bytes = requested_bytes
+        admitted_resident_ids, admitted_node_ids = self._clip_resident_prefix_to_sparse_budget(
+            resident_expert_ids,
+            expert_tensor_ids,
+        )
 
         # C++ native pin: load to GPU + mark is_resident + exempt from eviction
         # C++ 原生 pin：加载到 GPU + 标记 is_resident + 驱逐豁免
-        self.archer_engine.pin_resident_nodes(node_ids)
+        if admitted_node_ids:
+            self.archer_engine.pin_resident_nodes(admitted_node_ids)
 
         # Materialize Python tensor data pointers via begin().
         # The C++ engine loaded data to GPU internally, but Python tensors
@@ -752,7 +813,7 @@ class OffloadEngine(object):
         # begin() 会更新它们。is_resident=true 保证不被驱逐，所以这里安全。
         pinned_tensors = 0
         fast_path_modules = 0
-        for layer_id, expert_id in resident_expert_ids:
+        for layer_id, expert_id in admitted_resident_ids:
             expert_module = self.moe_layers[layer_id].experts[expert_id]
             for param in expert_module.parameters(recurse=True):
                 if param.data.data_ptr() in self.offload_set:
@@ -774,8 +835,7 @@ class OffloadEngine(object):
                 pinned_tensors += 1
             fast_path_modules += self._mark_module_resident_fastpath(expert_module)
 
-        self._activate_resident_registry(resident_expert_ids, node_ids)
-        self.resident_registry.requested_tensor_count = pinned_tensors
+        self._activate_resident_registry(admitted_resident_ids, admitted_node_ids)
         self.resident_registry.admitted_tensor_count = pinned_tensors
         self.resident_registry.fast_path_modules = fast_path_modules
         print(

@@ -13,6 +13,7 @@ from finemoe.common.constants import (
 )
 from finemoe.utils import (
     expand_tensor_for_offload,
+    infer_routed_expert_size_mb,
     parse_expert_id,
     normalize_runtime_config,
     parse_expert_layout,
@@ -62,6 +63,7 @@ class HFConfigParsingTest(unittest.TestCase):
             parse_expert_id("model.layers.3.block_sparse_moe.experts.5.w2.weight", cfg),
             (3, 5),
         )
+        self.assertGreater(infer_routed_expert_size_mb(cfg), 300.0)
 
     def test_deepseek_v2_packed_layout(self):
         cfg = DeepseekV2Config(
@@ -102,6 +104,21 @@ class HFConfigParsingTest(unittest.TestCase):
             parse_expert_id("layers.5.mlp.experts.3.down_proj.weight", cfg),
             (4, 3),
         )
+        self.assertGreater(infer_routed_expert_size_mb(cfg), 30.0)
+
+    def test_qwen_expert_size_inference_prefers_moe_intermediate_size(self):
+        cfg = Qwen2MoeConfig(
+            num_hidden_layers=24,
+            num_experts=60,
+            num_experts_per_tok=4,
+            hidden_size=2048,
+            moe_intermediate_size=1408,
+            intermediate_size=5632,
+            torch_dtype=torch.bfloat16,
+        )
+        size_mb = infer_routed_expert_size_mb(cfg)
+        self.assertGreater(size_mb, 16.0)
+        self.assertLess(size_mb, 17.0)
 
     def test_model_registry_includes_packed_architectures(self):
         self.assertIn("mixtral", MODEL_MAPPING_NAMES)
