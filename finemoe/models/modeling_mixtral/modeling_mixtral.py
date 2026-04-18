@@ -12,6 +12,7 @@ from ..packed_runtime import (
     dispatch_packed_experts,
     ensure_no_prefetch_runtime,
     install_runtime_device_property,
+    trace_packed_batch,
 )
 
 
@@ -54,6 +55,13 @@ class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):
             num_experts = getattr(self.experts, "num_experts", None)
         if num_experts is None:
             num_experts = len(self.experts)
+        trace_packed_batch(
+            module=self,
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=num_experts,
+        )
         final_hidden_states = dispatch_packed_experts(
             hidden_states=flat_states,
             top_k_index=top_k_index,

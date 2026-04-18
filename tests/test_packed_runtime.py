@@ -24,6 +24,7 @@ dispatch_packed_experts = PACKED_RUNTIME.dispatch_packed_experts
 _run_packed_resident_expert = PACKED_RUNTIME._run_packed_resident_expert
 _infer_module_device = PACKED_RUNTIME._infer_module_device
 _supports_packed_resident_fastpath = PACKED_RUNTIME._supports_packed_resident_fastpath
+trace_packed_batch = PACKED_RUNTIME.trace_packed_batch
 
 
 class FakePackedDispatcher:
@@ -94,6 +95,14 @@ class _MixedDeviceExpert(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x
+
+
+class _FakeTracer:
+    def __init__(self):
+        self.calls = []
+
+    def update_entry(self, **kwargs):
+        self.calls.append(kwargs)
 
 
 class PackedRuntimeForwardTest(unittest.TestCase):
@@ -354,6 +363,37 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         self.assertNotIn(next(iter(resident_ids)), dispatched)
         self.assertEqual(dispatched, set(active_experts) - resident_ids)
         self.assertEqual(dispatcher.wait_calls, 1)
+
+    def test_trace_packed_batch_updates_each_sequence(self):
+        hidden_states = torch.randn(2, 3, 4)
+        top_k_index = torch.tensor(
+            [[0, 1], [1, 2], [0, 2], [1, 0], [2, 1], [0, 1]],
+            dtype=torch.long,
+        )
+        top_k_weights = torch.tensor(
+            [[0.7, 0.3], [0.6, 0.4], [0.8, 0.2], [0.55, 0.45], [0.9, 0.1], [0.65, 0.35]],
+            dtype=torch.float32,
+        )
+        tracer = _FakeTracer()
+        module = type("PackedModule", (), {})()
+        module.expert_tracer = tracer
+        module.seq_id_list = ["seq0", "seq1"]
+        module.layer_id = 3
+
+        trace_packed_batch(
+            module=module,
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=3,
+        )
+
+        self.assertEqual(len(tracer.calls), 2)
+        self.assertEqual(tracer.calls[0]["seq_id"], "seq0")
+        self.assertEqual(tracer.calls[1]["seq_id"], "seq1")
+        self.assertEqual(tuple(tracer.calls[0]["expert_list"].shape), (3, 2))
+        self.assertEqual(tuple(tracer.calls[0]["hidden_states"].shape), (3, 4))
+        self.assertEqual(tuple(tracer.calls[0]["expert_probs"].shape), (3, 3))
 
 
 if __name__ == "__main__":

@@ -129,6 +129,45 @@ def dispatch_packed_experts(
     return final_hidden_states
 
 
+def trace_packed_batch(
+    *,
+    module,
+    hidden_states: torch.Tensor,
+    top_k_index: torch.Tensor,
+    top_k_weights: torch.Tensor,
+    num_experts: int,
+) -> None:
+    tracer = getattr(module, "expert_tracer", None)
+    seq_id_list = getattr(module, "seq_id_list", None) or ()
+    layer_id = getattr(module, "layer_id", None)
+    if tracer is None or layer_id is None or hidden_states.dim() != 3 or not seq_id_list:
+        return
+
+    batch_size, sequence_length, hidden_dim = hidden_states.shape
+    if len(seq_id_list) != batch_size:
+        return
+
+    flat_states = hidden_states.reshape(-1, hidden_dim)
+    expert_index = top_k_index.reshape(batch_size, sequence_length, -1)
+    expert_probs = torch.zeros(
+        (batch_size * sequence_length, num_experts),
+        dtype=top_k_weights.dtype,
+        device=top_k_weights.device,
+    )
+    expert_probs.scatter_(1, top_k_index, top_k_weights.to(expert_probs.dtype))
+
+    for i, seq_id in enumerate(seq_id_list):
+        start = i * sequence_length
+        end = (i + 1) * sequence_length
+        tracer.update_entry(
+            seq_id=seq_id,
+            expert_list=expert_index[i],
+            layer_idx=layer_id,
+            hidden_states=flat_states[start:end],
+            expert_probs=expert_probs[start:end],
+        )
+
+
 def _build_packed_expert_assignments(
     *,
     top_k_index: torch.Tensor,

@@ -133,6 +133,10 @@ class MoE:
             )
 
     def _configure_hook(self, input_ids: torch.LongTensor):
+        trace_enabled = (
+            getattr(self.engine, "expert_tracer", None) is not None
+            and (self.eval_mode == "online" or self.prefetch_distance > 0)
+        )
         if self.arch == "qwen":
             finemoe.models.modeling_qwen.modeling_qwen2_moe.apply_rotary_pos_emb = (
                 apply_rotary_pos_emb
@@ -144,7 +148,7 @@ class MoE:
         elif self.expert_layout != "packed":
             raise ValueError(f"{self.arch} not supported")
 
-        if self.prefetch_distance <= 0:
+        if not trace_enabled:
             self.seq_id_list = []
             self.model.seq_id_list = self.seq_id_list
             self.model.model.seq_id_list = self.seq_id_list

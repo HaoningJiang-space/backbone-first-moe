@@ -1127,13 +1127,26 @@ class OffloadEngine(object):
                 is_flash_attn_available = kwargs.get(
                     "is_flash_attn_available", False)
                 if self.dtype_cls is torch.bfloat16 or self.dtype_cls is torch.float16:
-                    model = cls._from_config(
-                        self.config,
-                        torch_dtype=self.dtype_cls,
-                        attn_implementation=(
-                            "flash_attention_2" if is_flash_attn_available else "eager"
-                        ),
-                    )
+                    requested_attn_impl = "flash_attention_2" if is_flash_attn_available else "eager"
+                    try:
+                        model = cls._from_config(
+                            self.config,
+                            torch_dtype=self.dtype_cls,
+                            attn_implementation=requested_attn_impl,
+                        )
+                    except ValueError as exc:
+                        if requested_attn_impl != "flash_attention_2" or "Flash Attention 2" not in str(exc):
+                            raise
+                        print(
+                            f"[WARNING] {cls.__name__} rejected flash_attention_2 on the current backend; "
+                            "falling back to eager attention.",
+                            flush=True,
+                        )
+                        model = cls._from_config(
+                            self.config,
+                            torch_dtype=self.dtype_cls,
+                            attn_implementation="eager",
+                        )
                 else:
                     model = cls._from_config(
                         self.config,
