@@ -7,6 +7,59 @@
 > frontier-feasible resident prefix selector.
 > Use this file for historical comparison, not for the current paper claim.
 
+## Current Runtime Claim
+
+The current paper-facing claim is:
+- serving path: `resident backbone + demand-only tail fallback`
+- selector: `frontier-feasible resident prefix`
+- applicability: methods should be evaluated under both concentration and budget sufficiency
+
+The current positive/runtime boundary split is:
+
+| Model | Runtime status | Role in paper | Interpretation |
+|---|---|---|---|
+| Qwen1.5-MoE-A2.7B-Chat | validated | strong positive | compact backbone, clear throughput gain |
+| OLMoE-1B-7B-0924 | validated | strong positive | resident backbone dominates under current budgets |
+| DeepSeek-V2-Lite | validated | weak positive / boundary | transferable hotspots exist, but gains are modest |
+| Mixtral | packed runtime tiny-smoke only | boundary / applicability case | packed runtime is enabled, but not yet a formal positive case |
+
+### Cross-Model Runtime Summary
+
+All numbers below compare:
+- `A`: demand-only baseline
+- `C`: resident backbone + demand-only tail
+
+Qwen1.5-MoE-A2.7B-Chat, same GPU, `batch=8`, `prefetch_distance=0`, 16 prompts, 64 new tokens:
+
+| mem | A gen tok/s | C gen tok/s | gain |
+|---|---:|---:|---:|
+| 0.07 | 2.9266 | 3.2331 | +10.5% |
+| 0.10 | 3.0946 | 3.6162 | +16.9% |
+
+OLMoE-1B-7B-0924, same GPU, `prefetch_distance=0`, 2 prompts, 8 new tokens:
+
+| mem | A gen tok/s | C gen tok/s | gain |
+|---|---:|---:|---:|
+| 0.07 | 0.3067 | 2.5799 | +741.2% |
+| 0.10 | 0.3157 | 1.7778 | +463.2% |
+
+DeepSeek-V2-Lite, same GPU, sequential `A/C`, `batch=2`, 2 prompts, 8 new tokens:
+
+| mem | A gen tok/s | C gen tok/s | gain |
+|---|---:|---:|---:|
+| 0.07 | 0.1597 | 0.1782 | +11.6% |
+| 0.10 | 0.1583 | 0.1776 | +12.2% |
+
+### Cross-Model Interpretation
+
+- `Qwen` is the primary positive case: compact backbone, meaningful throughput gain, stable resident prefix.
+- `OLMoE` is also a strong positive case, but with a different regime: small experts make resident pinning especially effective.
+- `DeepSeek-V2-Lite` is not a negative case. It is a weak positive / boundary case:
+  - transferable hotspots exist
+  - `C > A` on real hardware
+  - gains are materially smaller than `Qwen/OLMoE`
+- `Mixtral` should remain an applicability/boundary model until a formal packed-runtime evaluation shows a clear resident-backbone gain.
+
 ## Model & Hardware
 - Model: Qwen1.5-MoE-A2.7B-Chat (24 layers, 60 experts, top-4 routing)
 - GPU: NVIDIA A800 80GB PCIe
