@@ -194,8 +194,6 @@ def _supports_packed_resident_fast_path(experts_module, expert_idx: int) -> bool
         return False
     if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
         return True
-    if isinstance(experts_module, torch.nn.ModuleList):
-        return _infer_module_device(experts_module[expert_idx]) is not None
     return False
 
 
