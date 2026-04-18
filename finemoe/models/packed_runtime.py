@@ -173,8 +173,20 @@ def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, exp
             current_hidden_states = experts_module.act_fn(gate_up)
         return F.linear(current_hidden_states, down_proj)
     if isinstance(experts_module, torch.nn.ModuleList):
-        return experts_module[expert_idx](hidden_states)
+        expert_module = experts_module[expert_idx]
+        expert_device = _infer_module_device(expert_module)
+        if expert_device is not None and hidden_states.device != expert_device:
+            hidden_states = hidden_states.to(expert_device)
+        return expert_module(hidden_states)
 
     raise RuntimeError(
         f"Unsupported packed resident expert container type: {type(experts_module)!r}"
     )
+
+
+def _infer_module_device(module) -> torch.device | None:
+    for param in module.parameters(recurse=True):
+        return param.device
+    for buf in module.buffers(recurse=True):
+        return buf.device
+    return None
