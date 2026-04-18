@@ -409,6 +409,13 @@ the diagnostics tell us in advance whether a model should enter the main runtime
 `Mixtral`, `DeepSeek-V2`, and `DeepSeek-V3` are now runtime-enabled on the packed path,
 but only via tiny end-to-end validation so far.
 
+DeepSeek-specific reproducibility note:
+- the packed runtime path lives on `multi-model-runtime`
+- but `DeepSeek-V2/V3` wrappers still import `transformers.models.deepseek_v2/v3`
+- so fresh-clone runtime reproduction additionally requires a DeepSeek-capable transformers backend
+- on `10.16.52.172`, the validated prefix is:
+  `PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH`
+
 That means:
 - the packed runtime path is real
 - these models are no longer "unsupported"

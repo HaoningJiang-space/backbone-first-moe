@@ -5,6 +5,12 @@ Current paper-facing split:
 - `DeepSeek-V2-Lite`: weak positive / boundary case
 - `Mixtral`: applicability / boundary case; tiny packed-runtime probe is positive, but full-model runtime is still missing
 
+DeepSeek runtime precondition:
+- `DeepSeek-V2` / `DeepSeek-V3` are not fully vendored in this repo
+- `multi-model-runtime` requires a transformers backend that provides `transformers.models.deepseek_v2` / `deepseek_v3`
+- on `10.16.52.172`, the validated prefix is:
+  `PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH`
+
 ## Runtime Table
 
 | Model | Role | mem | A gen tok/s | C gen tok/s | gain | C resident |
@@ -45,4 +51,3 @@ Tiny packed-runtime probe:
 - `OLMoE` is also strongly positive, but mainly because resident pinning dominates under the current small-expert regime.
 - `DeepSeek-V2-Lite` is not a negative case: `C > A` on real hardware, but the gains stay modest, so it should be framed as a weak positive / boundary case.
 - `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`) and a positive tiny packed-runtime probe, but without a full-model runtime asset it should still stay as an applicability / boundary model rather than a formal positive runtime case.
-

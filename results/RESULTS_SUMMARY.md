@@ -20,7 +20,7 @@ The current positive/runtime boundary split is:
 |---|---|---|---|
 | Qwen1.5-MoE-A2.7B-Chat | validated | strong positive | compact backbone, clear throughput gain |
 | OLMoE-1B-7B-0924 | validated | strong positive | resident backbone dominates under current budgets |
-| DeepSeek-V2-Lite | validated | weak positive / boundary | transferable hotspots exist, but gains are modest |
+| DeepSeek-V2-Lite | validated with DeepSeek-capable transformers backend | weak positive / boundary | transferable hotspots exist, but gains are modest |
 | Mixtral | packed runtime tiny-probe only | boundary / applicability case | packed runtime is enabled and tiny `C > A`, but not yet a formal full-model positive case |
 
 ### Cross-Model Runtime Summary
@@ -44,6 +44,11 @@ OLMoE-1B-7B-0924, same GPU, `prefetch_distance=0`, 2 prompts, 8 new tokens:
 | 0.10 | 0.3157 | 1.7778 | +463.2% |
 
 DeepSeek-V2-Lite, same GPU, sequential `A/C`, `batch=2`, 2 prompts, 8 new tokens:
+
+Runtime precondition:
+- these probes require a transformers backend that provides `transformers.models.deepseek_v2`
+- on `10.16.52.172`, the validated prefix is:
+  `PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH`
 
 | mem | A gen tok/s | C gen tok/s | gain |
 |---|---:|---:|---:|
