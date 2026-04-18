@@ -30,12 +30,20 @@ from configs.datasets.config_lmsys import (
     max_new_tokens,
     min_new_tokens,
 )
+from finemoe.utils import normalize_runtime_config, parse_expert_layout
 
 warnings.filterwarnings("ignore")
 
 
 def resolve_moe_name(resolved_model_path: str) -> str:
     return Path(resolved_model_path.rstrip("/")).name
+
+
+def resolve_trace_prefetch_distance(model_config) -> int:
+    normalized = normalize_runtime_config(model_config)
+    if parse_expert_layout(normalized) == "packed":
+        return 0
+    return prefetch_distance
 
 
 def load_prompts(prompt_file):
@@ -106,12 +114,18 @@ def main():
 
     moe_name = resolve_moe_name(resolved_model_path)
 
+    model_config = transformers.AutoConfig.from_pretrained(
+        resolved_model_path,
+        trust_remote_code=True,
+    )
+    trace_prefetch_distance = resolve_trace_prefetch_distance(model_config)
+
     model = MoE(
         resolved_model_path,
         {
             "offload_path": os.path.join(offload_path, moe_name),
             "device_memory_ratio": device_memory_ratio,
-            "prefetch_distance": prefetch_distance,
+            "prefetch_distance": trace_prefetch_distance,
             "store_capacity": None,
             "device": device,
             "eval_batch_size": args.batch_size,
