@@ -20,6 +20,12 @@
 - Added grouped modulelist expert dispatch:
   - `Qwen` and `OLMoE` now dispatch active experts by sorted expert blocks
   - removed the hot-path `one_hot + torch.where` loop from modulelist MoE execution
+- Added grouped packed expert dispatch:
+  - `Mixtral` / `DeepSeek` now build active packed expert assignments once per step
+  - removed the hot-path per-expert `torch.where(router_mask[:, expert_idx])` lookup
+- Aligned packed model `device` semantics with runtime execution device:
+  - packed runtime models now expose the configured runtime device to `generate()`
+  - removed the `input_ids on cuda / model on cpu` warning on packed tiny probes
 
 ## Next
 
@@ -31,7 +37,7 @@ Goal:
 Concrete work:
 - Separate resident-hit handling from generic `begin()/end()` hook logic.
 - Make resident metadata queryable without walking Python module state.
-- Extend the fast path beyond modulelist experts to packed expert slices.
+- Add a true resident-hit fast path for packed experts, not just grouped demand dispatch.
 
 Why:
 - The story stays the same: resident backbone is the main source of throughput gain.
@@ -43,8 +49,7 @@ Goal:
 - Keep `demand-only tail fallback`, but make it cheaper under batch traffic.
 
 Concrete work:
-- Extend grouped demand service beyond modulelist experts to packed expert slices.
-- Reuse grouped demand metadata across repeated warm-path decode steps when possible.
+- Reuse grouped packed/modulelist demand metadata across repeated warm-path decode steps when possible.
 - Reuse warm-path artifacts to reduce repeated setup cost.
 
 Why:
