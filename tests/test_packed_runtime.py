@@ -22,6 +22,7 @@ _build_packed_expert_assignments = PACKED_RUNTIME._build_packed_expert_assignmen
 install_runtime_device_property = PACKED_RUNTIME.install_runtime_device_property
 dispatch_packed_experts = PACKED_RUNTIME.dispatch_packed_experts
 _run_packed_resident_expert = PACKED_RUNTIME._run_packed_resident_expert
+_infer_module_device = PACKED_RUNTIME._infer_module_device
 
 
 class FakePackedDispatcher:
@@ -82,6 +83,16 @@ class _AffineExpert(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x * self.scale + self.bias
+
+
+class _MixedDeviceExpert(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.ones(2, 2))
+        self.register_buffer("other_device_buffer", torch.ones(2, device="meta"))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x
 
 
 class PackedRuntimeForwardTest(unittest.TestCase):
@@ -217,6 +228,10 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         actual = _run_packed_resident_expert(experts, hidden_states, 1)
         expected = experts[1](hidden_states)
         self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
+
+    def test_infer_module_device_returns_none_for_mixed_devices(self):
+        expert = _MixedDeviceExpert()
+        self.assertIsNone(_infer_module_device(expert))
 
     def test_dispatch_packed_experts_supports_resident_fast_path(self):
         torch.manual_seed(0)

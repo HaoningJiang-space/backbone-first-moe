@@ -72,8 +72,13 @@ def dispatch_packed_experts(
     )
 
     resident_expert_ids = set(resident_expert_ids or ())
-    resident_active = [expert_idx for expert_idx in active_experts if expert_idx in resident_expert_ids]
-    demand_active = [expert_idx for expert_idx in active_experts if expert_idx not in resident_expert_ids]
+    resident_active: list[int] = []
+    demand_active: list[int] = []
+    for expert_idx in active_experts:
+        if expert_idx in resident_expert_ids and _supports_packed_resident_fast_path(experts_module, expert_idx):
+            resident_active.append(expert_idx)
+        else:
+            demand_active.append(expert_idx)
 
     for expert_idx in resident_active:
         token_idx, weights = assignment_map[expert_idx]
@@ -184,9 +189,25 @@ def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, exp
     )
 
 
+def _supports_packed_resident_fast_path(experts_module, expert_idx: int) -> bool:
+    if experts_module is None:
+        return False
+    if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
+        return True
+    if isinstance(experts_module, torch.nn.ModuleList):
+        return _infer_module_device(experts_module[expert_idx]) is not None
+    return False
+
+
 def _infer_module_device(module) -> torch.device | None:
+    devices = []
     for param in module.parameters(recurse=True):
-        return param.device
+        devices.append(param.device)
     for buf in module.buffers(recurse=True):
-        return buf.device
-    return None
+        devices.append(buf.device)
+    if not devices:
+        return None
+    first = devices[0]
+    if any(device != first for device in devices[1:]):
+        return None
+    return first
