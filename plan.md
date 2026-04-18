@@ -14,6 +14,9 @@
   - `source_file`
 - Runtime evaluation output now exposes this state in [finemoe/backbone/runtime_eval.py](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/finemoe/backbone/runtime_eval.py).
 - Added resident-registry tests in [tests/test_resident_registry.py](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/tests/test_resident_registry.py).
+- Added a modulelist resident fast path:
+  - resident expert subtrees are marked once after pinning
+  - generic pre/post hook bookkeeping now bypasses those marked resident subtrees
 
 ## Next
 
@@ -25,7 +28,7 @@ Goal:
 Concrete work:
 - Separate resident-hit handling from generic `begin()/end()` hook logic.
 - Make resident metadata queryable without walking Python module state.
-- Reduce packed-slice indirection on resident hits.
+- Extend the fast path beyond modulelist experts to packed expert slices.
 
 Why:
 - The story stays the same: resident backbone is the main source of throughput gain.

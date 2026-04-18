@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import torch.nn as nn
 from finemoe.models.modeling_qwen.configuration_qwen2_moe import Qwen2MoeConfig
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "finemoe" / "runtime" / "model_offload.py"
@@ -78,6 +79,16 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(registry["admitted_count"], 2)
         self.assertEqual(registry["admitted_tensor_count"], 4)
         self.assertTrue(registry["clipped"])
+
+    def test_mark_module_resident_fastpath_marks_subtree(self):
+        engine = self._build_engine_stub()
+        module = nn.Sequential(nn.Linear(4, 4), nn.Sequential(nn.Linear(4, 4)))
+        marked = OffloadEngine._mark_module_resident_fastpath(engine, module)
+        self.assertEqual(marked, 4)
+        self.assertTrue(getattr(module, "_archer_resident_fastpath"))
+        self.assertTrue(getattr(module[0], "_archer_resident_fastpath"))
+        self.assertTrue(getattr(module[1], "_archer_resident_fastpath"))
+        self.assertTrue(getattr(module[1][0], "_archer_resident_fastpath"))
 
 
 if __name__ == "__main__":

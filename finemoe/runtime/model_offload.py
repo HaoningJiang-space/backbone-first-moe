@@ -330,6 +330,7 @@ class ResidentRegistry:
     admitted_count: int = 0
     requested_tensor_count: int = 0
     admitted_tensor_count: int = 0
+    fast_path_modules: int = 0
     clipped: bool = False
 
     def to_public_dict(self):
@@ -342,6 +343,7 @@ class ResidentRegistry:
             "admitted_count": int(self.admitted_count),
             "requested_tensor_count": int(self.requested_tensor_count),
             "admitted_tensor_count": int(self.admitted_tensor_count),
+            "fast_path_modules": int(self.fast_path_modules),
             "clipped": bool(self.clipped),
         }
 
@@ -559,6 +561,7 @@ class OffloadEngine(object):
         self.resident_registry.admitted_count = 0
         self.resident_registry.admitted_node_ids = []
         self.resident_registry.admitted_tensor_count = 0
+        self.resident_registry.fast_path_modules = 0
         self.resident_registry.clipped = False
 
     def _activate_resident_registry(self, resident_expert_ids, node_ids):
@@ -584,6 +587,19 @@ class OffloadEngine(object):
 
     def get_resident_registry(self):
         return self.resident_registry.to_public_dict()
+
+    def _mark_module_resident_fastpath(self, module):
+        """Mark a resident expert subtree to bypass generic hook bookkeeping."""
+        marked = 0
+        stack = [module]
+        while stack:
+            current = stack.pop()
+            if getattr(current, "_archer_resident_fastpath", False):
+                continue
+            current._archer_resident_fastpath = True
+            marked += 1
+            stack.extend(list(current.children()))
+        return marked
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.
@@ -655,6 +671,7 @@ class OffloadEngine(object):
         # C++ 引擎已经把数据加载到 GPU，但 Python tensor 仍指向占位内存。
         # begin() 会更新它们。is_resident=true 保证不被驱逐，所以这里安全。
         pinned_tensors = 0
+        fast_path_modules = 0
         for layer_id, expert_id in resident_expert_ids:
             expert_module = self.moe_layers[layer_id].experts[expert_id]
             for param in expert_module.parameters(recurse=True):
@@ -675,10 +692,12 @@ class OffloadEngine(object):
                     self.offload_set.add(buf.data_ptr())
                 self.offload_set.discard(buf.data_ptr())
                 pinned_tensors += 1
+            fast_path_modules += self._mark_module_resident_fastpath(expert_module)
 
         self._activate_resident_registry(resident_expert_ids, node_ids)
         self.resident_registry.requested_tensor_count = pinned_tensors
         self.resident_registry.admitted_tensor_count = pinned_tensors
+        self.resident_registry.fast_path_modules = fast_path_modules
         print(
             f"Pinned {self.resident_registry.admitted_count} resident experts "
             f"({pinned_tensors} tensors) on {self.device}",
@@ -1461,6 +1480,8 @@ class OffloadEngine(object):
 
         @torch.no_grad()
         def _pre_forward_module_hook(module, args, kwargs):
+            if getattr(module, "_archer_resident_fastpath", False):
+                return
             # if self.request_id_flag == False:
             #     self.request_id_flag = True
             #     # print(kwargs, args, type(module))
@@ -1499,6 +1520,8 @@ class OffloadEngine(object):
 
         @torch.no_grad()
         def _post_forward_module_hook(module, input, output):
+            if getattr(module, "_archer_resident_fastpath", False):
+                return
             device_list = []
             param_not_offload = set()
             for param in module.parameters(recurse=False):
