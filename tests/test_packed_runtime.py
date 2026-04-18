@@ -19,6 +19,7 @@ assert PACKED_SPEC.loader is not None
 PACKED_SPEC.loader.exec_module(PACKED_RUNTIME)
 
 _build_packed_expert_assignments = PACKED_RUNTIME._build_packed_expert_assignments
+install_runtime_device_property = PACKED_RUNTIME.install_runtime_device_property
 
 
 class FakePackedDispatcher:
@@ -162,6 +163,21 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         token_idx, weights = assignment_map[2]
         self.assertTrue(torch.equal(token_idx, torch.tensor([0, 1, 2])))
         self.assertTrue(torch.allclose(weights, torch.tensor([0.7, 0.4, 0.8])))
+
+    def test_install_runtime_device_property_prefers_runtime_device(self):
+        class _DummyBase:
+            @property
+            def device(self):
+                return torch.device("cpu")
+
+        class _DummyModel(_DummyBase):
+            pass
+
+        install_runtime_device_property(_DummyModel)
+        model = _DummyModel()
+        self.assertEqual(model.device, torch.device("cpu"))
+        model._device = "cuda:0"
+        self.assertEqual(model.device, torch.device("cuda:0"))
 
 
 if __name__ == "__main__":

@@ -8,7 +8,14 @@ from transformers.models.mixtral.modeling_mixtral import (
     MixtralSparseMoeBlock,
 )
 
-from ..packed_runtime import dispatch_packed_experts, ensure_no_prefetch_runtime
+from ..packed_runtime import (
+    dispatch_packed_experts,
+    ensure_no_prefetch_runtime,
+    install_runtime_device_property,
+)
+
+
+install_runtime_device_property(MixtralPreTrainedModel)
 
 
 class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):

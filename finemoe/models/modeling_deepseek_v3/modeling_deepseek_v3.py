@@ -9,7 +9,14 @@ from transformers.models.deepseek_v3.modeling_deepseek_v3 import (
     DeepseekV3PreTrainedModel,
 )
 
-from ..packed_runtime import dispatch_packed_experts, ensure_no_prefetch_runtime
+from ..packed_runtime import (
+    dispatch_packed_experts,
+    ensure_no_prefetch_runtime,
+    install_runtime_device_property,
+)
+
+
+install_runtime_device_property(DeepseekV3PreTrainedModel)
 
 
 class SyncDeepseekV3MoE(DeepseekV3MoE):

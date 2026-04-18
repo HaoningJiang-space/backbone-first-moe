@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 import torch
+from transformers.modeling_utils import PreTrainedModel
 
 
 def ensure_no_prefetch_runtime(module) -> None:
@@ -18,6 +19,24 @@ def ensure_no_prefetch_runtime(module) -> None:
         raise RuntimeError("expert_dispatcher is not initialized for packed-expert block")
     if getattr(module, "layer_id", None) is None:
         raise RuntimeError("layer_id is not initialized for packed-expert block")
+
+
+def install_runtime_device_property(model_cls) -> None:
+    if getattr(model_cls, "_archer_runtime_device_installed", False):
+        return
+
+    original_device = getattr(model_cls, "device", None)
+
+    def _device(self):
+        runtime_device = getattr(self, "_device", None)
+        if runtime_device is not None:
+            return torch.device(runtime_device)
+        if isinstance(original_device, property) and original_device.fget is not None:
+            return original_device.fget(self)
+        return PreTrainedModel.device.fget(self)
+
+    model_cls.device = property(_device)
+    model_cls._archer_runtime_device_installed = True
 
 
 def dispatch_packed_experts(
