@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 import torch
+import torch.nn.functional as F
 from transformers.modeling_utils import PreTrainedModel
 
 
@@ -47,6 +48,8 @@ def dispatch_packed_experts(
     num_experts: int,
     layer_id: int,
     expert_dispatcher,
+    experts_module=None,
+    resident_expert_ids=None,
 ) -> torch.Tensor:
     tokens, hidden_dim = hidden_states.shape
     router_mask, active_experts, assignment_map = _build_packed_expert_assignments(
@@ -76,9 +79,13 @@ def dispatch_packed_experts(
         device=hidden_states.device,
     )
 
-    for output_tensor, _, expert_idx, _ in results:
-        expert_idx = int(expert_idx)
+    resident_expert_ids = set(resident_expert_ids or ())
+    resident_active = [expert_idx for expert_idx in active_experts if expert_idx in resident_expert_ids]
+    demand_active = [expert_idx for expert_idx in active_experts if expert_idx not in resident_expert_ids]
+
+    for expert_idx in resident_active:
         token_idx, weights = assignment_map[expert_idx]
+        output_tensor = _run_packed_resident_expert(experts_module, hidden_states[token_idx], expert_idx)
         weighted = output_tensor.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
@@ -87,6 +94,27 @@ def dispatch_packed_experts(
             dtype=final_hidden_states.dtype,
         ).unsqueeze(-1)
         final_hidden_states.index_add_(0, token_idx, weighted)
+
+    if demand_active:
+        expert_dispatcher.set_inputs(hidden_states, router_mask)
+        expert_dispatcher.set_expected_queue(len(demand_active))
+        gpu_id = hidden_states.device.index if hidden_states.is_cuda else -1
+
+        for expert_idx in demand_active:
+            expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), gpu_id, False)
+
+        results = expert_dispatcher.wait_expert()
+        for output_tensor, _, expert_idx, _ in results:
+            expert_idx = int(expert_idx)
+            token_idx, weights = assignment_map[expert_idx]
+            weighted = output_tensor.to(
+                device=final_hidden_states.device,
+                dtype=final_hidden_states.dtype,
+            ) * weights.to(
+                device=final_hidden_states.device,
+                dtype=final_hidden_states.dtype,
+            ).unsqueeze(-1)
+            final_hidden_states.index_add_(0, token_idx, weighted)
 
     return final_hidden_states
 
@@ -137,3 +165,18 @@ def _build_packed_expert_assignments(
         )
 
     return router_mask, active_experts, assignment_map
+
+
+def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, expert_idx: int) -> torch.Tensor:
+    if experts_module is None:
+        raise RuntimeError("experts_module is required for packed resident fast path")
+
+    gate_up_proj = experts_module.gate_up_proj[expert_idx]
+    down_proj = experts_module.down_proj[expert_idx]
+    gate_up = F.linear(hidden_states, gate_up_proj)
+    if getattr(experts_module, "has_gate", True):
+        gate, up = gate_up.chunk(2, dim=-1)
+        current_hidden_states = experts_module.act_fn(gate) * up
+    else:
+        current_hidden_states = experts_module.act_fn(gate_up)
+    return F.linear(current_hidden_states, down_proj)

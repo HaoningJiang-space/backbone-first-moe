@@ -20,6 +20,7 @@ PACKED_SPEC.loader.exec_module(PACKED_RUNTIME)
 
 _build_packed_expert_assignments = PACKED_RUNTIME._build_packed_expert_assignments
 install_runtime_device_property = PACKED_RUNTIME.install_runtime_device_property
+dispatch_packed_experts = PACKED_RUNTIME.dispatch_packed_experts
 
 
 class FakePackedDispatcher:
@@ -178,6 +179,62 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         self.assertEqual(model.device, torch.device("cpu"))
         model._device = "cuda:0"
         self.assertEqual(model.device, torch.device("cuda:0"))
+
+    def test_dispatch_packed_experts_supports_resident_fast_path(self):
+        torch.manual_seed(0)
+        cfg = MixtralConfig(
+            num_hidden_layers=1,
+            hidden_size=32,
+            intermediate_size=16,
+            num_local_experts=4,
+            num_experts_per_tok=2,
+            num_attention_heads=4,
+            num_key_value_heads=4,
+        )
+        block = SyncMixtralSparseMoeBlock(cfg)
+        self._reinitialize_parameters(block)
+        hidden_states = torch.randn(5, cfg.hidden_size)
+        gate_output = block.gate(hidden_states)
+        if isinstance(gate_output, tuple):
+            if len(gate_output) == 3:
+                _, top_k_weights, top_k_index = gate_output
+            else:
+                top_k_weights, top_k_index = gate_output
+        else:
+            routing_weights = F.softmax(gate_output, dim=1, dtype=torch.float)
+            top_k_weights, top_k_index = torch.topk(routing_weights, block.top_k, dim=-1)
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)
+            top_k_weights = top_k_weights.to(hidden_states.dtype)
+        dispatcher = FakePackedDispatcher(block.experts, block.experts.act_fn)
+
+        baseline = dispatch_packed_experts(
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            layer_id=0,
+            expert_dispatcher=dispatcher,
+            experts_module=block.experts,
+            resident_expert_ids=(),
+        )
+        resident = dispatch_packed_experts(
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            layer_id=0,
+            expert_dispatcher=FakePackedDispatcher(block.experts, block.experts.act_fn),
+            experts_module=block.experts,
+            resident_expert_ids={0, 1, 2, 3},
+        )
+        self.assertTrue(
+            torch.allclose(
+                torch.nan_to_num(baseline),
+                torch.nan_to_num(resident),
+                atol=1e-5,
+                rtol=1e-4,
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -61,6 +61,8 @@ class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):
             num_experts=num_experts,
             layer_id=self.layer_id,
             expert_dispatcher=self.expert_dispatcher,
+            experts_module=self.experts,
+            resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
         )
         final_hidden_states = final_hidden_states.reshape(
             batch_size, sequence_length, hidden_dim

@@ -584,6 +584,15 @@ class OffloadEngine(object):
             self.resident_registry.requested_count
             != self.resident_registry.admitted_count
         )
+        for module in getattr(self, "expert_layer_modules", []):
+            layer_id = getattr(module, "layer_id", None)
+            if layer_id is None:
+                continue
+            module.resident_local_expert_ids = {
+                expert_id
+                for resid_layer_id, expert_id in self.resident_expert_ids_set
+                if resid_layer_id == layer_id
+            }
 
     def get_resident_registry(self):
         return self.resident_registry.to_public_dict()
