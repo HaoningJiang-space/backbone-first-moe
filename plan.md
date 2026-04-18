@@ -26,6 +26,10 @@
 - Aligned packed model `device` semantics with runtime execution device:
   - packed runtime models now expose the configured runtime device to `generate()`
   - removed the `input_ids on cuda / model on cpu` warning on packed tiny probes
+- Added an explicit packed resident fast-path contract:
+  - runtime now assigns `resident_fastpath_local_expert_ids` per layer
+  - packed execution consumes that explicit set instead of guessing from container type
+  - `ModuleList`-backed packed paths now safely fall back to demand execution
 
 ## Next
 

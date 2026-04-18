@@ -62,7 +62,7 @@ class SyncDeepseekV3MoE(DeepseekV3MoE):
             layer_id=self.layer_id,
             expert_dispatcher=self.expert_dispatcher,
             experts_module=self.experts,
-            resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
+            resident_fastpath_expert_ids=getattr(self, "resident_fastpath_local_expert_ids", ()),
         ).view(*orig_shape)
         hidden_states = hidden_states + self.shared_experts(residuals)
         return hidden_states

@@ -90,6 +90,38 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertTrue(getattr(module[1], "_archer_resident_fastpath"))
         self.assertTrue(getattr(module[1][0], "_archer_resident_fastpath"))
 
+    def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
+        engine = self._build_engine_stub()
+        engine.config.model_type = "mixtral"
+
+        class _PackedExperts:
+            def __init__(self):
+                self.gate_up_proj = object()
+                self.down_proj = object()
+
+        packed_module = SimpleNamespace(layer_id=0, experts=_PackedExperts())
+        modulelist_module = SimpleNamespace(layer_id=1, experts=nn.ModuleList([nn.Linear(2, 2)]))
+        engine.expert_layer_modules = [packed_module, modulelist_module]
+
+        OffloadEngine._record_requested_residents(
+            engine,
+            resident_file="/tmp/resident.json",
+            resident_expert_ids=[(0, 2), (0, 3), (1, 0)],
+            selection_rule="frontier_prefix",
+        )
+        OffloadEngine._activate_resident_registry(
+            engine,
+            resident_expert_ids=[(0, 2), (0, 3), (1, 0)],
+            node_ids=[10, 11, 12],
+        )
+
+        self.assertEqual(packed_module.resident_local_expert_ids, {2, 3})
+        self.assertEqual(packed_module.resident_fastpath_local_expert_ids, {2, 3})
+        self.assertEqual(modulelist_module.resident_local_expert_ids, {0})
+        self.assertEqual(modulelist_module.resident_fastpath_local_expert_ids, set())
+        registry = OffloadEngine.get_resident_registry(engine)
+        self.assertEqual(registry["fast_path_expert_count"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

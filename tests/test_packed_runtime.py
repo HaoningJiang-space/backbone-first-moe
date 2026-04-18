@@ -233,15 +233,6 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         expert = _MixedDeviceExpert()
         self.assertIsNone(_infer_module_device(expert))
 
-    def test_modulelist_containers_do_not_use_packed_resident_fast_path(self):
-        experts = torch.nn.ModuleList(
-            [
-                _AffineExpert(scale=2.0, bias=1.0),
-                _AffineExpert(scale=-1.0, bias=0.5),
-            ]
-        )
-        self.assertFalse(PACKED_RUNTIME._supports_packed_resident_fast_path(experts, 0))
-
     def test_dispatch_packed_experts_supports_resident_fast_path(self):
         torch.manual_seed(0)
         cfg = MixtralConfig(
@@ -277,7 +268,7 @@ class PackedRuntimeForwardTest(unittest.TestCase):
             layer_id=0,
             expert_dispatcher=dispatcher,
             experts_module=block.experts,
-            resident_expert_ids=(),
+            resident_fastpath_expert_ids=(),
         )
         resident = dispatch_packed_experts(
             hidden_states=hidden_states,
@@ -287,7 +278,7 @@ class PackedRuntimeForwardTest(unittest.TestCase):
             layer_id=0,
             expert_dispatcher=FakePackedDispatcher(block.experts, block.experts.act_fn),
             experts_module=block.experts,
-            resident_expert_ids={0, 1, 2, 3},
+            resident_fastpath_expert_ids={0, 1, 2, 3},
         )
         self.assertTrue(
             torch.allclose(
@@ -341,7 +332,7 @@ class PackedRuntimeForwardTest(unittest.TestCase):
             layer_id=0,
             expert_dispatcher=dispatcher,
             experts_module=block.experts,
-            resident_expert_ids=resident_ids,
+            resident_fastpath_expert_ids=resident_ids,
         )
 
         dispatched = {expert_idx for _, expert_idx in dispatcher.enqueued}

@@ -331,6 +331,7 @@ class ResidentRegistry:
     requested_tensor_count: int = 0
     admitted_tensor_count: int = 0
     fast_path_modules: int = 0
+    fast_path_expert_count: int = 0
     clipped: bool = False
 
     def to_public_dict(self):
@@ -344,6 +345,7 @@ class ResidentRegistry:
             "requested_tensor_count": int(self.requested_tensor_count),
             "admitted_tensor_count": int(self.admitted_tensor_count),
             "fast_path_modules": int(self.fast_path_modules),
+            "fast_path_expert_count": int(self.fast_path_expert_count),
             "clipped": bool(self.clipped),
         }
 
@@ -562,6 +564,7 @@ class OffloadEngine(object):
         self.resident_registry.admitted_node_ids = []
         self.resident_registry.admitted_tensor_count = 0
         self.resident_registry.fast_path_modules = 0
+        self.resident_registry.fast_path_expert_count = 0
         self.resident_registry.clipped = False
 
     def _activate_resident_registry(self, resident_expert_ids, node_ids):
@@ -588,11 +591,29 @@ class OffloadEngine(object):
             layer_id = getattr(module, "layer_id", None)
             if layer_id is None:
                 continue
-            module.resident_local_expert_ids = {
+            resident_local_ids = {
                 expert_id
                 for resid_layer_id, expert_id in self.resident_expert_ids_set
                 if resid_layer_id == layer_id
             }
+            module.resident_local_expert_ids = resident_local_ids
+            module.resident_fastpath_local_expert_ids = self._resolve_resident_fastpath_ids(
+                module,
+                resident_local_ids,
+            )
+            self.resident_registry.fast_path_expert_count += len(
+                module.resident_fastpath_local_expert_ids
+            )
+
+    def _resolve_resident_fastpath_ids(self, module, resident_local_ids):
+        if not resident_local_ids:
+            return set()
+        experts = getattr(module, "experts", None)
+        if experts is None:
+            return set()
+        if hasattr(experts, "gate_up_proj") and hasattr(experts, "down_proj"):
+            return set(resident_local_ids)
+        return set()
 
     def get_resident_registry(self):
         return self.resident_registry.to_public_dict()

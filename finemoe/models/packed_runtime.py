@@ -49,7 +49,7 @@ def dispatch_packed_experts(
     layer_id: int,
     expert_dispatcher,
     experts_module=None,
-    resident_expert_ids=None,
+    resident_fastpath_expert_ids=None,
 ) -> torch.Tensor:
     tokens, hidden_dim = hidden_states.shape
     router_mask, active_experts, assignment_map = _build_packed_expert_assignments(
@@ -71,11 +71,11 @@ def dispatch_packed_experts(
         device=hidden_states.device,
     )
 
-    resident_expert_ids = set(resident_expert_ids or ())
+    resident_fastpath_expert_ids = set(resident_fastpath_expert_ids or ())
     resident_active: list[int] = []
     demand_active: list[int] = []
     for expert_idx in active_experts:
-        if expert_idx in resident_expert_ids and _supports_packed_resident_fast_path(experts_module, expert_idx):
+        if expert_idx in resident_fastpath_expert_ids:
             resident_active.append(expert_idx)
         else:
             demand_active.append(expert_idx)
@@ -187,14 +187,6 @@ def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, exp
     raise RuntimeError(
         f"Unsupported packed resident expert container type: {type(experts_module)!r}"
     )
-
-
-def _supports_packed_resident_fast_path(experts_module, expert_idx: int) -> bool:
-    if experts_module is None:
-        return False
-    if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
-        return True
-    return False
 
 
 def _infer_module_device(module) -> torch.device | None:
