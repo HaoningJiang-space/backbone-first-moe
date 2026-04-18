@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import functools
 import json
+from dataclasses import dataclass, field
 
 from tqdm import tqdm
 
@@ -309,6 +310,42 @@ class ExpertMapMatcher():
                         pred_map, prob_map)
 
 
+@dataclass
+class ResidentRegistry:
+    """Runtime-visible resident admission state.
+
+    This keeps resident backbone metadata as a first-class runtime object
+    instead of treating the resident JSON as write-only input.
+    """
+
+    enabled: bool = False
+    source_file: str = ""
+    selection_rule: str = ""
+    layout: str = ""
+    requested_expert_ids: list = field(default_factory=list)
+    admitted_expert_ids: list = field(default_factory=list)
+    requested_node_ids: list = field(default_factory=list)
+    admitted_node_ids: list = field(default_factory=list)
+    requested_count: int = 0
+    admitted_count: int = 0
+    requested_tensor_count: int = 0
+    admitted_tensor_count: int = 0
+    clipped: bool = False
+
+    def to_public_dict(self):
+        return {
+            "enabled": bool(self.enabled),
+            "source_file": self.source_file,
+            "selection_rule": self.selection_rule,
+            "layout": self.layout,
+            "requested_count": int(self.requested_count),
+            "admitted_count": int(self.admitted_count),
+            "requested_tensor_count": int(self.requested_tensor_count),
+            "admitted_tensor_count": int(self.admitted_tensor_count),
+            "clipped": bool(self.clipped),
+        }
+
+
 class OffloadEngine(object):
     param_id = 0
     request_id = 0
@@ -356,6 +393,9 @@ class OffloadEngine(object):
         self.eval_mode = eval_mode
 
         self.moe_layers = []
+        self.resident_expert_ids = []
+        self.resident_expert_ids_set = set()
+        self._reset_resident_registry()
 
     def init_expert_map_matcher(self):
         self.expert_map_matcher = ExpertMapMatcher(
@@ -457,7 +497,15 @@ class OffloadEngine(object):
         with open(resident_file, "r") as f:
             payload = json.load(f)
 
+        selection_rule = ""
+
         if isinstance(payload, dict):
+            selection_rule = (
+                payload.get("selection_rule")
+                or payload.get("selection_method")
+                or payload.get("method")
+                or ""
+            )
             if "resident_set" in payload:
                 payload = payload["resident_set"]
             elif "resident_expert_ids" in payload:
@@ -468,6 +516,7 @@ class OffloadEngine(object):
                 )
 
         resident_ids = []
+        seen = set()
         for item in payload:
             if isinstance(item, dict):
                 layer_id = int(item["layer"])
@@ -479,9 +528,62 @@ class OffloadEngine(object):
                 raise ValueError(
                     f"Invalid resident expert entry: {item!r}"
                 )
-            resident_ids.append((layer_id, expert_id))
+            key = (layer_id, expert_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            resident_ids.append(key)
 
-        return sorted(set(resident_ids))
+        self._record_requested_residents(
+            resident_file=resident_file,
+            resident_expert_ids=resident_ids,
+            selection_rule=selection_rule,
+        )
+        return resident_ids
+
+    def _reset_resident_registry(self):
+        self.resident_registry = ResidentRegistry(
+            layout=parse_expert_layout(self.config),
+        )
+
+    def _record_requested_residents(self, resident_file, resident_expert_ids, selection_rule=""):
+        self.resident_registry.enabled = bool(resident_expert_ids)
+        self.resident_registry.source_file = resident_file or ""
+        self.resident_registry.selection_rule = selection_rule or ""
+        self.resident_registry.layout = parse_expert_layout(self.config)
+        self.resident_registry.requested_expert_ids = list(resident_expert_ids)
+        self.resident_registry.requested_count = len(resident_expert_ids)
+        self.resident_registry.requested_node_ids = []
+        self.resident_registry.requested_tensor_count = 0
+        self.resident_registry.admitted_expert_ids = []
+        self.resident_registry.admitted_count = 0
+        self.resident_registry.admitted_node_ids = []
+        self.resident_registry.admitted_tensor_count = 0
+        self.resident_registry.clipped = False
+
+    def _activate_resident_registry(self, resident_expert_ids, node_ids):
+        self.resident_expert_ids = list(resident_expert_ids)
+        self.resident_expert_ids_set = set(resident_expert_ids)
+        self.resident_registry.enabled = bool(resident_expert_ids)
+        self.resident_registry.admitted_expert_ids = list(resident_expert_ids)
+        self.resident_registry.admitted_count = len(resident_expert_ids)
+        self.resident_registry.requested_count = max(
+            self.resident_registry.requested_count,
+            len(resident_expert_ids),
+        )
+        self.resident_registry.admitted_node_ids = list(node_ids)
+        self.resident_registry.admitted_tensor_count = len(node_ids)
+        self.resident_registry.requested_tensor_count = max(
+            self.resident_registry.requested_tensor_count,
+            len(node_ids),
+        )
+        self.resident_registry.clipped = (
+            self.resident_registry.requested_count
+            != self.resident_registry.admitted_count
+        )
+
+    def get_resident_registry(self):
+        return self.resident_registry.to_public_dict()
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.
@@ -506,11 +608,13 @@ class OffloadEngine(object):
                         f"Could not find packed tensor ids for resident expert ({layer_id}, {expert_id})"
                     )
                 node_ids.extend(tensor_ids)
+            self.resident_registry.requested_node_ids = list(node_ids)
+            self.resident_registry.requested_tensor_count = len(node_ids)
             self.archer_engine.pin_resident_nodes(node_ids)
-            self.resident_expert_ids = resident_expert_ids
+            self._activate_resident_registry(resident_expert_ids, node_ids)
             print(
-                f"Pinned {len(resident_expert_ids)} resident experts "
-                f"({len(node_ids)} tensors) on {self.device}",
+                f"Pinned {self.resident_registry.admitted_count} resident experts "
+                f"({self.resident_registry.admitted_tensor_count} tensors) on {self.device}",
                 flush=True,
             )
             return
@@ -536,6 +640,8 @@ class OffloadEngine(object):
                     f"({layer_id}, {expert_id})"
                 )
             node_ids.append(tensor_id)
+        self.resident_registry.requested_node_ids = list(node_ids)
+        self.resident_registry.requested_tensor_count = len(node_ids)
 
         # C++ native pin: load to GPU + mark is_resident + exempt from eviction
         # C++ 原生 pin：加载到 GPU + 标记 is_resident + 驱逐豁免
@@ -570,9 +676,11 @@ class OffloadEngine(object):
                 self.offload_set.discard(buf.data_ptr())
                 pinned_tensors += 1
 
-        self.resident_expert_ids = resident_expert_ids
+        self._activate_resident_registry(resident_expert_ids, node_ids)
+        self.resident_registry.requested_tensor_count = pinned_tensors
+        self.resident_registry.admitted_tensor_count = pinned_tensors
         print(
-            f"Pinned {len(resident_expert_ids)} resident experts "
+            f"Pinned {self.resident_registry.admitted_count} resident experts "
             f"({pinned_tensors} tensors) on {self.device}",
             flush=True,
         )
@@ -1001,7 +1109,7 @@ class OffloadEngine(object):
                 if resident_expert_ids:
                     self.pin_resident_experts(model, resident_expert_ids)
                     self.expert_prefetcher.set_resident_experts(
-                        resident_expert_ids
+                        getattr(self, "resident_expert_ids", resident_expert_ids)
                     )
                 # print("OffloadEngine init done, rank", dist.get_rank(), flush=True)
                 return model

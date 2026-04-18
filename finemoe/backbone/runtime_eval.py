@@ -153,6 +153,10 @@ def evaluate_runtime(runtime_cfg):
     if torch.cuda.is_available():
         peak_memory_mb = torch.cuda.max_memory_allocated(device=runtime_cfg.device) / (1024 ** 2)
 
+    resident_registry = None
+    if hasattr(model.engine, "get_resident_registry"):
+        resident_registry = model.engine.get_resident_registry()
+
     payload = {
         "tag": runtime_cfg.tag,
         "model_path": runtime_cfg.model_path,
@@ -171,7 +175,15 @@ def evaluate_runtime(runtime_cfg):
         "generated_tokens_per_sec": float(total_generated_tokens / total_elapsed) if total_elapsed > 0 else 0.0,
         "end_to_end_tokens_per_sec": float((total_prompt_tokens + total_generated_tokens) / total_elapsed) if total_elapsed > 0 else 0.0,
         "peak_memory_mb": peak_memory_mb,
-        "resident_count": len(getattr(model.engine, "resident_expert_ids", [])),
+        "resident_count": (
+            resident_registry["admitted_count"]
+            if resident_registry is not None
+            else len(getattr(model.engine, "resident_expert_ids", []))
+        ),
+        "resident_requested_count": resident_registry["requested_count"] if resident_registry is not None else 0,
+        "resident_admitted_count": resident_registry["admitted_count"] if resident_registry is not None else 0,
+        "resident_clipped": resident_registry["clipped"] if resident_registry is not None else False,
+        "resident_registry": resident_registry,
         "per_batch": per_batch,
     }
 
