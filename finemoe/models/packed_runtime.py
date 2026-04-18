@@ -80,7 +80,19 @@ def dispatch_packed_experts(
         else:
             demand_active.append(expert_idx)
 
-    if resident_active:
+    if len(resident_active) == 1:
+        expert_idx = resident_active[0]
+        token_idx, weights = assignment_map[expert_idx]
+        output_tensor = _run_packed_resident_expert(experts_module, hidden_states[token_idx], expert_idx)
+        weighted = output_tensor.to(
+            device=final_hidden_states.device,
+            dtype=final_hidden_states.dtype,
+        ) * weights.to(
+            device=final_hidden_states.device,
+            dtype=final_hidden_states.dtype,
+        ).unsqueeze(-1)
+        final_hidden_states.index_add_(0, token_idx, weighted)
+    elif resident_active:
         token_idx, weighted = _run_grouped_packed_resident_experts(
             experts_module=experts_module,
             hidden_states=hidden_states,
