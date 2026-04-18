@@ -1,0 +1,165 @@
+{
+  "models": [
+    {
+      "model_id": "qwen",
+      "title": "Qwen1.5-MoE-A2.7B-Chat",
+      "role": "strong_positive",
+      "runtime": {
+        "0.07": {
+          "A": {
+            "generated_tokens_per_sec": 2.9265763734370425,
+            "end_to_end_tokens_per_sec": 8.931202311514411,
+            "resident_count": 0,
+            "path": "results/runtime_formal/qwen/qwen_A_mem0p07.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 3.2330965511563856,
+            "end_to_end_tokens_per_sec": 9.866627658558306,
+            "resident_count": 275,
+            "path": "results/runtime_formal/qwen/qwen_C_mem0p07.json"
+          },
+          "gain_percent": 10.473677724643093
+        },
+        "0.10": {
+          "A": {
+            "generated_tokens_per_sec": 3.0946195556544454,
+            "end_to_end_tokens_per_sec": 9.444029405683732,
+            "resident_count": 0,
+            "path": "results/runtime_formal/qwen/qwen_A_mem0p10.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 3.616239902917047,
+            "end_to_end_tokens_per_sec": 11.03588837560134,
+            "resident_count": 464,
+            "path": "results/runtime_formal/qwen/qwen_C_mem0p10.json"
+          },
+          "gain_percent": 16.855718057798242
+        }
+      },
+      "applicability": {
+        "0.07": {
+          "top20_access_coverage": 0.7706523986765922,
+          "top20_stall_coverage": 0.38372093023255816,
+          "knee_ratio": 0.36936936936936937,
+          "frontier_selected_ratio": 0.9099099099099099,
+          "frontier_horizon": 13,
+          "slack_utilization": 1.0,
+          "path": "results/runtime_formal/applicability/qwen_applicability.json"
+        },
+        "0.10": {
+          "top20_access_coverage": 0.7706523986765922,
+          "top20_stall_coverage": 0.3198529411764707,
+          "knee_ratio": 0.27941176470588236,
+          "frontier_selected_ratio": 0.8319327731092437,
+          "frontier_horizon": 13,
+          "slack_utilization": 0.0,
+          "path": "results/runtime_formal/applicability/qwen_applicability.json"
+        }
+      }
+    },
+    {
+      "model_id": "olmoe",
+      "title": "OLMoE-1B-7B-0924",
+      "role": "strong_positive",
+      "runtime": {
+        "0.07": {
+          "A": {
+            "generated_tokens_per_sec": 0.30669263939498553,
+            "end_to_end_tokens_per_sec": 10.120857100034524,
+            "resident_count": 0,
+            "path": "results/runtime_formal/olmoe/olmoe_A_mem0p07.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 2.579916989720354,
+            "end_to_end_tokens_per_sec": 85.13726066077169,
+            "resident_count": 1023,
+            "path": "results/runtime_formal/olmoe/olmoe_C_mem0p07.json"
+          },
+          "gain_percent": 741.2060344225321
+        },
+        "0.10": {
+          "A": {
+            "generated_tokens_per_sec": 0.3156784721467179,
+            "end_to_end_tokens_per_sec": 10.417389580841691,
+            "resident_count": 0,
+            "path": "results/runtime_formal/olmoe/olmoe_A_mem0p10.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 1.777806690042016,
+            "end_to_end_tokens_per_sec": 58.66762077138653,
+            "resident_count": 1023,
+            "path": "results/runtime_formal/olmoe/olmoe_C_mem0p10.json"
+          },
+          "gain_percent": 463.1700755367774
+        }
+      },
+      "applicability": null
+    },
+    {
+      "model_id": "deepseek_v2_lite",
+      "title": "DeepSeek-V2-Lite",
+      "role": "weak_positive_boundary",
+      "runtime": {
+        "0.07": {
+          "A": {
+            "generated_tokens_per_sec": 0.1596684169371653,
+            "end_to_end_tokens_per_sec": 5.269057758926454,
+            "resident_count": 0,
+            "path": "results/runtime_formal/deepseek/deepseek_v2_A_mem0p07.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 0.1781505466542565,
+            "end_to_end_tokens_per_sec": 5.878968039590465,
+            "resident_count": 186,
+            "path": "results/runtime_formal/deepseek/deepseek_v2_C_mem0p07.json"
+          },
+          "gain_percent": 11.575319697924048
+        },
+        "0.10": {
+          "A": {
+            "generated_tokens_per_sec": 0.15829760003976712,
+            "end_to_end_tokens_per_sec": 5.223820801312314,
+            "resident_count": 0,
+            "path": "results/runtime_formal/deepseek/deepseek_v2_A_mem0p10.json"
+          },
+          "C": {
+            "generated_tokens_per_sec": 0.1775943228737249,
+            "end_to_end_tokens_per_sec": 5.860612654832922,
+            "resident_count": 174,
+            "path": "results/runtime_formal/deepseek/deepseek_v2_C_mem0p10.json"
+          },
+          "gain_percent": 12.190155017580873
+        }
+      },
+      "applicability": {
+        "0.05": {
+          "top20_access_coverage": 0.3650080374104925,
+          "top20_stall_coverage": 0.3273272551134685,
+          "knee_ratio": 0.35294117647058826,
+          "frontier_selected_ratio": 0.0,
+          "frontier_horizon": 14,
+          "slack_utilization": 2.722689075630252,
+          "path": "results/runtime_formal/applicability/deepseek_v2_lite_applicability.json"
+        },
+        "0.07": {
+          "top20_access_coverage": 0.3650080374104925,
+          "top20_stall_coverage": 0.3237616487788546,
+          "knee_ratio": 0.3783783783783784,
+          "frontier_selected_ratio": 0.0,
+          "frontier_horizon": 14,
+          "slack_utilization": 1.945945945945946,
+          "path": "results/runtime_formal/applicability/deepseek_v2_lite_applicability.json"
+        },
+        "0.10": {
+          "top20_access_coverage": 0.3650080374104925,
+          "top20_stall_coverage": 0.3143400726942299,
+          "knee_ratio": 0.36554621848739494,
+          "frontier_selected_ratio": 0.0,
+          "frontier_horizon": 14,
+          "slack_utilization": 1.361344537815126,
+          "path": "results/runtime_formal/applicability/deepseek_v2_lite_applicability.json"
+        }
+      }
+    }
+  ]
+}

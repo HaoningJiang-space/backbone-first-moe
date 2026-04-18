@@ -1,0 +1,35 @@
+{
+  "tag": "runtime_eval",
+  "model_path": "/data/ziheng/Efficient_AI/models/DeepSeek-V2-Lite",
+  "prompt_file": "/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-chat-1m~eval_prompts.json",
+  "offload_path": "/data/finemoe_offloads/DeepSeek-V2-Lite",
+  "store_prefix": "",
+  "resident_expert_ids_file": "",
+  "device_memory_ratio": 0.07,
+  "prefetch_distance": 0,
+  "num_prompts": 2,
+  "batch_size": 2,
+  "max_new_tokens": 8,
+  "total_elapsed_sec": 100.2076697879238,
+  "total_prompt_tokens": 512,
+  "total_generated_tokens": 16,
+  "generated_tokens_per_sec": 0.1596684169371653,
+  "end_to_end_tokens_per_sec": 5.269057758926454,
+  "peak_memory_mb": 5839.09326171875,
+  "resident_count": 0,
+  "per_batch": [
+    {
+      "batch_size": 2,
+      "elapsed_sec": 100.2076697879238,
+      "prompt_tokens": [
+        256,
+        256
+      ],
+      "generated_tokens": [
+        8,
+        8
+      ],
+      "tokens_per_sec": 0.1596684169371653
+    }
+  ]
+}
