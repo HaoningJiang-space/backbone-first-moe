@@ -1,5 +1,5 @@
 {
-  "tag": "mixtral_tiny_A_probe",
+  "tag": "mixtral_tiny_A_resfast2",
   "model_path": "/data/ziheng/mixtral_tiny_runtime/model",
   "offload_path": "/data/ziheng/mixtral_tiny_runtime/offload",
   "resident_file": "",
@@ -11,11 +11,11 @@
   "seed": 42,
   "total_prompt_tokens": 8,
   "total_generated_tokens": 4,
-  "generated_tokens_per_sec": 7.490180449183765,
-  "end_to_end_tokens_per_sec": 22.470541347551293,
-  "total_elapsed_sec": 0.5340325279394165,
+  "generated_tokens_per_sec": 8.524305188510807,
+  "end_to_end_tokens_per_sec": 25.57291556553242,
+  "total_elapsed_sec": 0.469246456050314,
   "resident_count": 0,
-  "peak_memory_mb": 17.4091796875,
+  "peak_memory_mb": 17.4111328125,
   "input_shape": [
     1,
     8

@@ -35,9 +35,9 @@ Current paper-facing split:
 | 0.10 | 0.974 | 0.531 | 0.534 | 87 | 15.8 |
 
 Tiny packed-runtime probe:
-- `A`: gen tok/s=7.4902, resident_count=0
-- `C`: gen tok/s=8.5867, resident_count=1
-- tiny probe gain: +14.6%
+- `A`: gen tok/s=8.5243, resident_count=0
+- `C`: gen tok/s=8.8031, resident_count=1
+- tiny probe gain: +3.3%
 
 ## Interpretation
 

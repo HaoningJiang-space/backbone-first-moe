@@ -156,7 +156,7 @@ Current examples from the applicability diagnostics:
   - real-hardware gains are positive but small (`~11-12%`)
 - `Mixtral`: applicability / boundary case
   - simulation shows retained gain `~0.96-0.97` at `mem=0.07/0.10`
-  - tiny packed-runtime probe is directionally positive (`A 7.49 -> C 8.59 gen tok/s`, `+14.6%`)
+  - tiny packed-runtime probe remains directionally positive after packed-path cleanup (`A 8.52 -> C 8.80 gen tok/s`, `+3.3%`)
   - full-model runtime evidence is still missing, so it stays out of the main runtime table
 
 ## Current Throughput Priorities
