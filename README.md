@@ -32,7 +32,7 @@ pytest -q
 
 Fresh-clone validation that has already been exercised:
 - `v0.3.1`: local fresh clone install + full unit test pass + `Qwen/OLMoE` runtime smoke on `10.16.52.172`
-- `multi-model-runtime`: local fresh clone install + full unit test pass + `DeepSeek-V2-Lite` full-model `A/C` probes on `10.16.52.172`
+- `multi-model-runtime`: local fresh clone install + full unit test pass + `DeepSeek-V2-Lite` full-model `A/C` probes plus `Mixtral` tiny packed-runtime `A/C` probe on `10.16.52.172`
 
 ## What This Repository Claims
 
@@ -49,7 +49,7 @@ Runtime support that is validated today depends on the branch:
   - `Qwen1.5-MoE-A2.7B-Chat`
   - `OLMoE-1B-7B-0924`
   - `DeepSeek-V2-Lite`
-  - `Mixtral` / `DeepSeek-V3` packed runtime tiny smokes
+  - `Mixtral` / `DeepSeek-V3` packed runtime tiny probes
 
 The selector is not a ratio sweep. It ranks experts by profiling utility, then chooses the largest resident prefix that remains feasible under a burst-aware tail frontier constraint.
 
@@ -127,7 +127,7 @@ This outputs, for each memory budget:
 - burst-aware frontier size
 - slack utilization under the frontier-feasible resident prefix
 
-Packed-MoE architectures (`Mixtral`, `DeepSeek-V2`, `DeepSeek-V3`) are runtime-enabled on the `multi-model-runtime` branch. `DeepSeek-V2-Lite` has full-model `A/C` probes; `Mixtral` and `DeepSeek-V3` are currently validated via tiny end-to-end smokes and should enter the formal runtime table only if the applicability diagnostics indicate a compact backbone under the target budget.
+Packed-MoE architectures (`Mixtral`, `DeepSeek-V2`, `DeepSeek-V3`) are runtime-enabled on the `multi-model-runtime` branch. `DeepSeek-V2-Lite` has full-model `A/C` probes; `Mixtral` and `DeepSeek-V3` are currently validated via tiny end-to-end probes and should enter the formal runtime table only if the applicability diagnostics indicate a compact backbone under the target budget.
 
 Current examples from the applicability diagnostics:
 - `Qwen1.5-MoE-A2.7B-Chat`: positive case
@@ -137,6 +137,10 @@ Current examples from the applicability diagnostics:
   - lower concentration than `Qwen`
   - transferable hotspots exist
   - real-hardware gains are positive but small (`~11-12%`)
+- `Mixtral`: applicability / boundary case
+  - simulation shows retained gain `~0.96-0.97` at `mem=0.07/0.10`
+  - tiny packed-runtime probe is directionally positive (`A 7.49 -> C 8.59 gen tok/s`, `+14.6%`)
+  - full-model runtime evidence is still missing, so it stays out of the main runtime table
 
 ## Method Summary
 

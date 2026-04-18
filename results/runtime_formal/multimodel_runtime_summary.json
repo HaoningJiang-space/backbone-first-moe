@@ -214,6 +214,9 @@
         "tiny_runtime": {
           "A_resident_count": 0,
           "C_resident_count": 1,
+          "A_generated_tokens_per_sec": 7.490180449183765,
+          "C_generated_tokens_per_sec": 8.586658378255752,
+          "gain_percent": 14.63887200730223,
           "A_path": "results/runtime_formal/mixtral/mixtral_tiny_A.json",
           "C_path": "results/runtime_formal/mixtral/mixtral_tiny_C.json"
         }

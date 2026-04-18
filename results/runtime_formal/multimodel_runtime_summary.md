@@ -3,7 +3,7 @@
 Current paper-facing split:
 - `Qwen` / `OLMoE`: strong positive cases
 - `DeepSeek-V2-Lite`: weak positive / boundary case
-- `Mixtral`: applicability case until a formal packed-runtime probe is completed
+- `Mixtral`: applicability / boundary case; tiny packed-runtime probe is positive, but full-model runtime is still missing
 
 ## Runtime Table
 
@@ -34,14 +34,15 @@ Current paper-facing split:
 | 0.07 | 0.962 | 0.355 | 0.518 | 59 | 10.3 |
 | 0.10 | 0.974 | 0.531 | 0.534 | 87 | 15.8 |
 
-Tiny packed-runtime enablement:
-- `A` tiny smoke resident_count=0
-- `C` tiny smoke resident_count=1
+Tiny packed-runtime probe:
+- `A`: gen tok/s=7.4902, resident_count=0
+- `C`: gen tok/s=8.5867, resident_count=1
+- tiny probe gain: +14.6%
 
 ## Interpretation
 
 - `Qwen` remains the clearest compact-backbone positive case.
 - `OLMoE` is also strongly positive, but mainly because resident pinning dominates under the current small-expert regime.
 - `DeepSeek-V2-Lite` is not a negative case: `C > A` on real hardware, but the gains stay modest, so it should be framed as a weak positive / boundary case.
-- `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`), but without full-model runtime assets it should stay as an applicability / boundary model rather than a formal positive runtime case.
+- `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`) and a positive tiny packed-runtime probe, but without a full-model runtime asset it should still stay as an applicability / boundary model rather than a formal positive runtime case.
 

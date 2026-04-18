@@ -146,6 +146,22 @@ def summarize_mixtral_boundary(assets: dict | None):
         "tiny_runtime": {
             "A_resident_count": int(tiny_a.get("resident_count", 0)),
             "C_resident_count": int(tiny_c.get("resident_count", 0)),
+            "A_generated_tokens_per_sec": (
+                float(tiny_a["generated_tokens_per_sec"])
+                if tiny_a.get("generated_tokens_per_sec") is not None
+                else None
+            ),
+            "C_generated_tokens_per_sec": (
+                float(tiny_c["generated_tokens_per_sec"])
+                if tiny_c.get("generated_tokens_per_sec") is not None
+                else None
+            ),
+            "gain_percent": (
+                ((float(tiny_c["generated_tokens_per_sec"]) / float(tiny_a["generated_tokens_per_sec"])) - 1.0) * 100.0
+                if tiny_a.get("generated_tokens_per_sec") not in (None, 0)
+                and tiny_c.get("generated_tokens_per_sec") is not None
+                else None
+            ),
             "A_path": str(assets["tiny_A"].relative_to(ROOT)),
             "C_path": str(assets["tiny_C"].relative_to(ROOT)),
         },
@@ -179,7 +195,7 @@ def render_markdown(summary):
     lines.append("Current paper-facing split:")
     lines.append("- `Qwen` / `OLMoE`: strong positive cases")
     lines.append("- `DeepSeek-V2-Lite`: weak positive / boundary case")
-    lines.append("- `Mixtral`: applicability case until a formal packed-runtime probe is completed")
+    lines.append("- `Mixtral`: applicability / boundary case; tiny packed-runtime probe is positive, but full-model runtime is still missing")
     lines.append("")
     lines.append("## Runtime Table")
     lines.append("")
@@ -234,12 +250,15 @@ def render_markdown(summary):
                 f"{ada[mem]['profile_tput']:.1f} |"
             )
         lines.append("")
-        lines.append("Tiny packed-runtime enablement:")
+        lines.append("Tiny packed-runtime probe:")
         lines.append(
-            f"- `A` tiny smoke resident_count={mixtral['boundary']['tiny_runtime']['A_resident_count']}"
+            f"- `A`: gen tok/s={mixtral['boundary']['tiny_runtime']['A_generated_tokens_per_sec']:.4f}, resident_count={mixtral['boundary']['tiny_runtime']['A_resident_count']}"
         )
         lines.append(
-            f"- `C` tiny smoke resident_count={mixtral['boundary']['tiny_runtime']['C_resident_count']}"
+            f"- `C`: gen tok/s={mixtral['boundary']['tiny_runtime']['C_generated_tokens_per_sec']:.4f}, resident_count={mixtral['boundary']['tiny_runtime']['C_resident_count']}"
+        )
+        lines.append(
+            f"- tiny probe gain: {mixtral['boundary']['tiny_runtime']['gain_percent']:+.1f}%"
         )
     lines.append("")
     lines.append("## Interpretation")
@@ -247,7 +266,7 @@ def render_markdown(summary):
     lines.append("- `Qwen` remains the clearest compact-backbone positive case.")
     lines.append("- `OLMoE` is also strongly positive, but mainly because resident pinning dominates under the current small-expert regime.")
     lines.append("- `DeepSeek-V2-Lite` is not a negative case: `C > A` on real hardware, but the gains stay modest, so it should be framed as a weak positive / boundary case.")
-    lines.append("- `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`), but without full-model runtime assets it should stay as an applicability / boundary model rather than a formal positive runtime case.")
+    lines.append("- `Mixtral` has non-trivial backbone structure in simulation (`retained≈0.96-0.97` at `mem=0.07/0.10`) and a positive tiny packed-runtime probe, but without a full-model runtime asset it should still stay as an applicability / boundary model rather than a formal positive runtime case.")
     lines.append("")
     return "\n".join(lines) + "\n"
 

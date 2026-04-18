@@ -21,7 +21,7 @@ The current positive/runtime boundary split is:
 | Qwen1.5-MoE-A2.7B-Chat | validated | strong positive | compact backbone, clear throughput gain |
 | OLMoE-1B-7B-0924 | validated | strong positive | resident backbone dominates under current budgets |
 | DeepSeek-V2-Lite | validated | weak positive / boundary | transferable hotspots exist, but gains are modest |
-| Mixtral | packed runtime tiny-smoke only | boundary / applicability case | packed runtime is enabled, but not yet a formal positive case |
+| Mixtral | packed runtime tiny-probe only | boundary / applicability case | packed runtime is enabled and tiny `C > A`, but not yet a formal full-model positive case |
 
 ### Cross-Model Runtime Summary
 
@@ -58,7 +58,7 @@ DeepSeek-V2-Lite, same GPU, sequential `A/C`, `batch=2`, 2 prompts, 8 new tokens
   - transferable hotspots exist
   - `C > A` on real hardware
   - gains are materially smaller than `Qwen/OLMoE`
-- `Mixtral` should remain an applicability/boundary model until a formal packed-runtime evaluation shows a clear resident-backbone gain.
+- `Mixtral` currently has positive tiny packed-runtime evidence (`A 7.49 -> C 8.59 gen tok/s`, `+14.6%`), but it should still remain an applicability/boundary model until a formal full-model packed-runtime evaluation is available.
 
 ## Model & Hardware
 - Model: Qwen1.5-MoE-A2.7B-Chat (24 layers, 60 experts, top-4 routing)
