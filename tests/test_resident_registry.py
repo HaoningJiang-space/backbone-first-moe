@@ -32,6 +32,20 @@ class ResidentRegistryTest(unittest.TestCase):
         OffloadEngine._reset_resident_registry(engine)
         return engine
 
+    @staticmethod
+    def _fake_archer_engine(node_map):
+        class _FakeArcherEngine:
+            def __init__(self, mapping):
+                self.mapping = mapping
+
+            def get_node_id(self, tensor_ids):
+                return self.mapping[int(tensor_ids[0])][0]
+
+            def get_node_byte_size(self, tensor_ids):
+                return self.mapping[int(tensor_ids[0])][1]
+
+        return _FakeArcherEngine(node_map)
+
     def test_load_resident_ids_preserves_order_and_records_registry(self):
         engine = self._build_engine_stub()
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -62,6 +76,14 @@ class ResidentRegistryTest(unittest.TestCase):
 
     def test_activate_registry_tracks_requested_vs_admitted_counts(self):
         engine = self._build_engine_stub()
+        engine.archer_engine = self._fake_archer_engine(
+            {
+                10: (100, 64),
+                11: (101, 128),
+                12: (101, 128),
+                13: (102, 256),
+            }
+        )
         OffloadEngine._record_requested_residents(
             engine,
             resident_file="/tmp/resident.json",
@@ -77,8 +99,26 @@ class ResidentRegistryTest(unittest.TestCase):
         registry = OffloadEngine.get_resident_registry(engine)
         self.assertEqual(registry["requested_count"], 3)
         self.assertEqual(registry["admitted_count"], 2)
+        self.assertEqual(registry["requested_node_count"], 3)
+        self.assertEqual(registry["admitted_node_count"], 3)
         self.assertEqual(registry["admitted_tensor_count"], 4)
+        self.assertEqual(registry["requested_bytes"], 448)
+        self.assertEqual(registry["admitted_bytes"], 448)
         self.assertTrue(registry["clipped"])
+
+    def test_collect_unique_node_stats_deduplicates_packed_tensor_ids(self):
+        engine = self._build_engine_stub()
+        engine.archer_engine = self._fake_archer_engine(
+            {
+                20: (200, 512),
+                21: (200, 512),
+                22: (201, 256),
+            }
+        )
+
+        node_ids, total_bytes = OffloadEngine._collect_unique_node_stats(engine, [20, 21, 22])
+        self.assertEqual(node_ids, [200, 201])
+        self.assertEqual(total_bytes, 768)
 
     def test_mark_module_resident_fastpath_marks_subtree(self):
         engine = self._build_engine_stub()

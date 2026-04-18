@@ -328,8 +328,12 @@ class ResidentRegistry:
     admitted_node_ids: list = field(default_factory=list)
     requested_count: int = 0
     admitted_count: int = 0
+    requested_node_count: int = 0
+    admitted_node_count: int = 0
     requested_tensor_count: int = 0
     admitted_tensor_count: int = 0
+    requested_bytes: int = 0
+    admitted_bytes: int = 0
     fast_path_modules: int = 0
     fast_path_expert_count: int = 0
     clipped: bool = False
@@ -342,8 +346,12 @@ class ResidentRegistry:
             "layout": self.layout,
             "requested_count": int(self.requested_count),
             "admitted_count": int(self.admitted_count),
+            "requested_node_count": int(self.requested_node_count),
+            "admitted_node_count": int(self.admitted_node_count),
             "requested_tensor_count": int(self.requested_tensor_count),
             "admitted_tensor_count": int(self.admitted_tensor_count),
+            "requested_bytes": int(self.requested_bytes),
+            "admitted_bytes": int(self.admitted_bytes),
             "fast_path_modules": int(self.fast_path_modules),
             "fast_path_expert_count": int(self.fast_path_expert_count),
             "clipped": bool(self.clipped),
@@ -558,16 +566,21 @@ class OffloadEngine(object):
         self.resident_registry.requested_expert_ids = list(resident_expert_ids)
         self.resident_registry.requested_count = len(resident_expert_ids)
         self.resident_registry.requested_node_ids = []
+        self.resident_registry.requested_node_count = 0
         self.resident_registry.requested_tensor_count = 0
+        self.resident_registry.requested_bytes = 0
         self.resident_registry.admitted_expert_ids = []
         self.resident_registry.admitted_count = 0
         self.resident_registry.admitted_node_ids = []
+        self.resident_registry.admitted_node_count = 0
         self.resident_registry.admitted_tensor_count = 0
+        self.resident_registry.admitted_bytes = 0
         self.resident_registry.fast_path_modules = 0
         self.resident_registry.fast_path_expert_count = 0
         self.resident_registry.clipped = False
 
     def _activate_resident_registry(self, resident_expert_ids, node_ids):
+        tensor_ids = node_ids
         self.resident_expert_ids = list(resident_expert_ids)
         self.resident_expert_ids_set = set(resident_expert_ids)
         self.resident_registry.enabled = bool(resident_expert_ids)
@@ -577,11 +590,22 @@ class OffloadEngine(object):
             self.resident_registry.requested_count,
             len(resident_expert_ids),
         )
-        self.resident_registry.admitted_node_ids = list(node_ids)
-        self.resident_registry.admitted_tensor_count = len(node_ids)
+        admitted_node_ids, admitted_bytes = self._collect_unique_node_stats(tensor_ids)
+        self.resident_registry.admitted_node_ids = admitted_node_ids
+        self.resident_registry.admitted_node_count = len(admitted_node_ids)
+        self.resident_registry.admitted_tensor_count = len(tensor_ids)
+        self.resident_registry.admitted_bytes = admitted_bytes
         self.resident_registry.requested_tensor_count = max(
             self.resident_registry.requested_tensor_count,
-            len(node_ids),
+            len(tensor_ids),
+        )
+        self.resident_registry.requested_node_count = max(
+            self.resident_registry.requested_node_count,
+            len(admitted_node_ids),
+        )
+        self.resident_registry.requested_bytes = max(
+            self.resident_registry.requested_bytes,
+            admitted_bytes,
         )
         self.resident_registry.clipped = (
             self.resident_registry.requested_count
@@ -604,6 +628,21 @@ class OffloadEngine(object):
             self.resident_registry.fast_path_expert_count += len(
                 module.resident_fastpath_local_expert_ids
             )
+
+    def _collect_unique_node_stats(self, tensor_ids):
+        if not tensor_ids or not hasattr(self, "archer_engine") or self.archer_engine is None:
+            return [], 0
+        unique_node_ids = []
+        seen_node_ids = set()
+        total = 0
+        for tensor_id in tensor_ids:
+            node_id = int(self.archer_engine.get_node_id([int(tensor_id)]))
+            if node_id in seen_node_ids:
+                continue
+            seen_node_ids.add(node_id)
+            unique_node_ids.append(node_id)
+            total += int(self.archer_engine.get_node_byte_size([int(tensor_id)]))
+        return unique_node_ids, total
 
     def _resolve_resident_fastpath_ids(self, module, resident_local_ids):
         if not resident_local_ids:
@@ -654,8 +693,11 @@ class OffloadEngine(object):
                         f"Could not find packed tensor ids for resident expert ({layer_id}, {expert_id})"
                     )
                 node_ids.extend(tensor_ids)
-            self.resident_registry.requested_node_ids = list(node_ids)
+            requested_node_ids, requested_bytes = self._collect_unique_node_stats(node_ids)
+            self.resident_registry.requested_node_ids = requested_node_ids
+            self.resident_registry.requested_node_count = len(requested_node_ids)
             self.resident_registry.requested_tensor_count = len(node_ids)
+            self.resident_registry.requested_bytes = requested_bytes
             self.archer_engine.pin_resident_nodes(node_ids)
             self._activate_resident_registry(resident_expert_ids, node_ids)
             print(
@@ -686,8 +728,11 @@ class OffloadEngine(object):
                     f"({layer_id}, {expert_id})"
                 )
             node_ids.append(tensor_id)
-        self.resident_registry.requested_node_ids = list(node_ids)
+        requested_node_ids, requested_bytes = self._collect_unique_node_stats(node_ids)
+        self.resident_registry.requested_node_ids = requested_node_ids
+        self.resident_registry.requested_node_count = len(requested_node_ids)
         self.resident_registry.requested_tensor_count = len(node_ids)
+        self.resident_registry.requested_bytes = requested_bytes
 
         # C++ native pin: load to GPU + mark is_resident + exempt from eviction
         # C++ 原生 pin：加载到 GPU + 标记 is_resident + 驱逐豁免

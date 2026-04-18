@@ -450,6 +450,18 @@ int ArcherPrefetchHandle::GetNodeDevice(std::vector<std::uint32_t> tensor_ids) c
     return node->device.index();
 }
 
+std::size_t ArcherPrefetchHandle::GetNodeId(std::vector<std::uint32_t> tensor_ids) const
+{
+    auto node = kTopologyHandle->GetNodeFromTensorID(tensor_ids[0]);
+    return node->id;
+}
+
+std::int64_t ArcherPrefetchHandle::GetNodeByteSize(std::vector<std::uint32_t> tensor_ids) const
+{
+    auto node = kTopologyHandle->GetNodeFromTensorID(tensor_ids[0]);
+    return node->byte_size;
+}
+
 // void ArcherPrefetchHandle::SetNodeCachePriority(const std::uint32_t tensor_id, const float priority) {
 //     auto node = kTopologyHandle->GetNodeFromTensorID(tensor_id);
 //     node->cache_priority = priority;
