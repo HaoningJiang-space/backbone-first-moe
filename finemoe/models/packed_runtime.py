@@ -80,16 +80,15 @@ def dispatch_packed_experts(
         else:
             demand_active.append(expert_idx)
 
-    for expert_idx in resident_active:
-        token_idx, weights = assignment_map[expert_idx]
-        output_tensor = _run_packed_resident_expert(experts_module, hidden_states[token_idx], expert_idx)
-        weighted = output_tensor.to(
-            device=final_hidden_states.device,
-            dtype=final_hidden_states.dtype,
-        ) * weights.to(
-            device=final_hidden_states.device,
-            dtype=final_hidden_states.dtype,
-        ).unsqueeze(-1)
+    if resident_active:
+        token_idx, weighted = _run_grouped_packed_resident_experts(
+            experts_module=experts_module,
+            hidden_states=hidden_states,
+            assignment_map=assignment_map,
+            resident_active=resident_active,
+            output_device=final_hidden_states.device,
+            output_dtype=final_hidden_states.dtype,
+        )
         final_hidden_states.index_add_(0, token_idx, weighted)
 
     if demand_active:
@@ -187,6 +186,69 @@ def _run_packed_resident_expert(experts_module, hidden_states: torch.Tensor, exp
     raise RuntimeError(
         f"Unsupported packed resident expert container type: {type(experts_module)!r}"
     )
+
+
+def _run_grouped_packed_resident_experts(
+    *,
+    experts_module,
+    hidden_states: torch.Tensor,
+    assignment_map: Dict[int, Tuple[torch.Tensor, torch.Tensor]],
+    resident_active: list[int],
+    output_device: torch.device,
+    output_dtype: torch.dtype,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    token_parts = []
+    expert_parts = []
+    weight_parts = []
+    for expert_idx in resident_active:
+        token_idx, weights = assignment_map[expert_idx]
+        token_parts.append(token_idx)
+        expert_parts.append(torch.full_like(token_idx, int(expert_idx)))
+        weight_parts.append(weights)
+
+    token_idx = torch.cat(token_parts, dim=0)
+    expert_idx = torch.cat(expert_parts, dim=0)
+    route_weights = torch.cat(weight_parts, dim=0)
+
+    if hasattr(experts_module, "gate_up_proj") and hasattr(experts_module, "down_proj"):
+        expert_device = experts_module.gate_up_proj.device
+        current_states = hidden_states[token_idx]
+        if current_states.device != expert_device:
+            current_states = current_states.to(expert_device)
+        expert_idx_on_device = expert_idx.to(expert_device)
+        gate_up_proj = experts_module.gate_up_proj[expert_idx_on_device]
+        gate_up = torch.bmm(gate_up_proj, current_states.unsqueeze(-1)).squeeze(-1)
+        if getattr(experts_module, "has_gate", True):
+            gate, up = gate_up.chunk(2, dim=-1)
+            current_hidden_states = experts_module.act_fn(gate) * up
+        else:
+            current_hidden_states = experts_module.act_fn(gate_up)
+        down_proj = experts_module.down_proj[expert_idx_on_device]
+        output_tensor = torch.bmm(down_proj, current_hidden_states.unsqueeze(-1)).squeeze(-1)
+        weighted = output_tensor.to(
+            device=output_device,
+            dtype=output_dtype,
+        ) * route_weights.to(
+            device=output_device,
+            dtype=output_dtype,
+        ).unsqueeze(-1)
+        return token_idx.to(output_device), weighted
+
+    outputs = []
+    token_offsets = []
+    for expert in resident_active:
+        local_token_idx, local_weights = assignment_map[expert]
+        output_tensor = _run_packed_resident_expert(experts_module, hidden_states[local_token_idx], expert)
+        weighted = output_tensor.to(
+            device=output_device,
+            dtype=output_dtype,
+        ) * local_weights.to(
+            device=output_device,
+            dtype=output_dtype,
+        ).unsqueeze(-1)
+        outputs.append(weighted)
+        token_offsets.append(local_token_idx.to(output_device))
+    return torch.cat(token_offsets, dim=0), torch.cat(outputs, dim=0)
 
 
 def _infer_module_device(module) -> torch.device | None:
