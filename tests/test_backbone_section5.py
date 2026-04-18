@@ -1,12 +1,17 @@
 import unittest
+import importlib.util
 from pathlib import Path
 
-from experiments.runtime.section5_sweep import (
-    RuntimeSweepArgs,
-    build_runtime_sweep_configs,
-    format_runtime_summary,
-    resident_file_for_mem,
-)
+MODULE_PATH = Path(__file__).resolve().parents[1] / "experiments" / "runtime" / "section5_sweep.py"
+SPEC = importlib.util.spec_from_file_location("section5_sweep", MODULE_PATH)
+SECTION5_SWEEP = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(SECTION5_SWEEP)
+
+RuntimeSweepArgs = SECTION5_SWEEP.RuntimeSweepArgs
+build_runtime_sweep_configs = SECTION5_SWEEP.build_runtime_sweep_configs
+format_runtime_summary = SECTION5_SWEEP.format_runtime_summary
+resident_file_for_mem = SECTION5_SWEEP.resident_file_for_mem
 
 
 class Section5HelpersTest(unittest.TestCase):

@@ -2,7 +2,37 @@
 
 Resident backbone extraction and demand-only tail for MoE expert offloading.
 
-This project builds on top of [FineMoE](https://github.com/IntelliSys-Lab/FineMoE-EuroSys26) and adds a runtime-native resident backbone path. The current stable line is the `v0.3.0-stable` branch.
+This project builds on top of [FineMoE](https://github.com/IntelliSys-Lab/FineMoE-EuroSys26) and adds a runtime-native resident backbone path.
+
+There are currently two supported tracks:
+- `v0.3.1` tag / `v0.3.0-stable` branch: stable runtime for `Qwen1.5-MoE-A2.7B-Chat` and `OLMoE-1B-7B-0924`
+- `multi-model-runtime` branch: adds packed-MoE runtime enablement for `DeepSeek-V2-Lite`, `Mixtral`, and `DeepSeek-V3`; this branch is validated by fresh-clone unit tests and targeted runtime probes, but it is still the active integration branch
+
+If you want the most conservative checkout, use `v0.3.1`. If you need `DeepSeek` or `Mixtral`, clone `multi-model-runtime`.
+
+## Quick Start
+
+Stable release:
+
+```bash
+git clone --branch v0.3.1 https://github.com/HaoningJiang-space/backbone-first-moe.git
+cd backbone-first-moe
+pip install -e ".[runtime]"
+pytest -q
+```
+
+Packed-MoE integration branch:
+
+```bash
+git clone --branch multi-model-runtime https://github.com/HaoningJiang-space/backbone-first-moe.git
+cd backbone-first-moe
+pip install -e ".[runtime]"
+pytest -q
+```
+
+Fresh-clone validation that has already been exercised:
+- `v0.3.1`: local fresh clone install + full unit test pass + `Qwen/OLMoE` runtime smoke on `10.16.52.172`
+- `multi-model-runtime`: local fresh clone install + full unit test pass + `DeepSeek-V2-Lite` full-model `A/C` probes on `10.16.52.172`
 
 ## What This Repository Claims
 
@@ -11,9 +41,15 @@ The serving path that is currently validated is:
 - demand-only tail fallback
 - no speculative prefetch on the critical path
 
-Runtime support that is validated today:
-- `Qwen1.5-MoE-A2.7B-Chat`
-- `OLMoE-1B-7B-0924`
+Runtime support that is validated today depends on the branch:
+- `v0.3.1` / `v0.3.0-stable`
+  - `Qwen1.5-MoE-A2.7B-Chat`
+  - `OLMoE-1B-7B-0924`
+- `multi-model-runtime`
+  - `Qwen1.5-MoE-A2.7B-Chat`
+  - `OLMoE-1B-7B-0924`
+  - `DeepSeek-V2-Lite`
+  - `Mixtral` / `DeepSeek-V3` packed runtime tiny smokes
 
 The selector is not a ratio sweep. It ranks experts by profiling utility, then chooses the largest resident prefix that remains feasible under a burst-aware tail frontier constraint.
 
@@ -56,6 +92,17 @@ Backbone-only improves generation throughput by:
 - `+741.2%` at `mem=0.07`
 - `+463.2%` at `mem=0.10`
 
+DeepSeek-V2-Lite, same GPU (`cuda:0`), `prefetch_distance=0`, 2 prompts, 8 new tokens. These numbers are currently validated on `multi-model-runtime`.
+
+| Config | mem=0.07 | mem=0.10 | Notes |
+|---|---:|---:|---|
+| A demand-only | 0.1597 | 0.1583 | No resident backbone |
+| C backbone-only | 0.1782 | 0.1776 | Packed runtime, resident demand-only tail |
+
+Backbone-only improves generation throughput by:
+- `+11.6%` at `mem=0.07`
+- `+12.2%` at `mem=0.10`
+
 ## Applicability and Boundary Cases
 
 Positive runtime cases should satisfy both:
@@ -80,15 +127,16 @@ This outputs, for each memory budget:
 - burst-aware frontier size
 - slack utilization under the frontier-feasible resident prefix
 
-Packed-MoE architectures (`Mixtral`, `DeepSeek-V2`, `DeepSeek-V3`) are runtime-enabled on the `multi-model-runtime` branch and currently validated via tiny end-to-end smokes. They should enter the formal runtime table only if the applicability diagnostics indicate a compact backbone under the target budget.
+Packed-MoE architectures (`Mixtral`, `DeepSeek-V2`, `DeepSeek-V3`) are runtime-enabled on the `multi-model-runtime` branch. `DeepSeek-V2-Lite` has full-model `A/C` probes; `Mixtral` and `DeepSeek-V3` are currently validated via tiny end-to-end smokes and should enter the formal runtime table only if the applicability diagnostics indicate a compact backbone under the target budget.
 
 Current examples from the applicability diagnostics:
 - `Qwen1.5-MoE-A2.7B-Chat`: positive case
   - top-20% access coverage `~0.77`
   - burst-feasible resident ratio `~0.83-0.91`
-- `DeepSeek-V2-Lite`: boundary case under current budgets
-  - top-20% access coverage `~0.37`
-  - burst-feasible resident ratio `0.0` at `mem=0.05/0.07/0.10`
+- `DeepSeek-V2-Lite`: weak positive / boundary case under current budgets
+  - lower concentration than `Qwen`
+  - transferable hotspots exist
+  - real-hardware gains are positive but small (`~11-12%`)
 
 ## Method Summary
 
@@ -131,8 +179,13 @@ This produces one resident JSON per memory budget plus a summary JSON.
 ## Reproducing Real-Hardware Runtime Evaluation
 
 Supported runtime models:
-- `Qwen1.5-MoE-A2.7B-Chat`
-- `OLMoE-1B-7B-0924`
+- `v0.3.1`
+  - `Qwen1.5-MoE-A2.7B-Chat`
+  - `OLMoE-1B-7B-0924`
+- `multi-model-runtime`
+  - `Qwen1.5-MoE-A2.7B-Chat`
+  - `OLMoE-1B-7B-0924`
+  - `DeepSeek-V2-Lite`
 
 Backbone-only (`C`) example:
 
@@ -212,6 +265,10 @@ Before tagging a release, this repository should satisfy all of the following:
 - selector CLI runs from a clean checkout
 - `Qwen` runtime smoke runs from a clean checkout
 - `OLMoE` runtime smoke runs from a clean checkout
+
+For `multi-model-runtime`, the additional expectation is:
+- packed-runtime unit tests pass from a fresh clone
+- `DeepSeek-V2-Lite` full-model `A/C` probe runs on a clean checkout
 
 ## Base Runtime Modifications vs FineMoE
 
