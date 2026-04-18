@@ -258,6 +258,73 @@ The current simulator already contains most of the needed instrumentation:
   - `profile_freq`
   - `profile_depth_freq`
   - `profile_miss_stall`
+
+---
+
+## 4. Immediate Throughput Roadmap
+
+The project is no longer blocked on the high-level method.
+The current blocker is the gap between:
+
+- a correct backbone-first abstraction
+- and a runtime that realizes its full throughput potential
+
+### 4.1 What should not change now
+
+The main method should stay fixed:
+
+1. utility-ranked resident backbone
+2. burst-aware frontier-feasible resident prefix
+3. demand-only tail fallback
+
+The project should **not** go back to:
+
+- ratio-grid tuning
+- throughput sweep as the selector
+- speculative prefetch as the main path
+
+### 4.2 What should improve now
+
+The next gains should come from runtime work, in this order:
+
+1. **Packed full-model assets**
+   - `Mixtral` is still missing full-model runtime assets on the current hardware path.
+   - This is an enablement blocker, not an algorithm blocker.
+
+2. **Packed-path runtime overhead**
+   - once full assets exist, the likely bottleneck is:
+     - synthetic slice lookup
+     - packed expert registration overhead
+     - packed block hook / dispatch overhead
+   - this is where the next throughput wins should come from
+
+3. **Warm-path measurement discipline**
+   - use the same GPU
+   - keep offload artifacts reused
+   - avoid mixing cold-start costs into the main comparisons
+
+4. **Resident slack realism**
+   - if `C` underperforms, the first question should be:
+     - is tail slack too small under the current budget?
+   - not:
+     - should we invent another ratio heuristic?
+
+### 4.3 Current target split
+
+The practical target is now:
+
+- `Qwen` / `OLMoE`: formal positive runtime cases
+- `DeepSeek-V2-Lite`: weak positive / boundary case
+- `Mixtral`: move from tiny positive probe to full-model runtime case
+
+### 4.4 Decision rule
+
+If future packed full-model probes show only weak gains, the paper should still keep:
+
+- `Qwen` / `OLMoE` as main positive cases
+- `DeepSeek` / `Mixtral` as applicability and boundary evidence
+
+That is still coherent and consistent with the project thesis.
 - deadline-aware admission
 - value-aware admission
 

@@ -8,7 +8,24 @@ There are currently two supported tracks:
 - `v0.3.1` tag / `v0.3.0-stable` branch: stable runtime for `Qwen1.5-MoE-A2.7B-Chat` and `OLMoE-1B-7B-0924`
 - `multi-model-runtime` branch: adds packed-MoE runtime enablement for `DeepSeek-V2-Lite`, `Mixtral`, and `DeepSeek-V3`; this branch is validated by fresh-clone unit tests and targeted runtime probes, but it is still the active integration branch
 
-If you want the most conservative checkout, use `v0.3.1`. If you need `DeepSeek` or `Mixtral`, clone `multi-model-runtime`.
+## Which Branch Should You Use?
+
+Use **`multi-model-runtime`** unless you explicitly need the frozen stable release.
+
+- **Recommended default branch: `multi-model-runtime`**
+  - this is the current active integration branch
+  - this is the branch that should be used for ongoing development and new experiments
+  - this is the only branch that currently contains the packed-MoE runtime path (`DeepSeek`, `Mixtral`, `DeepSeek-V3`)
+- **Conservative frozen release: `v0.3.1` / `v0.3.0-stable`**
+  - use this only if you want the narrowest validated scope
+  - this line is intentionally limited to `Qwen + OLMoE`
+
+In other words:
+
+- if you are continuing the project, use `multi-model-runtime`
+- if you are reproducing the older stable release only, use `v0.3.1`
+
+Older historical branches should not be treated as the main working branch.
 
 ## Quick Start
 
@@ -141,6 +158,47 @@ Current examples from the applicability diagnostics:
   - simulation shows retained gain `~0.96-0.97` at `mem=0.07/0.10`
   - tiny packed-runtime probe is directionally positive (`A 7.49 -> C 8.59 gen tok/s`, `+14.6%`)
   - full-model runtime evidence is still missing, so it stays out of the main runtime table
+
+## Current Throughput Priorities
+
+The main throughput question is no longer whether backbone pinning helps. That has already been established for:
+- `Qwen`
+- `OLMoE`
+- `DeepSeek-V2-Lite`
+- `Mixtral` tiny packed-runtime probes
+
+The current engineering question is how to make the gain larger and more stable.
+
+Priority order:
+
+1. **Finish full-model packed runtime assets**
+   - `Mixtral` is currently limited by missing full-model assets, not by a known runtime correctness bug.
+   - Until full-model checkpoints and offloads are in place, the packed path cannot produce a formal throughput table.
+
+2. **Reduce packed-runtime control overhead**
+   - The next likely bottleneck is not backbone selection, but packed expert indirection:
+     - synthetic slice lookup
+     - packed-to-expert dispatch bookkeeping
+     - hook overhead on packed MoE blocks
+   - This should be treated as a runtime optimization problem, not a selector-tuning problem.
+
+3. **Prebuild and reuse offload artifacts**
+   - Throughput measurements should not pay repeated setup costs:
+     - JIT compilation
+     - offload index construction
+     - cold-start initialization
+   - The highest-signal comparisons are warm-path `A` vs `C` runs on the same GPU.
+
+4. **Keep the method fixed while optimizing the runtime**
+   - The project should not go back to ratio sweeps or prefetch tuning.
+   - The current method remains:
+     - utility-ranked resident backbone
+     - burst-aware frontier-feasible prefix
+     - demand-only tail fallback
+
+In short:
+
+> The best way to improve throughput now is to make the runtime cheaper, not to make the selector more heuristic.
 
 ## Method Summary
 

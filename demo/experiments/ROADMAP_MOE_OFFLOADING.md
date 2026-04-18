@@ -258,6 +258,47 @@ The current simulator already contains most of the needed instrumentation:
   - `profile_freq`
   - `profile_depth_freq`
   - `profile_miss_stall`
+
+---
+
+## 4. Immediate Throughput Roadmap
+
+The method is no longer the main uncertainty.
+The next uncertainty is runtime efficiency.
+
+### Keep fixed
+
+The main design should remain:
+
+1. resident backbone
+2. burst-aware frontier-feasible resident prefix
+3. demand-only tail fallback
+
+Do not go back to:
+
+- ratio grid search as the main method
+- throughput sweep as the selector
+- speculative prefetch as the default serving path
+
+### Improve next
+
+The next throughput improvements should come from:
+
+1. finishing full-model packed assets (`Mixtral`)
+2. reducing packed-runtime control overhead
+3. reusing offload/JIT artifacts and measuring warm paths
+4. enforcing realistic tail slack without turning the method into heuristic tuning
+
+### Current paper split
+
+- `Qwen` / `OLMoE`: strong positive cases
+- `DeepSeek-V2-Lite`: weak positive / boundary case
+- `Mixtral`: tiny positive packed-runtime probe; still missing full-model runtime evidence
+
+### Interpretation rule
+
+If packed full-model probes remain weak, keep them as applicability / boundary evidence.
+That is still consistent with the backbone-first thesis.
 - deadline-aware admission
 - value-aware admission
 
