@@ -23,8 +23,12 @@ from backbone_moe.simulator import SystemBottleneckAnalyzer
 
 
 def format_mem_tag(mem_ratio: float) -> str:
-    text = f"{mem_ratio:.6f}".rstrip("0").rstrip(".")
-    return text.replace(".", "p")
+    text = f"{mem_ratio:.6f}"
+    whole, frac = text.split(".")
+    frac = frac.rstrip("0")
+    if len(frac) < 2:
+        frac = frac.ljust(2, "0")
+    return f"{whole}p{frac}"
 
 
 def resolve_expert_size_mb(args):

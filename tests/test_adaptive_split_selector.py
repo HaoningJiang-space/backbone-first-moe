@@ -18,6 +18,7 @@ class AdaptiveSplitSelectorTest(unittest.TestCase):
         self.assertEqual(format_mem_tag(0.006), "0p006")
         self.assertEqual(format_mem_tag(0.008), "0p008")
         self.assertEqual(format_mem_tag(0.01), "0p01")
+        self.assertEqual(format_mem_tag(0.10), "0p10")
         self.assertEqual(format_mem_tag(0.012), "0p012")
 
     def test_cache_capacity_for_mem_ratio(self):
