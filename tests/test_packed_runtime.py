@@ -59,6 +59,21 @@ class FakePackedDispatcher:
         return results
 
 
+class TrackingPackedDispatcher(FakePackedDispatcher):
+    def __init__(self, experts, act_fn):
+        super().__init__(experts, act_fn)
+        self.enqueued = []
+        self.wait_calls = 0
+
+    def enqueue_expert(self, layer_id, expert_idx, gpu_id=-1, remote=False):
+        self.enqueued.append((layer_id, expert_idx))
+        super().enqueue_expert(layer_id, expert_idx, gpu_id, remote)
+
+    def wait_expert(self):
+        self.wait_calls += 1
+        return super().wait_expert()
+
+
 class _AffineExpert(torch.nn.Module):
     def __init__(self, scale: float, bias: float):
         super().__init__()
@@ -258,6 +273,57 @@ class PackedRuntimeForwardTest(unittest.TestCase):
                 rtol=1e-4,
             )
         )
+
+    def test_dispatch_packed_experts_only_dispatches_demand_experts(self):
+        torch.manual_seed(0)
+        cfg = MixtralConfig(
+            num_hidden_layers=1,
+            hidden_size=32,
+            intermediate_size=16,
+            num_local_experts=4,
+            num_experts_per_tok=2,
+            num_attention_heads=4,
+            num_key_value_heads=4,
+        )
+        block = SyncMixtralSparseMoeBlock(cfg)
+        self._reinitialize_parameters(block)
+        hidden_states = torch.randn(5, cfg.hidden_size)
+        gate_output = block.gate(hidden_states)
+        if isinstance(gate_output, tuple):
+            if len(gate_output) == 3:
+                _, top_k_weights, top_k_index = gate_output
+            else:
+                top_k_weights, top_k_index = gate_output
+        else:
+            routing_weights = F.softmax(gate_output, dim=1, dtype=torch.float)
+            top_k_weights, top_k_index = torch.topk(routing_weights, block.top_k, dim=-1)
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)
+            top_k_weights = top_k_weights.to(hidden_states.dtype)
+
+        _, active_experts, _ = _build_packed_expert_assignments(
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            device=hidden_states.device,
+        )
+        resident_ids = {active_experts[0]}
+        dispatcher = TrackingPackedDispatcher(block.experts, block.experts.act_fn)
+
+        dispatch_packed_experts(
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            layer_id=0,
+            expert_dispatcher=dispatcher,
+            experts_module=block.experts,
+            resident_expert_ids=resident_ids,
+        )
+
+        dispatched = {expert_idx for _, expert_idx in dispatcher.enqueued}
+        self.assertNotIn(next(iter(resident_ids)), dispatched)
+        self.assertEqual(dispatched, set(active_experts) - resident_ids)
+        self.assertEqual(dispatcher.wait_calls, 1)
 
 
 if __name__ == "__main__":
