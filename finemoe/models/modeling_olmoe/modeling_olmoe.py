@@ -36,6 +36,7 @@ from transformers.utils import (
     logging,
     replace_return_docstrings,
 )
+from ..modulelist_runtime import dispatch_modulelist_experts
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -558,18 +559,12 @@ class OlmoeSparseMoeBlock(nn.Module):
             routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
 
-        final_hidden_states = torch.zeros(
-            (batch_size * sequence_length, hidden_dim), dtype=hidden_states.dtype, device=hidden_states.device
+        final_hidden_states = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=self.experts,
         )
-
-        expert_mask = torch.nn.functional.one_hot(selected_experts, num_classes=self.num_experts).permute(2, 1, 0)
-
-        for expert_idx in range(self.num_experts):
-            expert_layer = self.experts[expert_idx]
-            idx, top_x = torch.where(expert_mask[expert_idx])
-            current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
-            current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx, None]
-            final_hidden_states.index_add_(0, top_x, current_hidden_states.to(hidden_states.dtype))
 
         final_hidden_states = final_hidden_states.reshape(batch_size, sequence_length, hidden_dim)
         return final_hidden_states, router_logits
@@ -663,19 +658,12 @@ class SyncOlmoeSparseMoeBlock(nn.Module):
                 self.expert_map_matcher.traj_prefetch(seq_id, trajs)
 
         # === Expert computation ===
-        final_hidden_states = torch.zeros(
-            (batch_size * sequence_length, hidden_dim), dtype=hidden_states.dtype, device=hidden_states.device
+        final_hidden_states = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=self.experts,
         )
-
-        expert_mask = torch.nn.functional.one_hot(selected_experts, num_classes=self.num_experts).permute(2, 1, 0)
-
-        for expert_idx in range(self.num_experts):
-            expert_layer = self.experts[expert_idx]
-            idx, top_x = torch.where(expert_mask[expert_idx])
-            current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
-            current_hidden_states = expert_layer(current_state).to(
-                routing_weights.device) * routing_weights[top_x, idx, None]
-            final_hidden_states.index_add_(0, top_x, current_hidden_states.to(hidden_states.dtype))
 
         final_hidden_states = final_hidden_states.reshape(batch_size, sequence_length, hidden_dim)
         return final_hidden_states, router_logits

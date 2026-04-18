@@ -40,8 +40,8 @@ Goal:
 - Keep `demand-only tail fallback`, but make it cheaper under batch traffic.
 
 Concrete work:
-- Coalesce duplicate tail expert fetches within the same batch-step.
-- Group tail fetches per layer-step instead of per token whenever possible.
+- Coalesce duplicate tail expert service within the same batch-step.
+- Group modulelist expert execution by active expert blocks instead of `one_hot + torch.where`.
 - Reuse warm-path artifacts to reduce repeated setup cost.
 
 Why:
