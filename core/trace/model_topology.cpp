@@ -109,7 +109,18 @@ void Node::SetDevice(const torch::Device& target_device,
             // ARCHER_LOG_DEBUG("Allocate GPU Memory for node {}", this->id);
             device_memory_ptr = kDeviceMemoryPool->AllocateMemory(id, byte_size, target_device);
             // ARCHER_LOG_DEBUG("Allocate GPU Memory for node {} done", this->id);
-            assert(device_memory_ptr != nullptr);
+            if (device_memory_ptr == nullptr) {
+                if (!on_demand) {
+                    is_overflow = true;
+                    device = CPU_DEVICE;
+                    ARCHER_LOG_WARN("SetDevice fallback to host due sparse budget ",
+                                    str(),
+                                    " target=",
+                                    target_device.str());
+                    return;
+                }
+                assert(device_memory_ptr != nullptr);
+            }
             assert(host_memory_ptr != nullptr);
 
             auto start_time = MCIROSECONDS_SINCE_EPOCH;
