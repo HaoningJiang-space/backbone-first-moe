@@ -115,20 +115,39 @@ def dispatch_packed_experts(
 
     dispatch_wait_wall_time_sec = 0.0
     dispatch_wait_calls = 0
+    dispatch_batch_calls = 0
     if demand_active:
-        expert_dispatcher.set_inputs(hidden_states, router_mask)
-        expert_dispatcher.set_assignments(
-            [int(expert_idx) for expert_idx in demand_active],
-            [assignment_map[int(expert_idx)][0] for expert_idx in demand_active],
-        )
-        expert_dispatcher.set_expected_queue(len(demand_active))
         gpu_id = hidden_states.device.index if hidden_states.is_cuda else -1
-
-        for expert_idx in demand_active:
-            expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), gpu_id, False)
+        demand_expert_indices = [int(expert_idx) for expert_idx in demand_active]
+        demand_token_indices = [
+            assignment_map[int(expert_idx)][0] for expert_idx in demand_active
+        ]
+        if hasattr(expert_dispatcher, "dispatch_batch"):
+            dispatch_batch_calls = 1
+            expert_dispatcher.dispatch_batch(
+                hidden_states,
+                router_mask,
+                int(layer_id),
+                demand_expert_indices,
+                demand_token_indices,
+                gpu_id,
+                False,
+            )
+        else:
+            expert_dispatcher.set_inputs(hidden_states, router_mask)
+            expert_dispatcher.set_assignments(
+                demand_expert_indices,
+                demand_token_indices,
+            )
+            expert_dispatcher.set_expected_queue(len(demand_active))
+            for expert_idx in demand_active:
+                expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), gpu_id, False)
 
         wait_start = time.perf_counter()
-        results = expert_dispatcher.wait_expert()
+        if hasattr(expert_dispatcher, "wait_batch"):
+            results = expert_dispatcher.wait_batch()
+        else:
+            results = expert_dispatcher.wait_expert()
         dispatch_wait_wall_time_sec = time.perf_counter() - wait_start
         dispatch_wait_calls = 1
         for output_tensor, _, expert_idx, _ in results:
@@ -150,6 +169,7 @@ def dispatch_packed_experts(
             resident_token_assignments=sum(int(assignment_map[idx][0].numel()) for idx in resident_active),
             demand_token_assignments=sum(int(assignment_map[idx][0].numel()) for idx in demand_active),
             resident_compute_wall_time_sec=resident_compute_wall_time_sec,
+            dispatch_batch_calls=dispatch_batch_calls,
             dispatch_wait_calls=dispatch_wait_calls,
             dispatch_wait_wall_time_sec=dispatch_wait_wall_time_sec,
         )

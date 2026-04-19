@@ -49,6 +49,22 @@ class FakePackedDispatcher:
     def set_expected_queue(self, n):
         return None
 
+    def dispatch_batch(
+        self,
+        hidden_states,
+        router_mask,
+        layer_id,
+        expert_indices,
+        token_indices,
+        gpu_id=-1,
+        remote=False,
+    ):
+        self.set_inputs(hidden_states, router_mask)
+        self.set_assignments(expert_indices, token_indices)
+        self.set_expected_queue(len(expert_indices))
+        for expert_idx in expert_indices:
+            self.enqueue_expert(layer_id, expert_idx, gpu_id, remote)
+
     def enqueue_expert(self, layer_id, expert_idx, gpu_id=-1, remote=False):
         self.queue.append((layer_id, expert_idx))
 
@@ -77,10 +93,33 @@ class TrackingPackedDispatcher(FakePackedDispatcher):
         self.enqueued = []
         self.assignment_keys = None
         self.wait_calls = 0
+        self.batch_dispatch_calls = 0
+        self.wait_batch_calls = 0
 
     def enqueue_expert(self, layer_id, expert_idx, gpu_id=-1, remote=False):
         self.enqueued.append((layer_id, expert_idx))
         super().enqueue_expert(layer_id, expert_idx, gpu_id, remote)
+
+    def dispatch_batch(
+        self,
+        hidden_states,
+        router_mask,
+        layer_id,
+        expert_indices,
+        token_indices,
+        gpu_id=-1,
+        remote=False,
+    ):
+        self.batch_dispatch_calls += 1
+        super().dispatch_batch(
+            hidden_states,
+            router_mask,
+            layer_id,
+            expert_indices,
+            token_indices,
+            gpu_id,
+            remote,
+        )
 
     def set_assignments(self, expert_indices, token_indices):
         self.assignment_keys = [int(expert_idx) for expert_idx in expert_indices]
@@ -88,6 +127,10 @@ class TrackingPackedDispatcher(FakePackedDispatcher):
 
     def wait_expert(self):
         self.wait_calls += 1
+        return super().wait_expert()
+
+    def wait_batch(self):
+        self.wait_batch_calls += 1
         return super().wait_expert()
 
 
@@ -116,6 +159,24 @@ class _FakeTracer:
         self.calls = []
 
     def update_entry(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+class LegacyTrackingPackedDispatcher:
+    def __init__(self, experts, act_fn):
+        self.inner = TrackingPackedDispatcher(experts, act_fn)
+
+    def __getattr__(self, name):
+        if name in {"dispatch_batch", "wait_batch"}:
+            raise AttributeError(name)
+        return getattr(self.inner, name)
+
+
+class _PackedRuntimeProfileStub:
+    def __init__(self):
+        self.calls = []
+
+    def record_packed_dispatch(self, **kwargs):
         self.calls.append(kwargs)
 
 
@@ -376,8 +437,106 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         dispatched = {expert_idx for _, expert_idx in dispatcher.enqueued}
         self.assertNotIn(next(iter(resident_ids)), dispatched)
         self.assertEqual(dispatched, set(active_experts) - resident_ids)
-        self.assertEqual(dispatcher.wait_calls, 1)
+        self.assertEqual(dispatcher.batch_dispatch_calls, 1)
+        self.assertEqual(dispatcher.wait_batch_calls, 1)
+        self.assertEqual(dispatcher.wait_calls, 0)
         self.assertEqual(dispatcher.assignment_keys, sorted(set(active_experts) - resident_ids))
+
+    def test_dispatch_packed_experts_falls_back_to_legacy_dispatcher_api(self):
+        torch.manual_seed(0)
+        cfg = MixtralConfig(
+            num_hidden_layers=1,
+            hidden_size=32,
+            intermediate_size=16,
+            num_local_experts=4,
+            num_experts_per_tok=2,
+            num_attention_heads=4,
+            num_key_value_heads=4,
+        )
+        block = SyncMixtralSparseMoeBlock(cfg)
+        self._reinitialize_parameters(block)
+        hidden_states = torch.randn(5, cfg.hidden_size)
+        gate_output = block.gate(hidden_states)
+        if isinstance(gate_output, tuple):
+            if len(gate_output) == 3:
+                _, top_k_weights, top_k_index = gate_output
+            else:
+                top_k_weights, top_k_index = gate_output
+        else:
+            routing_weights = F.softmax(gate_output, dim=1, dtype=torch.float)
+            top_k_weights, top_k_index = torch.topk(routing_weights, block.top_k, dim=-1)
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)
+            top_k_weights = top_k_weights.to(hidden_states.dtype)
+
+        _, active_experts, _ = _build_packed_expert_assignments(
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            device=hidden_states.device,
+        )
+        resident_ids = {active_experts[0]}
+        dispatcher = LegacyTrackingPackedDispatcher(block.experts, block.experts.act_fn)
+
+        dispatch_packed_experts(
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            layer_id=0,
+            expert_dispatcher=dispatcher,
+            experts_module=block.experts,
+            resident_fastpath_expert_ids=resident_ids,
+        )
+
+        dispatched = {expert_idx for _, expert_idx in dispatcher.inner.enqueued}
+        self.assertNotIn(next(iter(resident_ids)), dispatched)
+        self.assertEqual(dispatched, set(active_experts) - resident_ids)
+        self.assertEqual(dispatcher.inner.batch_dispatch_calls, 0)
+        self.assertEqual(dispatcher.inner.wait_batch_calls, 0)
+        self.assertEqual(dispatcher.inner.wait_calls, 1)
+
+    def test_dispatch_packed_experts_records_batch_dispatch_usage(self):
+        torch.manual_seed(0)
+        cfg = MixtralConfig(
+            num_hidden_layers=1,
+            hidden_size=32,
+            intermediate_size=16,
+            num_local_experts=4,
+            num_experts_per_tok=2,
+            num_attention_heads=4,
+            num_key_value_heads=4,
+        )
+        block = SyncMixtralSparseMoeBlock(cfg)
+        self._reinitialize_parameters(block)
+        hidden_states = torch.randn(5, cfg.hidden_size)
+        gate_output = block.gate(hidden_states)
+        if isinstance(gate_output, tuple):
+            if len(gate_output) == 3:
+                _, top_k_weights, top_k_index = gate_output
+            else:
+                top_k_weights, top_k_index = gate_output
+        else:
+            routing_weights = F.softmax(gate_output, dim=1, dtype=torch.float)
+            top_k_weights, top_k_index = torch.topk(routing_weights, block.top_k, dim=-1)
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)
+            top_k_weights = top_k_weights.to(hidden_states.dtype)
+        dispatcher = TrackingPackedDispatcher(block.experts, block.experts.act_fn)
+        runtime_profile = _PackedRuntimeProfileStub()
+
+        dispatch_packed_experts(
+            hidden_states=hidden_states,
+            top_k_index=top_k_index,
+            top_k_weights=top_k_weights,
+            num_experts=block.experts.num_experts,
+            layer_id=0,
+            expert_dispatcher=dispatcher,
+            experts_module=block.experts,
+            resident_fastpath_expert_ids=(),
+            runtime_profile=runtime_profile,
+        )
+
+        self.assertEqual(len(runtime_profile.calls), 1)
+        self.assertEqual(runtime_profile.calls[0]["dispatch_batch_calls"], 1)
 
     def test_trace_packed_batch_updates_each_sequence(self):
         hidden_states = torch.randn(2, 3, 4)

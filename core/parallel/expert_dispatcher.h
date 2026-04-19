@@ -61,6 +61,14 @@ public:
         for (size_t i = 0; i < limit; ++i) { assignment_tokens_[expert_indices[i]] = token_indices[i].clone(); }
     }
 
+    void DispatchBatch(const torch::Tensor& hidden_states,
+                       const torch::Tensor& router_mask,
+                       int layer_idx,
+                       const std::vector<int>& expert_indices,
+                       const std::vector<torch::Tensor>& token_indices,
+                       int gpu_id = -1,
+                       bool remote = false);
+
     void EnqueueExpert(int layer_idx, int expert_idx, int gpu_id = -1, bool remote = false);
 
     void RegisterExpert(int layer_idx,
@@ -70,6 +78,7 @@ public:
     void SetExpectedQueue(int expected_pending = 0) { pending_.store(expected_pending); }
 
     std::vector<CallResult> WaitExpert() { return Wait(); }
+    std::vector<CallResult> WaitBatch() { return Wait(); }
     void SetNode(int layer_idx, int expert_idx, const NodePtr& node)
     {
         experts_[expert_idx][layer_idx]->node = node;

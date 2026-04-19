@@ -94,6 +94,22 @@ ExpertDispatcher::ExpertDispatcher(int num_experts, int num_layers, int dtype, i
     }
 }
 
+void ExpertDispatcher::DispatchBatch(const torch::Tensor& hidden_states,
+                                     const torch::Tensor& router_mask,
+                                     int layer_idx,
+                                     const std::vector<int>& expert_indices,
+                                     const std::vector<torch::Tensor>& token_indices,
+                                     int gpu_id,
+                                     bool remote)
+{
+    SetInputs(hidden_states, router_mask);
+    SetAssignments(expert_indices, token_indices);
+    SetExpectedQueue(expert_indices.size());
+    for (auto expert_idx : expert_indices) {
+        EnqueueExpert(layer_idx, expert_idx, gpu_id, remote);
+    }
+}
+
 void ExpertDispatcher::EnqueueExpert(int layer_idx, int expert_idx, int gpu_id, bool remote)
 {
     ExpertDispatcher::CallArgs args;

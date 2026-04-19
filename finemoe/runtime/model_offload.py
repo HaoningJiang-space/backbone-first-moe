@@ -415,6 +415,7 @@ class RuntimeProfile:
     packed_resident_token_assignments: int = 0
     packed_demand_token_assignments: int = 0
     packed_resident_compute_wall_time_sec: float = 0.0
+    packed_dispatch_batch_calls: int = 0
     packed_dispatch_wait_calls: int = 0
     packed_dispatch_wait_wall_time_sec: float = 0.0
 
@@ -514,6 +515,7 @@ class RuntimeProfile:
         resident_token_assignments,
         demand_token_assignments,
         resident_compute_wall_time_sec,
+        dispatch_batch_calls,
         dispatch_wait_calls,
         dispatch_wait_wall_time_sec,
     ):
@@ -523,6 +525,7 @@ class RuntimeProfile:
         self.packed_resident_token_assignments += int(resident_token_assignments)
         self.packed_demand_token_assignments += int(demand_token_assignments)
         self.packed_resident_compute_wall_time_sec += float(resident_compute_wall_time_sec)
+        self.packed_dispatch_batch_calls += int(dispatch_batch_calls)
         self.packed_dispatch_wait_calls += int(dispatch_wait_calls)
         self.packed_dispatch_wait_wall_time_sec += float(dispatch_wait_wall_time_sec)
 
@@ -569,6 +572,7 @@ class RuntimeProfile:
             "packed_resident_token_assignments": int(self.packed_resident_token_assignments),
             "packed_demand_token_assignments": int(self.packed_demand_token_assignments),
             "packed_resident_compute_wall_time_sec": float(self.packed_resident_compute_wall_time_sec),
+            "packed_dispatch_batch_calls": int(self.packed_dispatch_batch_calls),
             "packed_dispatch_wait_calls": int(self.packed_dispatch_wait_calls),
             "packed_dispatch_wait_wall_time_sec": float(self.packed_dispatch_wait_wall_time_sec),
         }
