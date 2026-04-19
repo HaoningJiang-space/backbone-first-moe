@@ -24,6 +24,10 @@ class ArcherConfig:
         default="",
         metadata={"help": "Path to JSON file listing resident (layer, expert) pairs"},
     )
+    sparse_budget_bytes_override: int = field(
+        default=0,
+        metadata={"help": "Optional explicit sparse-budget override in bytes"},
+    )
     # master_addr: str = field(
     #     default="127.0.0.1",
     #     metadata={"help": "Hosts for running archer"},

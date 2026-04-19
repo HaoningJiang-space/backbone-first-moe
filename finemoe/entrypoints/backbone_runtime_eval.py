@@ -17,6 +17,7 @@ def build_parser():
     parser.add_argument("--prefetch-distance", type=int, default=6)
     parser.add_argument("--store-prefix", type=str, default="")
     parser.add_argument("--resident-expert-ids-file", type=str, default="")
+    parser.add_argument("--sparse-budget-bytes-override", type=int, default=0)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--eval-mode", type=str, default="offline")
     parser.add_argument("--batch-size", type=int, default=1)
@@ -44,6 +45,7 @@ def main():
         prefetch_distance=args.prefetch_distance,
         store_prefix=args.store_prefix,
         resident_expert_ids_file=args.resident_expert_ids_file,
+        sparse_budget_bytes_override=args.sparse_budget_bytes_override,
         device=args.device,
         eval_mode=args.eval_mode,
         batch_size=args.batch_size,

@@ -396,6 +396,23 @@ class ResidentRegistryTest(unittest.TestCase):
             "min(free_device_memory_ratio,runtime_sparse_budget_bytes)",
         )
 
+    def test_sparse_budget_info_respects_runtime_and_resident_budget_overrides(self):
+        engine = self._build_engine_stub()
+        engine.device = "cuda:0"
+        engine.archer_engine = self._fake_archer_engine({}, sparse_cache_limit=4096)
+        engine._runtime_budget_override_bytes = 2048
+        engine._runtime_budget_override_source = "runtime_sparse_budget_override"
+        engine._resident_budget_override_bytes = 1024
+        engine._resident_budget_override_source = "runtime_sparse_budget_bytes"
+
+        budget = OffloadEngine.get_sparse_budget_info(engine)
+
+        self.assertEqual(budget["budget_bytes"], 1024)
+        self.assertEqual(
+            budget["budget_source"],
+            "min(min(free_device_memory_ratio,runtime_sparse_budget_override),runtime_sparse_budget_bytes)",
+        )
+
     def test_runtime_profile_exposes_recorded_counters(self):
         engine = self._build_engine_stub()
         engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()

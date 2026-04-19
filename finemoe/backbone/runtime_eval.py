@@ -20,6 +20,7 @@ class RuntimeEvalConfig:
     prefetch_distance: int = 6
     store_prefix: str = ""
     resident_expert_ids_file: str = ""
+    sparse_budget_bytes_override: int = 0
     device: str = "cuda:0"
     eval_mode: str = "offline"
     batch_size: int = 1
@@ -57,6 +58,7 @@ def build_model(runtime_cfg):
             "offload_path": runtime_cfg.offload_path,
             "device_memory_ratio": runtime_cfg.device_memory_ratio,
             "resident_expert_ids_file": runtime_cfg.resident_expert_ids_file,
+            "sparse_budget_bytes_override": runtime_cfg.sparse_budget_bytes_override,
             "prefetch_distance": runtime_cfg.prefetch_distance,
             "store_capacity": runtime_cfg.store_capacity,
             "device": runtime_cfg.device,
@@ -170,6 +172,7 @@ def evaluate_runtime(runtime_cfg):
         "offload_path": runtime_cfg.offload_path,
         "store_prefix": runtime_cfg.store_prefix,
         "resident_expert_ids_file": runtime_cfg.resident_expert_ids_file,
+        "sparse_budget_bytes_override": int(runtime_cfg.sparse_budget_bytes_override),
         "device_memory_ratio": float(runtime_cfg.device_memory_ratio),
         "prefetch_distance": int(runtime_cfg.prefetch_distance),
         "num_prompts": len(prompts),

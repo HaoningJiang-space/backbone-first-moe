@@ -631,6 +631,8 @@ class OffloadEngine(object):
         self.moe_layers = []
         self.resident_expert_ids = []
         self.resident_expert_ids_set = set()
+        self._runtime_budget_override_bytes = None
+        self._runtime_budget_override_source = ""
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
         self._reset_resident_registry()
@@ -791,6 +793,8 @@ class OffloadEngine(object):
         self.resident_registry = ResidentRegistry(
             layout=parse_expert_layout(self.config),
         )
+        self._runtime_budget_override_bytes = None
+        self._runtime_budget_override_source = ""
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
 
@@ -902,17 +906,34 @@ class OffloadEngine(object):
         if getter is None:
             return 0
         runtime_budget_bytes = int(getter(torch.device(self.device)))
+        budget_bytes = runtime_budget_bytes
+        if (
+            self._runtime_budget_override_bytes is not None
+            and self._runtime_budget_override_bytes > 0
+        ):
+            if budget_bytes > 0:
+                budget_bytes = min(budget_bytes, int(self._runtime_budget_override_bytes))
+            else:
+                budget_bytes = int(self._runtime_budget_override_bytes)
         if (
             self._resident_budget_override_bytes is not None
             and self._resident_budget_override_bytes > 0
         ):
-            if runtime_budget_bytes > 0:
-                return min(runtime_budget_bytes, int(self._resident_budget_override_bytes))
+            if budget_bytes > 0:
+                return min(budget_bytes, int(self._resident_budget_override_bytes))
             return int(self._resident_budget_override_bytes)
-        return runtime_budget_bytes
+        return budget_bytes
 
     def _get_sparse_budget_source(self):
         runtime_source = "free_device_memory_ratio"
+        if (
+            self._runtime_budget_override_bytes is not None
+            and self._runtime_budget_override_bytes > 0
+        ):
+            if self._runtime_budget_override_source:
+                runtime_source = f"min({runtime_source},{self._runtime_budget_override_source})"
+            else:
+                runtime_source = f"min({runtime_source},runtime_sparse_budget_override)"
         if (
             self._resident_budget_override_bytes is not None
             and self._resident_budget_override_bytes > 0
@@ -1437,6 +1458,9 @@ class OffloadEngine(object):
         )
 
         self.archer_config = _archer_config
+        if getattr(_archer_config, "sparse_budget_bytes_override", 0):
+            self._runtime_budget_override_bytes = int(_archer_config.sparse_budget_bytes_override)
+            self._runtime_budget_override_source = "runtime_sparse_budget_override"
 
         self.expert_tracer.offload_engine = self
 
