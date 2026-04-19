@@ -515,7 +515,7 @@ class RuntimeProfile:
         resident_token_assignments,
         demand_token_assignments,
         resident_compute_wall_time_sec,
-        dispatch_batch_calls,
+        dispatch_batch_calls=0,
         dispatch_wait_calls,
         dispatch_wait_wall_time_sec,
     ):
@@ -1465,6 +1465,11 @@ class OffloadEngine(object):
         if getattr(_archer_config, "sparse_budget_bytes_override", 0):
             self._runtime_budget_override_bytes = int(_archer_config.sparse_budget_bytes_override)
             self._runtime_budget_override_source = "runtime_sparse_budget_override"
+            if hasattr(self.archer_engine, "set_sparse_cache_limit"):
+                self.archer_engine.set_sparse_cache_limit(
+                    self.device,
+                    self._runtime_budget_override_bytes,
+                )
 
         self.expert_tracer.offload_engine = self
 

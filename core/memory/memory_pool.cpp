@@ -170,3 +170,12 @@ void DeviceMemoryPool::SetMemoryRatio(const double ratio)
         memory_capacity_[i] = free_memory_[i];
     }
 }
+
+void DeviceMemoryPool::SetMemoryCapacity(const torch::Device& device, std::int64_t capacity_bytes)
+{
+    int device_id = device.index();
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::int64_t used_bytes = memory_capacity_[device_id] - free_memory_[device_id];
+    memory_capacity_[device_id] = capacity_bytes;
+    free_memory_[device_id] = std::max<std::int64_t>(0, capacity_bytes - used_bytes);
+}

@@ -496,6 +496,12 @@ std::int64_t ArcherPrefetchHandle::GetSparseCacheLimit(const torch::Device& devi
     return kTopologyHandle->GetSparseCacheLimit(device);
 }
 
+void ArcherPrefetchHandle::SetSparseCacheLimit(const torch::Device& device, std::int64_t capacity_bytes)
+{
+    kDeviceMemoryPool->SetMemoryCapacity(device, capacity_bytes);
+    ARCHER_LOG_INFO("Override sparse cache limit for device {}, {}", device.index(), capacity_bytes);
+}
+
 // void ArcherPrefetchHandle::SetNodeCachePriority(const std::uint32_t tensor_id, const float priority) {
 //     auto node = kTopologyHandle->GetNodeFromTensorID(tensor_id);
 //     node->cache_priority = priority;

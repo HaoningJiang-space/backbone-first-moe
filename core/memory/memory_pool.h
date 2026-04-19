@@ -66,6 +66,7 @@ public:
                    const torch::Device& device);
 
     void SetMemoryRatio(const double ratio);
+    void SetMemoryCapacity(const torch::Device& device, std::int64_t capacity_bytes);
     std::int64_t GetFreeMemory(const torch::Device& device);
     std::int64_t GetMemoryCapacity(const torch::Device& device);
 
