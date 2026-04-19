@@ -1,14 +1,17 @@
 # Paper Runtime Table
 
-This table uses the paper-facing comparison view:
-- `Qwen`: fixed-mem runtime points
+This table currently mixes:
+- `Qwen`: historical fixed-runtime reference points
 - `DeepSeek-V2-Lite`: fixed-mem runtime points
 - `OLMoE`: coverage-matched fair runtime points
 
+For the current paper-facing `Qwen` interpretation under fair budget and the two-lane modulelist runtime, use:
+- [qwen/qwen_realization_gap.md](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/qwen/qwen_realization_gap.md)
+
 | Model | Comparison View | mem | A gen tok/s | C gen tok/s | gain | C resident |
 |---|---|---:|---:|---:|---:|---:|
-| Qwen1.5-MoE-A2.7B-Chat | fixed | 0.070 | 2.9266 | 3.2331 | +10.5% | 275 |
-| Qwen1.5-MoE-A2.7B-Chat | fixed | 0.100 | 3.0946 | 3.6162 | +16.9% | 464 |
+| Qwen1.5-MoE-A2.7B-Chat | historical-fixed | 0.070 | 2.9266 | 3.2331 | +10.5% | 275 |
+| Qwen1.5-MoE-A2.7B-Chat | historical-fixed | 0.100 | 3.0946 | 3.6162 | +16.9% | 464 |
 | OLMoE-1B-7B-0924 | fair | 0.012 | 0.3332 | 0.4988 | +49.7% | 316 |
 | OLMoE-1B-7B-0924 | fair | 0.014 | 0.3336 | 0.5469 | +63.9% | 388 |
 | OLMoE-1B-7B-0924 | fair | 0.016 | 0.3339 | 0.6053 | +81.3% | 462 |
@@ -18,3 +21,4 @@ This table uses the paper-facing comparison view:
 ## Notes
 
 - OLMoE-1B-7B-0924: use coverage-matched fair runtime points for cross-model comparison because fixed mem-ratio is near-full-fit.
+- Qwen1.5-MoE-A2.7B-Chat: the two rows above are historical fixed-runtime numbers. The current fair-budget two-lane result is summarized in [qwen/qwen_realization_gap.md](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/qwen/qwen_realization_gap.md).

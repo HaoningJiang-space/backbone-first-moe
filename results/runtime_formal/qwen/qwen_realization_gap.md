@@ -2,6 +2,10 @@
 
 This note summarizes the current paper-facing interpretation for `Qwen1.5-MoE-A2.7B-Chat`.
 
+Machine-readable companion:
+
+- [qwen_realization_gap_summary.json](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/qwen/qwen_realization_gap_summary.json)
+
 It separates:
 
 - `structure-level headroom` from trace-driven idealized observation

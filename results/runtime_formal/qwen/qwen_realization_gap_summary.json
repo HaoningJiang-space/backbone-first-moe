@@ -1,0 +1,98 @@
+{
+  "model": "Qwen1.5-MoE-A2.7B-Chat",
+  "scope": "fair-budget two-lane modulelist long workflow summary",
+  "interpretation": {
+    "structure_layer": "idealized structural headroom remains high, but the simulator should be treated only as an upper-bound generator, not as a quantitative runtime predictor",
+    "realization_layer": "the two-lane modulelist runtime improves fair-budget realization over the older unified runtime, but only to a medium-strength throughput gain"
+  },
+  "structure_headroom": {
+    "workload": "Qwen fair64 @ mem=0.10",
+    "baseline_demand_only_tokens_per_sec": 27.78,
+    "oracle_single_cache_best_tokens_per_sec": 27.78,
+    "oracle_two_pool_best_tokens_per_sec": 445.01,
+    "oracle_two_pool_speedup": 16.02,
+    "zero_loading_speedup_upper_bound": 18.0,
+    "loading_share": 0.944,
+    "source": "/data/ziheng/backbone-first-moe_lb/results/observation_qwen/qwen_fair64_observation.json"
+  },
+  "historical_unified_runtime_reference": {
+    "mem": 0.1,
+    "a_generated_tokens_per_sec": 14.0118,
+    "c_generated_tokens_per_sec": 14.355,
+    "gain_percent": 2.45,
+    "note": "older fair-budget unified-runtime reference before the modulelist resident-lane + demand-lane split"
+  },
+  "common_constraints": {
+    "device_memory_ratio": 0.1,
+    "batch_size": 8,
+    "num_prompts": 64,
+    "max_new_tokens": 16,
+    "total_generated_tokens": 1024,
+    "total_prompt_tokens": 9455,
+    "sparse_budget_bytes": 4735686246,
+    "selection_budget_bytes": 4735686246,
+    "selection_budget_source": "runtime_sparse_budget_bytes",
+    "cache_capacity": 273,
+    "resident_capacity": 165,
+    "admitted_count": 165,
+    "admitted_bytes": 2854748160,
+    "clipped": false
+  },
+  "runs": [
+    {
+      "name": "main_run",
+      "a_generated_tokens_per_sec": 12.299891114778296,
+      "c_generated_tokens_per_sec": 13.068387546522263,
+      "gain_percent": 6.247993779559735,
+      "a_total_elapsed_sec": 83.25276951189153,
+      "c_total_elapsed_sec": 78.35702731914353,
+      "a_manual_subtree_begin_wall_time_sec": 48.300842814845964,
+      "c_manual_subtree_begin_wall_time_sec": 44.08938287419733,
+      "a_modulelist_demand_compute_wall_time_sec": 56.59922187938355,
+      "c_modulelist_demand_compute_wall_time_sec": 51.11428622121457,
+      "c_resident_fastpath_module_skips": 41850,
+      "source": {
+        "a_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/qwen_A_mem0p10_lane_long.json",
+        "c_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/qwen_C_mem0p10_lane_long.json",
+        "resident_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/residents/qwen_lane_mem0p10.json"
+      }
+    },
+    {
+      "name": "repeat_1",
+      "a_generated_tokens_per_sec": 12.47416674448329,
+      "c_generated_tokens_per_sec": 13.059550238653951,
+      "gain_percent": 4.692766307854179,
+      "a_manual_subtree_begin_wall_time_sec": 47.62409284338355,
+      "c_manual_subtree_begin_wall_time_sec": 44.08502294123173,
+      "a_modulelist_demand_compute_wall_time_sec": 55.68969960487448,
+      "c_modulelist_demand_compute_wall_time_sec": 51.12365735566709,
+      "c_resident_fastpath_module_skips": 41850,
+      "source": {
+        "a_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run1/qwen_A_mem0p10_lane_long.json",
+        "c_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run1/qwen_C_mem0p10_lane_long.json",
+        "resident_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run1/residents/qwen_lane_mem0p10.json"
+      }
+    },
+    {
+      "name": "repeat_2",
+      "a_generated_tokens_per_sec": 12.63219854666491,
+      "c_generated_tokens_per_sec": 13.068671891646884,
+      "gain_percent": 3.455244495798482,
+      "a_manual_subtree_begin_wall_time_sec": 47.02733639872167,
+      "c_manual_subtree_begin_wall_time_sec": 44.12132124020718,
+      "a_modulelist_demand_compute_wall_time_sec": 55.11101357813459,
+      "c_modulelist_demand_compute_wall_time_sec": 51.139605839853175,
+      "c_resident_fastpath_module_skips": 41850,
+      "source": {
+        "a_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/qwen_A_mem0p10_lane_long.json",
+        "c_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/qwen_C_mem0p10_lane_long.json",
+        "resident_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/residents/qwen_lane_mem0p10.json"
+      }
+    }
+  ],
+  "aggregates": {
+    "gain_percent_min": 3.455244495798482,
+    "gain_percent_max": 6.247993779559735,
+    "gain_percent_mean": 4.7986681944041315
+  }
+}

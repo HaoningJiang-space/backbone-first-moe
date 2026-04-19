@@ -113,9 +113,14 @@ For a paper-facing runtime table that already resolves the `OLMoE` fairness issu
 For a paper-facing note that explicitly separates `Qwen`'s idealized structural headroom from its current fair-runtime realization, see:
 - [results/runtime_formal/qwen/qwen_realization_gap.md](results/runtime_formal/qwen/qwen_realization_gap.md)
 
-## Validated Real-Hardware Results
+## Historical Fixed-Runtime Results
 
-Qwen1.5-MoE-A2.7B-Chat, `batch=8`, same GPU (`cuda:0`), `prefetch_distance=0`, 16 prompts, 64 new tokens.
+This section is kept as historical fixed-runtime reference material.
+
+For the current paper-facing `Qwen` claim under fair budget and the newer two-lane modulelist runtime, use:
+- [results/runtime_formal/qwen/qwen_realization_gap.md](results/runtime_formal/qwen/qwen_realization_gap.md)
+
+Qwen1.5-MoE-A2.7B-Chat, historical fixed-runtime results, `batch=8`, same GPU (`cuda:0`), `prefetch_distance=0`, 16 prompts, 64 new tokens.
 
 | Config | mem=0.07 | mem=0.10 | Notes |
 |---|---:|---:|---|
@@ -126,7 +131,7 @@ Backbone-only improves generation throughput by:
 - `+10.5%` at `mem=0.07`
 - `+16.9%` at `mem=0.10`
 
-These numbers were validated on real hardware after fixing sparse-node default-device propagation.
+These numbers were validated on real hardware after fixing sparse-node default-device propagation, but they should now be read as a historical unified/fixed-runtime reference rather than the current paper-facing `Qwen` truth.
 
 OLMoE-1B-7B-0924, same GPU (`cuda:0`), `prefetch_distance=0`, 2 prompts, 8 new tokens.
 
