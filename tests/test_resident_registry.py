@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import torch
 import torch.nn as nn
@@ -140,6 +141,64 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertTrue(getattr(module[0], "_archer_resident_fastpath"))
         self.assertTrue(getattr(module[1], "_archer_resident_fastpath"))
         self.assertTrue(getattr(module[1][0], "_archer_resident_fastpath"))
+
+    def test_run_module_demand_lane_cleans_up_partial_begin_failures(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 7
+        engine.offload_set = set()
+
+        class _RaisingArcherEngine:
+            def __init__(self):
+                self.begin_calls = 0
+                self.end_calls = 0
+
+            def begin(self, request_id, tensor):
+                self.begin_calls += 1
+                if self.begin_calls == 2:
+                    raise RuntimeError("boom")
+
+            def end(self, request_id, tensor):
+                self.end_calls += 1
+
+        engine.archer_engine = _RaisingArcherEngine()
+        module = nn.Linear(4, 4)
+        engine.offload_set = {param.data_ptr() for param in module.parameters()}
+
+        with self.assertRaisesRegex(RuntimeError, "boom"):
+            OffloadEngine.run_module_demand_lane(engine, module, torch.zeros(1, 4))
+
+        self.assertEqual(engine.archer_engine.begin_calls, 2)
+        self.assertEqual(engine.archer_engine.end_calls, 1)
+        self.assertEqual(
+            engine.offload_set,
+            {param.data_ptr() for param in module.parameters()},
+        )
+        self.assertFalse(getattr(module, "_archer_manual_service_active", True))
+
+    def test_begin_module_subtree_moves_non_offloaded_buffers(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 1
+        engine.offload_set = set()
+
+        class _BufferOnlyModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.ones(2, dtype=torch.float32))
+
+        module = _BufferOnlyModule()
+        with mock.patch.object(
+            OffloadEngine,
+            "_move_tensor_to_service_device",
+            autospec=True,
+        ) as move_mock:
+            begun = OffloadEngine._begin_module_subtree(engine, module)
+
+        self.assertEqual(begun, ())
+        move_mock.assert_called_once_with(engine, module.cache)
 
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
         engine = self._build_engine_stub()

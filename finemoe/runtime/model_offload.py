@@ -959,57 +959,81 @@ class OffloadEngine(object):
         for current in module._archer_service_modules:
             current._archer_manual_service_active = enabled
 
+    def _tensor_in_offload_set(self, tensor):
+        return tensor.data_ptr() in self.offload_set
+
+    def _move_tensor_to_service_device(self, tensor):
+        tensor_device = tensor.device
+        target_device = torch.device(self.device)
+        if tensor_device != target_device:
+            tensor.data = tensor.data.to(target_device)
+
+    def _begin_manual_service_tensor(self, tensor):
+        if not self._tensor_in_offload_set(tensor):
+            self._move_tensor_to_service_device(tensor)
+            return False
+        tensor_ptr = tensor.data_ptr()
+        self.offload_set.remove(tensor_ptr)
+        try:
+            self.archer_engine.begin(self.request_id, tensor)
+            return True
+        finally:
+            self.offload_set.add(tensor.data_ptr())
+
+    def _end_manual_service_tensor(self, tensor):
+        if not self._tensor_in_offload_set(tensor):
+            return False
+        tensor_ptr = tensor.data_ptr()
+        self.offload_set.remove(tensor_ptr)
+        try:
+            self.archer_engine.end(self.request_id, tensor)
+            return True
+        finally:
+            self.offload_set.add(tensor.data_ptr())
+
     def _begin_module_subtree(self, module):
         self._attach_module_service_metadata(module)
         t0 = time.perf_counter()
-        for param in module._archer_service_params:
-            if param.data.data_ptr() not in self.offload_set:
-                param.data = param.data.to(self.device)
-                continue
-            self.offload_set.remove(param.data.data_ptr())
-            self.archer_engine.begin(self.request_id, param)
-            self.offload_set.add(param.data.data_ptr())
-        for buf in module._archer_service_buffers:
-            if buf.data_ptr() not in self.offload_set:
-                continue
-            self.offload_set.remove(buf.data_ptr())
-            self.archer_engine.begin(self.request_id, buf)
-            self.offload_set.add(buf.data_ptr())
+        begun_tensors = []
+        try:
+            for param in module._archer_service_params:
+                if self._begin_manual_service_tensor(param):
+                    begun_tensors.append(param)
+            for buf in module._archer_service_buffers:
+                if self._begin_manual_service_tensor(buf):
+                    begun_tensors.append(buf)
+        except Exception:
+            for tensor in reversed(begun_tensors):
+                self._end_manual_service_tensor(tensor)
+            raise
         self.runtime_profile.record_manual_subtree_service(
             begin_calls=1,
             begin_wall_time_sec=time.perf_counter() - t0,
         )
+        return tuple(begun_tensors)
 
-    def _end_module_subtree(self, module):
+    def _end_module_subtree(self, module, begun_tensors=None):
         self._attach_module_service_metadata(module)
         t0 = time.perf_counter()
-        for param in module._archer_service_params:
-            if param.data.data_ptr() not in self.offload_set:
-                continue
-            self.offload_set.remove(param.data.data_ptr())
-            self.archer_engine.end(self.request_id, param)
-            self.offload_set.add(param.data.data_ptr())
-        for buf in module._archer_service_buffers:
-            if buf.data_ptr() not in self.offload_set:
-                continue
-            self.offload_set.remove(buf.data_ptr())
-            self.archer_engine.end(self.request_id, buf)
-            self.offload_set.add(buf.data_ptr())
+        tensors = begun_tensors
+        if tensors is None:
+            tensors = (*module._archer_service_params, *module._archer_service_buffers)
+        for tensor in tensors:
+            self._end_manual_service_tensor(tensor)
         self.runtime_profile.record_manual_subtree_service(
             end_calls=1,
             end_wall_time_sec=time.perf_counter() - t0,
         )
 
     def run_module_demand_lane(self, module, *args, **kwargs):
-        begun = False
+        begun_tensors = None
         self._set_manual_service_active(module, True)
         try:
-            self._begin_module_subtree(module)
-            begun = True
+            begun_tensors = self._begin_module_subtree(module)
             return module(*args, **kwargs)
         finally:
-            if begun:
-                self._end_module_subtree(module)
+            if begun_tensors is not None:
+                self._end_module_subtree(module, begun_tensors=begun_tensors)
             self._set_manual_service_active(module, False)
 
     def pin_resident_experts(self, model, resident_expert_ids):
