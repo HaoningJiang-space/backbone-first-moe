@@ -126,7 +126,7 @@ void ExpertDispatcher::Enqueue(const CallArgs& args)
     int expert_idx = args.expert_idx;
     auto expert_node = experts_[expert_idx][layer_idx];
 
-    expert_node->node->mutex.lock();
+    expert_node->node->active_service_users.fetch_add(1);
     expert_node->node->last_access_time = MCIROSECONDS_SINCE_EPOCH;
 
     {
@@ -214,6 +214,7 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
 
             bool cache_hit = expert_node->node->device.is_cuda();
             if (!expert_node->node->device.is_cuda()) {
+                expert_node->node->state = 1;
                 auto task = std::make_shared<Task>();
                 task->priority = 0;
                 task->node = expert_node->node;
@@ -232,15 +233,12 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
         }
 
         for (auto& item : pending_items) {
-            int wait_count = 0;
-            while (!item.expert_node->node->device.is_cuda()) {
-                std::this_thread::sleep_for(std::chrono::microseconds(10));
-                wait_count++;
-                if (wait_count % 100000 == 0) {
-                    ARCHER_LOG_WARN("ExpertDispatcher::EnqueueTask: wait_count ",
-                                    wait_count,
-                                    item.expert_node->node->str());
-                }
+            if (!item.cache_hit) {
+                std::unique_lock<std::mutex> node_lock(item.expert_node->node->mutex);
+                item.expert_node->node->cv.wait(node_lock, [&item]() {
+                    return item.expert_node->node->state == 0 &&
+                           item.expert_node->node->device.is_cuda();
+                });
             }
 
             item.expert_node->SetTensorsFromBlob(device);
@@ -384,7 +382,7 @@ void ExpertDispatcher::OutputFunc(ExecArgs args, torch::Tensor output, int gpu_i
         }
     }
 
-    args.expert_node->node->mutex.unlock();
+    args.expert_node->node->active_service_users.fetch_sub(1);
 
     {
         std::lock_guard<std::mutex> lock(output_mutex_);

@@ -94,7 +94,7 @@ void ArcherTaskPool::EnqueueTask(const TaskPtr& task)
                         task->remove_layer &&
                         ((t->node->corr_id & 0xffffffff) < (task->node->corr_id & 0xffffffff));
                     bool need_remove = (is_same_node && is_lower_priority) || is_outdate_layers;
-                    if (need_remove) t->node->mutex.unlock();
+                    if (need_remove && !t->on_demand) t->node->mutex.unlock();
                     return need_remove;
                 });
             unified_queue_[i].erase(it, unified_queue_[i].end());
@@ -233,6 +233,7 @@ void ArcherTaskPool::ClearCacheSparseNode(int device_id)
 
     for (auto n : device_nodes) {
         std::lock_guard<std::mutex> lock(this->candidates_mutex_);
+        if (n->active_service_users.load() > 0) { continue; }
         if (n->mutex.try_lock()) {
             ARCHER_LOG_DEBUG("RemoveCachedSparseNode: {}", n->str());
             n->SetDevice(n->default_host);
@@ -309,6 +310,7 @@ bool ArcherTaskPool::RemoveCachedSparseNode(const NodePtr& node, int device_id)
                 if (candidates_.find(n) != candidates_.end() && !n->is_overflow) { continue; }
             }
             if (nodes_exec.find(n) != nodes_exec.end()) { continue; }
+            if (n->active_service_users.load() > 0) { continue; }
             if (n->mutex.try_lock()) {
                 ARCHER_LOG_DEBUG("RemoveCachedSparseNode: {}", n->str());
                 n->SetDevice(n->default_host);
@@ -365,6 +367,7 @@ bool ArcherTaskPool::RemoveCachedDenseNode(const NodePtr& node)
         });
 
         for (auto& n : device_nodes) {
+            if (n->active_service_users.load() > 0) { continue; }
             if (n->mutex.try_lock()) {
                 ARCHER_LOG_DEBUG("RemoveCachedDenseNode: {} {}MB {}MB {}",
                                  device_id,

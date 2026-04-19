@@ -41,6 +41,7 @@ struct Node {
     torch::Device initial_host = DISK_DEVICE;
 
     std::atomic_uint8_t state{0};  // 0 for ready, 1 for moving
+    std::atomic_uint32_t active_service_users{0};
 
     std::mutex mutex;
     std::condition_variable cv;
