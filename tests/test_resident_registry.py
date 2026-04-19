@@ -355,9 +355,14 @@ class ResidentRegistryTest(unittest.TestCase):
         outputs = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
 
         self.assertEqual(len(outputs), 2)
+        expected_end_order = [
+            param.data_ptr()
+            for module in reversed(modules)
+            for param in module.parameters()
+        ]
         self.assertEqual(
             engine.archer_engine.end_group_tensors,
-            list(reversed(engine.archer_engine.begin_group_tensors)),
+            expected_end_order,
         )
 
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):

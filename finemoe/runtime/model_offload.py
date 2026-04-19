@@ -1070,13 +1070,18 @@ class OffloadEngine(object):
             return service_plan
 
         flat_tensors = []
+        tensor_groups = []
         for module in unique_modules:
             self._attach_module_service_metadata(module)
-            flat_tensors.extend(module._archer_service_params)
-            flat_tensors.extend(module._archer_service_buffers)
+            module_tensors = tuple(
+                (*module._archer_service_params, *module._archer_service_buffers)
+            )
+            tensor_groups.append(module_tensors)
+            flat_tensors.extend(module_tensors)
 
         service_plan = {
             "unique_modules": unique_modules,
+            "tensor_groups": tuple(tensor_groups),
             "flat_tensors": tuple(flat_tensors),
         }
         self._module_group_service_plans[plan_key] = service_plan
@@ -1250,16 +1255,24 @@ class OffloadEngine(object):
         self._set_manual_service_active_group(module_list, True)
         try:
             if self.no_control_mode:
+                begun_by_module = []
                 begun_tensors = []
-                for tensor in service_plan["flat_tensors"]:
-                    if self._tensor_in_offload_set(tensor):
-                        begun_tensors.append(tensor)
-                    else:
-                        self._move_tensor_to_service_device(tensor)
+                for module, module_tensors in zip(
+                    service_plan["unique_modules"], service_plan["tensor_groups"]
+                ):
+                    module_begun_tensors = []
+                    for tensor in module_tensors:
+                        if self._tensor_in_offload_set(tensor):
+                            module_begun_tensors.append(tensor)
+                        else:
+                            self._move_tensor_to_service_device(tensor)
+                    module_begun_tensors = tuple(module_begun_tensors)
+                    begun_tensors.extend(module_begun_tensors)
+                    begun_by_module.append((module, module_begun_tensors))
                 begun_tensors = tuple(begun_tensors)
                 if begun_tensors:
                     self._begin_manual_service_tensors_group(begun_tensors)
-                begun_by_module = ()
+                begun_by_module = tuple(begun_by_module)
             else:
                 begun_tensors = ()
                 begun_by_module = self._begin_module_subtrees_group(module_list)
@@ -1302,10 +1315,7 @@ class OffloadEngine(object):
         t0 = time.perf_counter()
         try:
             if service_ctx.no_control:
-                if service_ctx.begun_tensors:
-                    self._end_manual_service_tensors_group(
-                        tuple(reversed(service_ctx.begun_tensors))
-                    )
+                self._end_module_subtrees_group(service_ctx.begun_by_module)
             else:
                 self._end_module_subtrees_group(service_ctx.begun_by_module)
         finally:
