@@ -2,7 +2,12 @@
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-/data/ziheng/backbone-first-moe_fresh_e2e}"
+RESULT_ROOT="${RESULT_ROOT:-}"
+if [ -n "${RESULT_ROOT}" ]; then
+  OUT_ROOT="${RESULT_ROOT}"
+else
 OUT_ROOT="${OUT_ROOT:-${REPO_ROOT}/results/deepseek_packed_runtime_profile}"
+fi
 
 CONDA_ACTIVATE="${CONDA_ACTIVATE:-/home/ziheng/miniconda3/bin/activate}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-mxmoe}"
