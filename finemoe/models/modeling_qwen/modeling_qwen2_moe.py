@@ -804,6 +804,8 @@ class Qwen2MoeSparseMoeBlock(nn.Module):
             selected_experts=selected_experts,
             routing_weights=routing_weights,
             experts=self.experts,
+            resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
+            runtime_profile=getattr(self, "runtime_profile", None),
         )
 
         shared_expert_output = self.shared_expert(hidden_states)

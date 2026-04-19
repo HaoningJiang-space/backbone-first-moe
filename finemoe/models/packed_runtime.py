@@ -4,6 +4,7 @@ from typing import Dict, Tuple
 
 import torch
 import torch.nn.functional as F
+import time
 from transformers.modeling_utils import PreTrainedModel
 
 
@@ -50,6 +51,7 @@ def dispatch_packed_experts(
     expert_dispatcher,
     experts_module=None,
     resident_fastpath_expert_ids=None,
+    runtime_profile=None,
 ) -> torch.Tensor:
     tokens, hidden_dim = hidden_states.shape
     router_mask, active_experts, assignment_map = _build_packed_expert_assignments(
@@ -85,7 +87,9 @@ def dispatch_packed_experts(
     if len(resident_active) == 1:
         expert_idx = resident_active[0]
         token_idx, weights = assignment_map[expert_idx]
+        resident_compute_start = time.perf_counter()
         output_tensor = _run_packed_resident_expert(experts_module, hidden_states[token_idx], expert_idx)
+        resident_compute_wall_time_sec = time.perf_counter() - resident_compute_start
         weighted = output_tensor.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
@@ -95,6 +99,7 @@ def dispatch_packed_experts(
         ).unsqueeze(-1)
         final_hidden_states.index_add_(0, token_idx, weighted)
     elif resident_active:
+        resident_compute_start = time.perf_counter()
         token_idx, weighted = _run_grouped_packed_resident_experts(
             experts_module=experts_module,
             hidden_states=hidden_states,
@@ -103,8 +108,13 @@ def dispatch_packed_experts(
             output_device=final_hidden_states.device,
             output_dtype=final_hidden_states.dtype,
         )
+        resident_compute_wall_time_sec = time.perf_counter() - resident_compute_start
         final_hidden_states.index_add_(0, token_idx, weighted)
+    else:
+        resident_compute_wall_time_sec = 0.0
 
+    dispatch_wait_wall_time_sec = 0.0
+    dispatch_wait_calls = 0
     if demand_active:
         expert_dispatcher.set_inputs(hidden_states, router_mask)
         expert_dispatcher.set_expected_queue(len(demand_active))
@@ -113,7 +123,10 @@ def dispatch_packed_experts(
         for expert_idx in demand_active:
             expert_dispatcher.enqueue_expert(layer_id, int(expert_idx), gpu_id, False)
 
+        wait_start = time.perf_counter()
         results = expert_dispatcher.wait_expert()
+        dispatch_wait_wall_time_sec = time.perf_counter() - wait_start
+        dispatch_wait_calls = 1
         for output_tensor, _, expert_idx, _ in results:
             expert_idx = int(expert_idx)
             token_idx, weights = assignment_map[expert_idx]
@@ -125,6 +138,17 @@ def dispatch_packed_experts(
                 dtype=final_hidden_states.dtype,
             ).unsqueeze(-1)
             final_hidden_states.index_add_(0, token_idx, weighted)
+
+    if runtime_profile is not None:
+        runtime_profile.record_packed_dispatch(
+            resident_expert_blocks=len(resident_active),
+            demand_expert_blocks=len(demand_active),
+            resident_token_assignments=sum(int(assignment_map[idx][0].numel()) for idx in resident_active),
+            demand_token_assignments=sum(int(assignment_map[idx][0].numel()) for idx in demand_active),
+            resident_compute_wall_time_sec=resident_compute_wall_time_sec,
+            dispatch_wait_calls=dispatch_wait_calls,
+            dispatch_wait_wall_time_sec=dispatch_wait_wall_time_sec,
+        )
 
     return final_hidden_states
 

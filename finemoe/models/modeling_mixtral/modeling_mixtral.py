@@ -71,6 +71,7 @@ class SyncMixtralSparseMoeBlock(MixtralSparseMoeBlock):
             expert_dispatcher=self.expert_dispatcher,
             experts_module=self.experts,
             resident_fastpath_expert_ids=getattr(self, "resident_fastpath_local_expert_ids", ()),
+            runtime_profile=getattr(self, "runtime_profile", None),
         )
         final_hidden_states = final_hidden_states.reshape(
             batch_size, sequence_length, hidden_dim

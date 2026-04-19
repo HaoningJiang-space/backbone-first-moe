@@ -252,6 +252,42 @@ class ResidentRegistryTest(unittest.TestCase):
             "min(free_device_memory_ratio,runtime_sparse_budget_bytes)",
         )
 
+    def test_runtime_profile_exposes_recorded_counters(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.runtime_profile.record_module_io(
+            begin_calls=2,
+            param_begin_calls=3,
+            begin_wall_time_sec=0.25,
+            skipped_fastpath=True,
+        )
+        engine.runtime_profile.record_modulelist_dispatch(
+            active_expert_blocks=4,
+            resident_expert_blocks=1,
+            demand_expert_blocks=3,
+            token_assignments=12,
+            resident_token_assignments=2,
+            demand_token_assignments=10,
+            expert_compute_wall_time_sec=0.5,
+        )
+        engine.runtime_profile.record_packed_dispatch(
+            resident_expert_blocks=2,
+            demand_expert_blocks=5,
+            resident_token_assignments=6,
+            demand_token_assignments=14,
+            resident_compute_wall_time_sec=0.75,
+            dispatch_wait_calls=1,
+            dispatch_wait_wall_time_sec=1.25,
+        )
+
+        payload = OffloadEngine.get_runtime_profile(engine)
+        self.assertEqual(payload["module_begin_calls"], 2)
+        self.assertEqual(payload["param_begin_calls"], 3)
+        self.assertEqual(payload["resident_fastpath_module_skips"], 1)
+        self.assertEqual(payload["modulelist_active_expert_blocks"], 4)
+        self.assertEqual(payload["packed_demand_expert_blocks"], 5)
+        self.assertEqual(payload["packed_dispatch_wait_calls"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

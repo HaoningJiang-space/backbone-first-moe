@@ -37,6 +37,7 @@ class SyncDeepseekV2Moe(DeepseekV2Moe):
             expert_dispatcher=self.expert_dispatcher,
             experts_module=self.experts,
             resident_fastpath_expert_ids=getattr(self, "resident_fastpath_local_expert_ids", ()),
+            runtime_profile=getattr(self, "runtime_profile", None),
         ).view(*orig_shape)
         hidden_states = hidden_states + self.shared_experts(residuals)
         return hidden_states

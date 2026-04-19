@@ -156,6 +156,9 @@ def evaluate_runtime(runtime_cfg):
     resident_registry = None
     if hasattr(model.engine, "get_resident_registry"):
         resident_registry = model.engine.get_resident_registry()
+    runtime_profile = None
+    if hasattr(model.engine, "get_runtime_profile"):
+        runtime_profile = model.engine.get_runtime_profile()
     sparse_budget_info = {"budget_bytes": 0, "budget_source": ""}
     if hasattr(model.engine, "get_sparse_budget_info"):
         sparse_budget_info = model.engine.get_sparse_budget_info()
@@ -189,6 +192,7 @@ def evaluate_runtime(runtime_cfg):
         "resident_admitted_count": resident_registry["admitted_count"] if resident_registry is not None else 0,
         "resident_clipped": resident_registry["clipped"] if resident_registry is not None else False,
         "resident_registry": resident_registry,
+        "runtime_profile": runtime_profile,
         "per_batch": per_batch,
     }
 

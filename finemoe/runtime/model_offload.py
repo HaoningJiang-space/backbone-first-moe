@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import functools
 import json
+import time
 from dataclasses import dataclass, field
 
 from tqdm import tqdm
@@ -362,6 +363,137 @@ class ResidentRegistry:
         }
 
 
+@dataclass
+class RuntimeProfile:
+    """Coarse real-machine runtime attribution counters.
+
+    The fields below are intentionally reported as wall-time rather than
+    claiming exact DMA or kernel time. This keeps the payload honest while
+    still exposing where the current runtime spends host-visible time.
+    """
+
+    module_begin_calls: int = 0
+    module_end_calls: int = 0
+    param_begin_calls: int = 0
+    buffer_begin_calls: int = 0
+    param_end_calls: int = 0
+    buffer_end_calls: int = 0
+    module_begin_wall_time_sec: float = 0.0
+    module_end_wall_time_sec: float = 0.0
+    resident_fastpath_module_skips: int = 0
+
+    modulelist_dispatch_calls: int = 0
+    modulelist_active_expert_blocks: int = 0
+    modulelist_resident_expert_blocks: int = 0
+    modulelist_demand_expert_blocks: int = 0
+    modulelist_token_assignments: int = 0
+    modulelist_resident_token_assignments: int = 0
+    modulelist_demand_token_assignments: int = 0
+    modulelist_expert_compute_wall_time_sec: float = 0.0
+
+    packed_dispatch_calls: int = 0
+    packed_resident_expert_blocks: int = 0
+    packed_demand_expert_blocks: int = 0
+    packed_resident_token_assignments: int = 0
+    packed_demand_token_assignments: int = 0
+    packed_resident_compute_wall_time_sec: float = 0.0
+    packed_dispatch_wait_calls: int = 0
+    packed_dispatch_wait_wall_time_sec: float = 0.0
+
+    def record_module_io(
+        self,
+        *,
+        begin_calls=0,
+        end_calls=0,
+        param_begin_calls=0,
+        buffer_begin_calls=0,
+        param_end_calls=0,
+        buffer_end_calls=0,
+        begin_wall_time_sec=0.0,
+        end_wall_time_sec=0.0,
+        skipped_fastpath=False,
+    ):
+        self.module_begin_calls += int(begin_calls)
+        self.module_end_calls += int(end_calls)
+        self.param_begin_calls += int(param_begin_calls)
+        self.buffer_begin_calls += int(buffer_begin_calls)
+        self.param_end_calls += int(param_end_calls)
+        self.buffer_end_calls += int(buffer_end_calls)
+        self.module_begin_wall_time_sec += float(begin_wall_time_sec)
+        self.module_end_wall_time_sec += float(end_wall_time_sec)
+        if skipped_fastpath:
+            self.resident_fastpath_module_skips += 1
+
+    def record_modulelist_dispatch(
+        self,
+        *,
+        active_expert_blocks,
+        resident_expert_blocks,
+        demand_expert_blocks,
+        token_assignments,
+        resident_token_assignments,
+        demand_token_assignments,
+        expert_compute_wall_time_sec,
+    ):
+        self.modulelist_dispatch_calls += 1
+        self.modulelist_active_expert_blocks += int(active_expert_blocks)
+        self.modulelist_resident_expert_blocks += int(resident_expert_blocks)
+        self.modulelist_demand_expert_blocks += int(demand_expert_blocks)
+        self.modulelist_token_assignments += int(token_assignments)
+        self.modulelist_resident_token_assignments += int(resident_token_assignments)
+        self.modulelist_demand_token_assignments += int(demand_token_assignments)
+        self.modulelist_expert_compute_wall_time_sec += float(expert_compute_wall_time_sec)
+
+    def record_packed_dispatch(
+        self,
+        *,
+        resident_expert_blocks,
+        demand_expert_blocks,
+        resident_token_assignments,
+        demand_token_assignments,
+        resident_compute_wall_time_sec,
+        dispatch_wait_calls,
+        dispatch_wait_wall_time_sec,
+    ):
+        self.packed_dispatch_calls += 1
+        self.packed_resident_expert_blocks += int(resident_expert_blocks)
+        self.packed_demand_expert_blocks += int(demand_expert_blocks)
+        self.packed_resident_token_assignments += int(resident_token_assignments)
+        self.packed_demand_token_assignments += int(demand_token_assignments)
+        self.packed_resident_compute_wall_time_sec += float(resident_compute_wall_time_sec)
+        self.packed_dispatch_wait_calls += int(dispatch_wait_calls)
+        self.packed_dispatch_wait_wall_time_sec += float(dispatch_wait_wall_time_sec)
+
+    def to_public_dict(self):
+        return {
+            "module_begin_calls": int(self.module_begin_calls),
+            "module_end_calls": int(self.module_end_calls),
+            "param_begin_calls": int(self.param_begin_calls),
+            "buffer_begin_calls": int(self.buffer_begin_calls),
+            "param_end_calls": int(self.param_end_calls),
+            "buffer_end_calls": int(self.buffer_end_calls),
+            "module_begin_wall_time_sec": float(self.module_begin_wall_time_sec),
+            "module_end_wall_time_sec": float(self.module_end_wall_time_sec),
+            "resident_fastpath_module_skips": int(self.resident_fastpath_module_skips),
+            "modulelist_dispatch_calls": int(self.modulelist_dispatch_calls),
+            "modulelist_active_expert_blocks": int(self.modulelist_active_expert_blocks),
+            "modulelist_resident_expert_blocks": int(self.modulelist_resident_expert_blocks),
+            "modulelist_demand_expert_blocks": int(self.modulelist_demand_expert_blocks),
+            "modulelist_token_assignments": int(self.modulelist_token_assignments),
+            "modulelist_resident_token_assignments": int(self.modulelist_resident_token_assignments),
+            "modulelist_demand_token_assignments": int(self.modulelist_demand_token_assignments),
+            "modulelist_expert_compute_wall_time_sec": float(self.modulelist_expert_compute_wall_time_sec),
+            "packed_dispatch_calls": int(self.packed_dispatch_calls),
+            "packed_resident_expert_blocks": int(self.packed_resident_expert_blocks),
+            "packed_demand_expert_blocks": int(self.packed_demand_expert_blocks),
+            "packed_resident_token_assignments": int(self.packed_resident_token_assignments),
+            "packed_demand_token_assignments": int(self.packed_demand_token_assignments),
+            "packed_resident_compute_wall_time_sec": float(self.packed_resident_compute_wall_time_sec),
+            "packed_dispatch_wait_calls": int(self.packed_dispatch_wait_calls),
+            "packed_dispatch_wait_wall_time_sec": float(self.packed_dispatch_wait_wall_time_sec),
+        }
+
+
 class OffloadEngine(object):
     param_id = 0
     request_id = 0
@@ -414,6 +546,7 @@ class OffloadEngine(object):
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
         self._reset_resident_registry()
+        self.runtime_profile = RuntimeProfile()
 
     def init_expert_map_matcher(self):
         self.expert_map_matcher = ExpertMapMatcher(
@@ -761,6 +894,9 @@ class OffloadEngine(object):
 
     def get_resident_registry(self):
         return self.resident_registry.to_public_dict()
+
+    def get_runtime_profile(self):
+        return self.runtime_profile.to_public_dict()
 
     def _mark_module_resident_fastpath(self, module):
         """Mark a resident expert subtree to bypass generic hook bookkeeping."""
@@ -1316,6 +1452,7 @@ class OffloadEngine(object):
                         module.expert_tensor_map = self.expert_tensor_map
                         module.prefetch_distance = self.prefetch_distance
                         module.device = self.device
+                        module.runtime_profile = self.runtime_profile
 
                         self.expert_layer_modules.append(module)
 
@@ -1687,6 +1824,7 @@ class OffloadEngine(object):
         @torch.no_grad()
         def _pre_forward_module_hook(module, args, kwargs):
             if getattr(module, "_archer_resident_fastpath", False):
+                self.runtime_profile.record_module_io(skipped_fastpath=True)
                 return
             # if self.request_id_flag == False:
             #     self.request_id_flag = True
@@ -1697,6 +1835,9 @@ class OffloadEngine(object):
             #     # self.archer_prefetch.set_request(request_id)
 
             device_list = []
+            param_begin_calls = 0
+            buffer_begin_calls = 0
+            t0 = time.perf_counter()
 
             for name, param in module.named_parameters(recurse=False):
                 if not param.data.data_ptr() in self.offload_set:
@@ -1706,6 +1847,7 @@ class OffloadEngine(object):
                 self.offload_set.remove(param.data.data_ptr())
                 self.archer_engine.begin(self.request_id, param)
                 self.offload_set.add(param.data.data_ptr())
+                param_begin_calls += 1
 
                 device_list.append(param.data.device)
 
@@ -1721,15 +1863,26 @@ class OffloadEngine(object):
                 self.archer_engine.begin(self.request_id, buf)
                 # buf = buf.to(self.dtype)
                 self.offload_set.add(buf.data_ptr())
+                buffer_begin_calls += 1
 
                 device_list.append(buf.data.device)
+            self.runtime_profile.record_module_io(
+                begin_calls=1,
+                param_begin_calls=param_begin_calls,
+                buffer_begin_calls=buffer_begin_calls,
+                begin_wall_time_sec=time.perf_counter() - t0,
+            )
 
         @torch.no_grad()
         def _post_forward_module_hook(module, input, output):
             if getattr(module, "_archer_resident_fastpath", False):
+                self.runtime_profile.record_module_io(skipped_fastpath=True)
                 return
             device_list = []
             param_not_offload = set()
+            param_end_calls = 0
+            buffer_end_calls = 0
+            t0 = time.perf_counter()
             for param in module.parameters(recurse=False):
 
                 if not param.data.data_ptr() in self.offload_set:
@@ -1739,6 +1892,7 @@ class OffloadEngine(object):
                 self.offload_set.remove(param.data.data_ptr())
                 self.archer_engine.end(self.request_id, param)
                 self.offload_set.add(param.data.data_ptr())
+                param_end_calls += 1
 
                 device_list.append(param.data.device)
 
@@ -1750,8 +1904,15 @@ class OffloadEngine(object):
                 self.offload_set.remove(buf.data_ptr())
                 self.archer_engine.end(self.request_id, buf)
                 self.offload_set.add(buf.data_ptr())
+                buffer_end_calls += 1
 
                 device_list.append(buf.device)
+            self.runtime_profile.record_module_io(
+                end_calls=1,
+                param_end_calls=param_end_calls,
+                buffer_end_calls=buffer_end_calls,
+                end_wall_time_sec=time.perf_counter() - t0,
+            )
 
             if param_not_offload:
                 if isinstance(output, torch.Tensor):
