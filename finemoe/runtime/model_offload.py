@@ -1065,6 +1065,59 @@ class OffloadEngine(object):
         finally:
             self.offload_set.add(tensor.data_ptr())
 
+    def _begin_manual_service_tensors_group(self, tensors):
+        tensor_list = tuple(tensors)
+        if not tensor_list:
+            return ()
+
+        removed_tensors = []
+        try:
+            for tensor in tensor_list:
+                tensor_ptr = tensor.data_ptr()
+                self.offload_set.remove(tensor_ptr)
+                removed_tensors.append(tensor)
+
+            begin_group = getattr(self.archer_engine, "begin_group", None)
+            if begin_group is not None:
+                begin_group(self.request_id, list(tensor_list))
+            else:
+                begun = []
+                try:
+                    for tensor in tensor_list:
+                        self.archer_engine.begin(self.request_id, tensor)
+                        begun.append(tensor)
+                except Exception:
+                    for tensor in reversed(begun):
+                        self.archer_engine.end(self.request_id, tensor)
+                    raise
+            return tensor_list
+        finally:
+            for tensor in removed_tensors:
+                self.offload_set.add(tensor.data_ptr())
+
+    def _end_manual_service_tensors_group(self, tensors):
+        tensor_list = tuple(tensor for tensor in tensors if self._tensor_in_offload_set(tensor))
+        if not tensor_list:
+            return ()
+
+        removed_tensors = []
+        try:
+            for tensor in tensor_list:
+                tensor_ptr = tensor.data_ptr()
+                self.offload_set.remove(tensor_ptr)
+                removed_tensors.append(tensor)
+
+            end_group = getattr(self.archer_engine, "end_group", None)
+            if end_group is not None:
+                end_group(self.request_id, list(tensor_list))
+            else:
+                for tensor in tensor_list:
+                    self.archer_engine.end(self.request_id, tensor)
+            return tensor_list
+        finally:
+            for tensor in removed_tensors:
+                self.offload_set.add(tensor.data_ptr())
+
     def _begin_module_subtree(self, module):
         self._attach_module_service_metadata(module)
         t0 = time.perf_counter()
@@ -1088,31 +1141,26 @@ class OffloadEngine(object):
 
     def _begin_module_subtrees_group(self, modules):
         unique_modules = tuple(self._iter_unique_modules(modules))
-        t0 = time.perf_counter()
         begun_by_module = []
-        current_begun_tensors = []
-        try:
-            for module in unique_modules:
-                self._attach_module_service_metadata(module)
-                current_begun_tensors = []
-                for param in module._archer_service_params:
-                    if self._begin_manual_service_tensor(param):
-                        current_begun_tensors.append(param)
-                for buf in module._archer_service_buffers:
-                    if self._begin_manual_service_tensor(buf):
-                        current_begun_tensors.append(buf)
-                begun_by_module.append((module, tuple(current_begun_tensors)))
-        except Exception:
-            for tensor in reversed(current_begun_tensors):
-                self._end_manual_service_tensor(tensor)
-            for _, begun_tensors in reversed(begun_by_module):
-                for tensor in reversed(begun_tensors):
-                    self._end_manual_service_tensor(tensor)
-            raise
-        self.runtime_profile.record_manual_subtree_service(
-            begin_calls=1,
-            begin_wall_time_sec=time.perf_counter() - t0,
-        )
+        flat_begun_tensors = []
+        for module in unique_modules:
+            self._attach_module_service_metadata(module)
+            module_begun_tensors = []
+            for param in module._archer_service_params:
+                if self._tensor_in_offload_set(param):
+                    module_begun_tensors.append(param)
+                else:
+                    self._move_tensor_to_service_device(param)
+            for buf in module._archer_service_buffers:
+                if self._tensor_in_offload_set(buf):
+                    module_begun_tensors.append(buf)
+                else:
+                    self._move_tensor_to_service_device(buf)
+            begun_tensors = tuple(module_begun_tensors)
+            flat_begun_tensors.extend(begun_tensors)
+            begun_by_module.append((module, begun_tensors))
+        if flat_begun_tensors:
+            self._begin_manual_service_tensors_group(tuple(flat_begun_tensors))
         return tuple(begun_by_module)
 
     def _end_module_subtree(self, module, begun_tensors=None):
@@ -1129,14 +1177,11 @@ class OffloadEngine(object):
         )
 
     def _end_module_subtrees_group(self, begun_by_module):
-        t0 = time.perf_counter()
+        flat_begun_tensors = []
         for _, begun_tensors in reversed(tuple(begun_by_module)):
-            for tensor in begun_tensors:
-                self._end_manual_service_tensor(tensor)
-        self.runtime_profile.record_manual_subtree_service(
-            end_calls=1,
-            end_wall_time_sec=time.perf_counter() - t0,
-        )
+            flat_begun_tensors.extend(begun_tensors)
+        if flat_begun_tensors:
+            self._end_manual_service_tensors_group(tuple(flat_begun_tensors))
 
     def begin_module_group(self, modules, *, expert_blocks=0, token_assignments=0):
         module_list = tuple(modules)

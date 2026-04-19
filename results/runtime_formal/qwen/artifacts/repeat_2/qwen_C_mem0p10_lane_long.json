@@ -1,0 +1,280 @@
+{
+  "tag": "runtime_eval",
+  "model_path": "/data/ziheng/models/Qwen1.5-MoE-A2.7B-Chat",
+  "prompt_file": "/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-chat-1m~eval_prompts.json",
+  "offload_path": "/data/finemoe_offloads/Qwen1.5-MoE-A2.7B-Chat",
+  "store_prefix": "",
+  "resident_expert_ids_file": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/residents/qwen_lane_mem0p10.json",
+  "device_memory_ratio": 0.1,
+  "prefetch_distance": 0,
+  "num_prompts": 64,
+  "batch_size": 8,
+  "max_new_tokens": 16,
+  "total_elapsed_sec": 78.35532244516071,
+  "total_prompt_tokens": 9455,
+  "total_generated_tokens": 1024,
+  "generated_tokens_per_sec": 13.068671891646884,
+  "end_to_end_tokens_per_sec": 133.7369265161794,
+  "peak_memory_mb": 10639.193359375,
+  "sparse_budget_bytes": 4735686246,
+  "sparse_budget_source": "min(free_device_memory_ratio,runtime_sparse_budget_bytes)",
+  "resident_count": 165,
+  "resident_requested_count": 165,
+  "resident_admitted_count": 165,
+  "resident_clipped": false,
+  "resident_registry": {
+    "enabled": true,
+    "source_file": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/residents/qwen_lane_mem0p10.json",
+    "selection_rule": "frontier_prefix",
+    "layout": "modulelist",
+    "requested_count": 165,
+    "admitted_count": 165,
+    "requested_node_count": 165,
+    "admitted_node_count": 165,
+    "requested_tensor_count": 165,
+    "admitted_tensor_count": 495,
+    "requested_bytes": 2854748160,
+    "admitted_bytes": 2854748160,
+    "budget_bytes": 4735686246,
+    "budget_source": "min(free_device_memory_ratio,runtime_sparse_budget_bytes)",
+    "fast_path_modules": 825,
+    "fast_path_expert_count": 0,
+    "clipped": false
+  },
+  "runtime_profile": {
+    "module_begin_calls": 52864,
+    "module_end_calls": 52864,
+    "param_begin_calls": 43392,
+    "buffer_begin_calls": 0,
+    "param_end_calls": 43392,
+    "buffer_end_calls": 0,
+    "module_begin_wall_time_sec": 13.84447208722122,
+    "module_end_wall_time_sec": 0.8569854198722169,
+    "resident_fastpath_module_skips": 41850,
+    "manual_service_module_skips": 204290,
+    "manual_subtree_begin_calls": 20429,
+    "manual_subtree_end_calls": 20429,
+    "manual_subtree_begin_wall_time_sec": 44.12132124020718,
+    "manual_subtree_end_wall_time_sec": 0.5603243869263679,
+    "modulelist_dispatch_calls": 3072,
+    "modulelist_active_expert_blocks": 24614,
+    "modulelist_resident_expert_blocks": 4185,
+    "modulelist_demand_expert_blocks": 20429,
+    "modulelist_token_assignments": 1542144,
+    "modulelist_resident_token_assignments": 303134,
+    "modulelist_demand_token_assignments": 1239010,
+    "modulelist_expert_compute_wall_time_sec": 52.214622823987156,
+    "modulelist_resident_compute_wall_time_sec": 1.0750169841339812,
+    "modulelist_demand_compute_wall_time_sec": 51.139605839853175,
+    "packed_dispatch_calls": 0,
+    "packed_resident_expert_blocks": 0,
+    "packed_demand_expert_blocks": 0,
+    "packed_resident_token_assignments": 0,
+    "packed_demand_token_assignments": 0,
+    "packed_resident_compute_wall_time_sec": 0.0,
+    "packed_dispatch_wait_calls": 0,
+    "packed_dispatch_wait_wall_time_sec": 0.0
+  },
+  "per_batch": [
+    {
+      "batch_size": 8,
+      "elapsed_sec": 38.605896794004366,
+      "prompt_tokens": [
+        256,
+        256,
+        256,
+        131,
+        256,
+        215,
+        94,
+        83
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 3.3155556697203536
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 6.345454843016341,
+      "prompt_tokens": [
+        58,
+        72,
+        96,
+        77,
+        70,
+        74,
+        62,
+        45
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 20.171918824837874
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 6.104239895008504,
+      "prompt_tokens": [
+        84,
+        48,
+        125,
+        256,
+        256,
+        256,
+        256,
+        256
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 20.969031722469957
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 6.216647156048566,
+      "prompt_tokens": [
+        256,
+        82,
+        173,
+        63,
+        79,
+        256,
+        199,
+        87
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 20.589876952476025
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 5.249175130040385,
+      "prompt_tokens": [
+        256,
+        94,
+        199,
+        256,
+        47,
+        87,
+        79,
+        190
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 24.38478367152807
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 5.605174303986132,
+      "prompt_tokens": [
+        76,
+        61,
+        100,
+        256,
+        45,
+        79,
+        54,
+        256
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 22.83604274517788
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 4.862983150058426,
+      "prompt_tokens": [
+        198,
+        77,
+        77,
+        92,
+        256,
+        107,
+        80,
+        90
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 26.32129210615549
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 5.365751172997989,
+      "prompt_tokens": [
+        246,
+        111,
+        48,
+        256,
+        256,
+        256,
+        256,
+        81
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 23.855001074990767
+    }
+  ]
+}

@@ -33,9 +33,15 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("begin",
              (void(ArcherPrefetchHandle::*)(std::uint64_t&, torch::Tensor&)) &
                  ArcherPrefetchHandle::AcquireTensor)
+        .def("begin_group",
+             (void(ArcherPrefetchHandle::*)(std::uint64_t&, std::vector<torch::Tensor>)) &
+                 ArcherPrefetchHandle::AcquireTensorGroup)
         .def("end",
              (void(ArcherPrefetchHandle::*)(std::uint64_t&, torch::Tensor&)) &
                  ArcherPrefetchHandle::ReleaseTensor)
+        .def("end_group",
+             (void(ArcherPrefetchHandle::*)(std::uint64_t&, std::vector<torch::Tensor>)) &
+                 ArcherPrefetchHandle::ReleaseTensorGroup)
         // .def("begin",
         //      (void (ArcherPrefetchHandle::*)(torch::Tensor&, const std::uint32_t)) &
         //          ArcherPrefetchHandle::AcquireTensor)

@@ -6,7 +6,7 @@ This table currently mixes:
 - `OLMoE`: coverage-matched fair runtime points
 
 For the current paper-facing `Qwen` interpretation under fair budget and the two-lane modulelist runtime, use:
-- [qwen/qwen_realization_gap.md](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/qwen/qwen_realization_gap.md)
+- [qwen/qwen_realization_gap.md](qwen/qwen_realization_gap.md)
 
 | Model | Comparison View | mem | A gen tok/s | C gen tok/s | gain | C resident |
 |---|---|---:|---:|---:|---:|---:|
@@ -21,4 +21,4 @@ For the current paper-facing `Qwen` interpretation under fair budget and the two
 ## Notes
 
 - OLMoE-1B-7B-0924: use coverage-matched fair runtime points for cross-model comparison because fixed mem-ratio is near-full-fit.
-- Qwen1.5-MoE-A2.7B-Chat: the two rows above are historical fixed-runtime numbers. The current fair-budget two-lane result is summarized in [qwen/qwen_realization_gap.md](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/qwen/qwen_realization_gap.md).
+- Qwen1.5-MoE-A2.7B-Chat: the two rows above are historical fixed-runtime numbers. The current fair-budget two-lane result is summarized in [qwen/qwen_realization_gap.md](qwen/qwen_realization_gap.md).

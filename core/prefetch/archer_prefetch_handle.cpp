@@ -208,6 +208,35 @@ void ArcherPrefetchHandle::ReleaseTensor(std::uint64_t& request_id, torch::Tenso
     kArcherTensorHandle->UpdateTensorMap(old_ptr, (void*)buffer.data_ptr());
 }
 
+void ArcherPrefetchHandle::AcquireTensorGroup(std::uint64_t& request_id,
+                                              std::vector<torch::Tensor> buffers)
+{
+    std::vector<torch::Tensor> acquired;
+    acquired.reserve(buffers.size());
+    try {
+        for (auto& buffer : buffers) {
+            AcquireTensor(request_id, buffer);
+            acquired.push_back(buffer);
+        }
+    } catch (...) {
+        for (auto it = acquired.rbegin(); it != acquired.rend(); ++it) {
+            try {
+                ReleaseTensor(request_id, *it);
+            } catch (...) {
+            }
+        }
+        throw;
+    }
+}
+
+void ArcherPrefetchHandle::ReleaseTensorGroup(std::uint64_t& request_id,
+                                              std::vector<torch::Tensor> buffers)
+{
+    for (auto& buffer : buffers) {
+        ReleaseTensor(request_id, buffer);
+    }
+}
+
 void ArcherPrefetchHandle::PrefetchTensors(std::uint64_t& request_id,
                                            const std::vector<std::uint32_t>& buffer)
 {

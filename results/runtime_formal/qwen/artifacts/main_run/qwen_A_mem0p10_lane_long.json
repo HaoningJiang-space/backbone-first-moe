@@ -1,0 +1,280 @@
+{
+  "tag": "runtime_eval",
+  "model_path": "/data/ziheng/models/Qwen1.5-MoE-A2.7B-Chat",
+  "prompt_file": "/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-chat-1m~eval_prompts.json",
+  "offload_path": "/data/finemoe_offloads/Qwen1.5-MoE-A2.7B-Chat",
+  "store_prefix": "",
+  "resident_expert_ids_file": "",
+  "device_memory_ratio": 0.1,
+  "prefetch_distance": 0,
+  "num_prompts": 64,
+  "batch_size": 8,
+  "max_new_tokens": 16,
+  "total_elapsed_sec": 83.25276951189153,
+  "total_prompt_tokens": 9455,
+  "total_generated_tokens": 1024,
+  "generated_tokens_per_sec": 12.299891114778296,
+  "end_to_end_tokens_per_sec": 125.86968651539235,
+  "peak_memory_mb": 10638.693359375,
+  "sparse_budget_bytes": 4735686246,
+  "sparse_budget_source": "free_device_memory_ratio",
+  "resident_count": 0,
+  "resident_requested_count": 0,
+  "resident_admitted_count": 0,
+  "resident_clipped": false,
+  "resident_registry": {
+    "enabled": false,
+    "source_file": "",
+    "selection_rule": "",
+    "layout": "modulelist",
+    "requested_count": 0,
+    "admitted_count": 0,
+    "requested_node_count": 0,
+    "admitted_node_count": 0,
+    "requested_tensor_count": 0,
+    "admitted_tensor_count": 0,
+    "requested_bytes": 0,
+    "admitted_bytes": 0,
+    "budget_bytes": 0,
+    "budget_source": "",
+    "fast_path_modules": 0,
+    "fast_path_expert_count": 0,
+    "clipped": false
+  },
+  "runtime_profile": {
+    "module_begin_calls": 52864,
+    "module_end_calls": 52864,
+    "param_begin_calls": 43392,
+    "buffer_begin_calls": 0,
+    "param_end_calls": 43392,
+    "buffer_end_calls": 0,
+    "module_begin_wall_time_sec": 13.93439731223043,
+    "module_end_wall_time_sec": 0.8732618187787011,
+    "resident_fastpath_module_skips": 0,
+    "manual_service_module_skips": 246410,
+    "manual_subtree_begin_calls": 24641,
+    "manual_subtree_end_calls": 24641,
+    "manual_subtree_begin_wall_time_sec": 48.300842814845964,
+    "manual_subtree_end_wall_time_sec": 0.5930448467843235,
+    "modulelist_dispatch_calls": 3072,
+    "modulelist_active_expert_blocks": 24641,
+    "modulelist_resident_expert_blocks": 0,
+    "modulelist_demand_expert_blocks": 24641,
+    "modulelist_token_assignments": 1542144,
+    "modulelist_resident_token_assignments": 0,
+    "modulelist_demand_token_assignments": 1542144,
+    "modulelist_expert_compute_wall_time_sec": 56.59922187938355,
+    "modulelist_resident_compute_wall_time_sec": 0.0,
+    "modulelist_demand_compute_wall_time_sec": 56.59922187938355,
+    "packed_dispatch_calls": 0,
+    "packed_resident_expert_blocks": 0,
+    "packed_demand_expert_blocks": 0,
+    "packed_resident_token_assignments": 0,
+    "packed_demand_token_assignments": 0,
+    "packed_resident_compute_wall_time_sec": 0.0,
+    "packed_dispatch_wait_calls": 0,
+    "packed_dispatch_wait_wall_time_sec": 0.0
+  },
+  "per_batch": [
+    {
+      "batch_size": 8,
+      "elapsed_sec": 43.66576532297768,
+      "prompt_tokens": [
+        256,
+        256,
+        256,
+        131,
+        256,
+        215,
+        94,
+        83
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 2.9313582174327357
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 6.317425663932227,
+      "prompt_tokens": [
+        58,
+        72,
+        96,
+        77,
+        70,
+        74,
+        62,
+        45
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 20.261417673781935
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 6.032548008020967,
+      "prompt_tokens": [
+        84,
+        48,
+        125,
+        256,
+        256,
+        256,
+        256,
+        256
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 21.218231471976562
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 6.296663225977682,
+      "prompt_tokens": [
+        256,
+        82,
+        173,
+        63,
+        79,
+        256,
+        199,
+        87
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 20.328227095252576
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 5.115357712027617,
+      "prompt_tokens": [
+        256,
+        94,
+        199,
+        256,
+        47,
+        87,
+        79,
+        190
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 25.022687992872267
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 5.695034833042882,
+      "prompt_tokens": [
+        76,
+        61,
+        100,
+        256,
+        45,
+        79,
+        54,
+        256
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 22.475718542990727
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 4.726600914960727,
+      "prompt_tokens": [
+        198,
+        77,
+        77,
+        92,
+        256,
+        107,
+        80,
+        90
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 27.08077163757405
+    },
+    {
+      "batch_size": 8,
+      "elapsed_sec": 5.40337383095175,
+      "prompt_tokens": [
+        246,
+        111,
+        48,
+        256,
+        256,
+        256,
+        256,
+        81
+      ],
+      "generated_tokens": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "tokens_per_sec": 23.688903267582003
+    }
+  ]
+}

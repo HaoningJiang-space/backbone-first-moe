@@ -19,6 +19,8 @@ public:
 
     void AcquireTensor(std::uint64_t& request_id, torch::Tensor& buffer);
     void ReleaseTensor(std::uint64_t& request_id, torch::Tensor& buffer);
+    void AcquireTensorGroup(std::uint64_t& request_id, std::vector<torch::Tensor> buffers);
+    void ReleaseTensorGroup(std::uint64_t& request_id, std::vector<torch::Tensor> buffers);
     void PrefetchTensors(std::uint64_t& request_id, const std::vector<std::uint32_t>& buffer);
     void FetchTensors(std::uint64_t& request_id, const std::vector<std::uint32_t>& buffer);
 

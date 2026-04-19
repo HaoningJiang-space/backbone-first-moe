@@ -4,7 +4,15 @@ This note summarizes the current paper-facing interpretation for `Qwen1.5-MoE-A2
 
 Machine-readable companion:
 
-- [qwen_realization_gap_summary.json](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/qwen/qwen_realization_gap_summary.json)
+- [qwen_realization_gap_summary.json](qwen_realization_gap_summary.json)
+- Repo-contained artifacts:
+  - [artifacts/observation/qwen_fair64_observation.json](artifacts/observation/qwen_fair64_observation.json)
+  - [artifacts/main_run/qwen_A_mem0p10_lane_long.json](artifacts/main_run/qwen_A_mem0p10_lane_long.json)
+  - [artifacts/main_run/qwen_C_mem0p10_lane_long.json](artifacts/main_run/qwen_C_mem0p10_lane_long.json)
+  - [artifacts/repeat_1/qwen_A_mem0p10_lane_long.json](artifacts/repeat_1/qwen_A_mem0p10_lane_long.json)
+  - [artifacts/repeat_1/qwen_C_mem0p10_lane_long.json](artifacts/repeat_1/qwen_C_mem0p10_lane_long.json)
+  - [artifacts/repeat_2/qwen_A_mem0p10_lane_long.json](artifacts/repeat_2/qwen_A_mem0p10_lane_long.json)
+  - [artifacts/repeat_2/qwen_C_mem0p10_lane_long.json](artifacts/repeat_2/qwen_C_mem0p10_lane_long.json)
 
 It separates:
 

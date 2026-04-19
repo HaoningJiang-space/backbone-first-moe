@@ -13,7 +13,7 @@
     "oracle_two_pool_speedup": 16.02,
     "zero_loading_speedup_upper_bound": 18.0,
     "loading_share": 0.944,
-    "source": "/data/ziheng/backbone-first-moe_lb/results/observation_qwen/qwen_fair64_observation.json"
+    "source": "results/runtime_formal/qwen/artifacts/observation/qwen_fair64_observation.json"
   },
   "historical_unified_runtime_reference": {
     "mem": 0.1,
@@ -52,9 +52,9 @@
       "c_modulelist_demand_compute_wall_time_sec": 51.11428622121457,
       "c_resident_fastpath_module_skips": 41850,
       "source": {
-        "a_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/qwen_A_mem0p10_lane_long.json",
-        "c_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/qwen_C_mem0p10_lane_long.json",
-        "resident_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/residents/qwen_lane_mem0p10.json"
+        "a_json": "results/runtime_formal/qwen/artifacts/main_run/qwen_A_mem0p10_lane_long.json",
+        "c_json": "results/runtime_formal/qwen/artifacts/main_run/qwen_C_mem0p10_lane_long.json",
+        "resident_json": "results/runtime_formal/qwen/artifacts/main_run/qwen_lane_mem0p10.json"
       }
     },
     {
@@ -68,9 +68,9 @@
       "c_modulelist_demand_compute_wall_time_sec": 51.12365735566709,
       "c_resident_fastpath_module_skips": 41850,
       "source": {
-        "a_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run1/qwen_A_mem0p10_lane_long.json",
-        "c_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run1/qwen_C_mem0p10_lane_long.json",
-        "resident_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run1/residents/qwen_lane_mem0p10.json"
+        "a_json": "results/runtime_formal/qwen/artifacts/repeat_1/qwen_A_mem0p10_lane_long.json",
+        "c_json": "results/runtime_formal/qwen/artifacts/repeat_1/qwen_C_mem0p10_lane_long.json",
+        "resident_json": "results/runtime_formal/qwen/artifacts/repeat_1/qwen_lane_mem0p10.json"
       }
     },
     {
@@ -84,9 +84,9 @@
       "c_modulelist_demand_compute_wall_time_sec": 51.139605839853175,
       "c_resident_fastpath_module_skips": 41850,
       "source": {
-        "a_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/qwen_A_mem0p10_lane_long.json",
-        "c_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/qwen_C_mem0p10_lane_long.json",
-        "resident_json": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_repeat_seq/run2/residents/qwen_lane_mem0p10.json"
+        "a_json": "results/runtime_formal/qwen/artifacts/repeat_2/qwen_A_mem0p10_lane_long.json",
+        "c_json": "results/runtime_formal/qwen/artifacts/repeat_2/qwen_C_mem0p10_lane_long.json",
+        "resident_json": "results/runtime_formal/qwen/artifacts/repeat_2/qwen_lane_mem0p10.json"
       }
     }
   ],

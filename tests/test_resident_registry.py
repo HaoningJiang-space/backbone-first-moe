@@ -248,6 +248,43 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(begun, ())
         move_mock.assert_called_once_with(engine, module.cache)
 
+    def test_run_module_demand_lane_group_profiles_tail_group_without_manual_double_count(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 9
+
+        class _GroupedArcherEngine:
+            def __init__(self):
+                self.begin_group_calls = 0
+                self.end_group_calls = 0
+
+            def begin_group(self, request_id, tensors):
+                self.begin_group_calls += 1
+
+            def end_group(self, request_id, tensors):
+                self.end_group_calls += 1
+
+        engine.archer_engine = _GroupedArcherEngine()
+        modules = [nn.Linear(4, 4), nn.Linear(4, 4)]
+        engine.offload_set = {
+            param.data_ptr()
+            for module in modules
+            for param in module.parameters()
+        }
+        inputs = [torch.zeros(1, 4), torch.zeros(1, 4)]
+
+        outputs = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+
+        self.assertEqual(len(outputs), 2)
+        self.assertEqual(engine.archer_engine.begin_group_calls, 1)
+        self.assertEqual(engine.archer_engine.end_group_calls, 1)
+        payload = OffloadEngine.get_runtime_profile(engine)
+        self.assertEqual(payload["tail_group_begin_calls"], 1)
+        self.assertEqual(payload["tail_group_end_calls"], 1)
+        self.assertEqual(payload["manual_subtree_begin_calls"], 0)
+        self.assertEqual(payload["manual_subtree_end_calls"], 0)
+
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
         engine = self._build_engine_stub()
         engine.config.model_type = "mixtral"
