@@ -93,6 +93,7 @@ void Node::SetDevice(const torch::Device& target_device,
         }
     } else {
         // both are null, which means the node is not initialized
+        bool initial_materialization = (host_memory_ptr == nullptr && device_memory_ptr == nullptr);
         if (host_memory_ptr == nullptr && device_memory_ptr == nullptr) {
             // int numa_id =
             //     default_device.index() / 4;  // TODO: 8 gpus, 2 numa nodes, so 4 gpus per numa
@@ -110,7 +111,7 @@ void Node::SetDevice(const torch::Device& target_device,
             device_memory_ptr = kDeviceMemoryPool->AllocateMemory(id, byte_size, target_device);
             // ARCHER_LOG_DEBUG("Allocate GPU Memory for node {} done", this->id);
             if (device_memory_ptr == nullptr) {
-                if (!on_demand) {
+                if (initial_materialization || !on_demand) {
                     is_overflow = true;
                     device = CPU_DEVICE;
                     ARCHER_LOG_WARN("SetDevice fallback to host due sparse budget ",
