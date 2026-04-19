@@ -105,6 +105,22 @@ if is_flash_attn_2_available():
 
 logger = logging.get_logger(__name__)
 
+_OLMOE_CONFIG_DEFAULTS = {
+    "rope_theta": 10000.0,
+    "attention_bias": False,
+    "clip_qkv": None,
+    "router_aux_loss_coef": 0.01,
+    "output_router_logits": False,
+    "_attn_implementation": "eager",
+}
+
+
+def _ensure_olmoe_config_defaults(config: OlmoeConfig) -> OlmoeConfig:
+    for field, value in _OLMOE_CONFIG_DEFAULTS.items():
+        if not hasattr(config, field):
+            setattr(config, field, value)
+    return config
+
 
 # ========================
 # Load balancing loss
@@ -793,6 +809,7 @@ class OlmoePreTrainedModel(PreTrainedModel):
 @add_start_docstrings("The bare OLMoE Model.", OLMOE_START_DOCSTRING)
 class OlmoeModel(OlmoePreTrainedModel):
     def __init__(self, config: OlmoeConfig):
+        config = _ensure_olmoe_config_defaults(config)
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1004,6 +1021,7 @@ class OlmoeForCausalLM(OlmoePreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):
+        config = _ensure_olmoe_config_defaults(config)
         super().__init__(config)
         self.model = OlmoeModel(config)
         self.vocab_size = config.vocab_size

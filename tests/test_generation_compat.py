@@ -1,6 +1,7 @@
 import torch
 from transformers.generation import GenerationMixin
 
+from finemoe.models.modeling_olmoe.modeling_olmoe import _ensure_olmoe_config_defaults
 from finemoe.models.modeling_olmoe.modeling_olmoe import _get_cache_length as olmoe_get_cache_length
 from finemoe.models.modeling_olmoe.modeling_olmoe import OlmoeForCausalLM
 from finemoe.models.modeling_qwen.modeling_qwen2_moe import _get_cache_length as qwen_get_cache_length
@@ -82,3 +83,29 @@ def test_qwen_cache_length_helper_supports_legacy_and_modern_cache():
 def test_olmoe_cache_length_helper_supports_legacy_and_modern_cache():
     assert olmoe_get_cache_length(_LegacyCache(), 3, 7) == 5
     assert olmoe_get_cache_length(_ModernCache(), 3, 7) == 4
+
+
+class _PartialOlmoeConfig:
+    hidden_size = 64
+    num_attention_heads = 8
+    num_key_value_heads = 8
+    max_position_embeddings = 128
+    attention_dropout = 0.0
+    rms_norm_eps = 1e-5
+    hidden_act = "silu"
+    attention_bias = False
+    pad_token_id = 0
+    vocab_size = 256
+    num_hidden_layers = 1
+    intermediate_size = 128
+    num_experts = 4
+    num_experts_per_tok = 2
+
+
+def test_olmoe_config_defaults_cover_transformers_compat_gaps():
+    cfg = _PartialOlmoeConfig()
+    assert not hasattr(cfg, "rope_theta")
+    _ensure_olmoe_config_defaults(cfg)
+    assert cfg.rope_theta == 10000.0
+    assert cfg.clip_qkv is None
+    assert cfg._attn_implementation == "eager"
