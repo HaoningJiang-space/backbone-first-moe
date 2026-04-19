@@ -25,6 +25,7 @@ CUDA_DEVICE="${CUDA_DEVICE:-0}"
 
 RUN_C="${RUN_C:-1}"
 RESIDENT_FILE="${RESIDENT_FILE:-}"
+A_SPARSE_BUDGET_BYTES_OVERRIDE="${A_SPARSE_BUDGET_BYTES_OVERRIDE:-0}"
 TMP_BASE="${TMP_BASE:-/data/ziheng/tmp}"
 TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/data/ziheng/torch_ext_deepseek_packed_batch}"
 
@@ -108,7 +109,7 @@ resident_json="${OUT_ROOT}/residents/deepseek_batch_mem${tag}.json"
 
 rm -f "${a_json}" "${c_json}" "${resident_json}"
 
-run_eval "${a_json}" "" 0
+run_eval "${a_json}" "" "${A_SPARSE_BUDGET_BYTES_OVERRIDE}"
 
 if [ "${RUN_C}" = "0" ]; then
   echo "A-only run complete: ${a_json}"
