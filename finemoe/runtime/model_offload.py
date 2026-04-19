@@ -1303,7 +1303,9 @@ class OffloadEngine(object):
         try:
             if service_ctx.no_control:
                 if service_ctx.begun_tensors:
-                    self._end_manual_service_tensors_group(service_ctx.begun_tensors)
+                    self._end_manual_service_tensors_group(
+                        tuple(reversed(service_ctx.begun_tensors))
+                    )
             else:
                 self._end_module_subtrees_group(service_ctx.begun_by_module)
         finally:

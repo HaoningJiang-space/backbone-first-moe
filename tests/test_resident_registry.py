@@ -325,6 +325,41 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(payload["manual_subtree_begin_calls"], 0)
         self.assertEqual(payload["manual_subtree_end_calls"], 0)
 
+    def test_run_module_demand_lane_group_no_control_mode_releases_in_reverse_order(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 11
+        engine.no_control_mode = True
+
+        class _GroupedArcherEngine:
+            def __init__(self):
+                self.begin_group_tensors = None
+                self.end_group_tensors = None
+
+            def begin_group(self, request_id, tensors):
+                self.begin_group_tensors = [tensor.data_ptr() for tensor in tensors]
+
+            def end_group(self, request_id, tensors):
+                self.end_group_tensors = [tensor.data_ptr() for tensor in tensors]
+
+        engine.archer_engine = _GroupedArcherEngine()
+        modules = [nn.Linear(4, 4), nn.Linear(4, 4)]
+        engine.offload_set = {
+            param.data_ptr()
+            for module in modules
+            for param in module.parameters()
+        }
+        inputs = [torch.zeros(1, 4), torch.zeros(1, 4)]
+
+        outputs = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+
+        self.assertEqual(len(outputs), 2)
+        self.assertEqual(
+            engine.archer_engine.end_group_tensors,
+            list(reversed(engine.archer_engine.begin_group_tensors)),
+        )
+
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
         engine = self._build_engine_stub()
         engine.config.model_type = "mixtral"
