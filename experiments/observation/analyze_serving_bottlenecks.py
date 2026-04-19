@@ -187,6 +187,12 @@ def run_upper_bound_probe(args, state_file, output_dir):
         cache_layout="single",
     )
     num_tokens = len(baseline.access_sequence)
+    if num_tokens == 0:
+        raise ValueError(
+            "Observation state produced an empty access sequence. "
+            f"state_file={state_file}. This usually means the trace capture "
+            "did not record any decode iterations."
+        )
     demand_steps = build_batch_union_demand_steps(baseline.access_sequence)
     compute_only = compute_compute_only_upper_bound(num_tokens, args.gpu_compute_time_ms)
 
