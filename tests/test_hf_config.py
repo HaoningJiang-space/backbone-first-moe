@@ -229,6 +229,20 @@ class HFConfigParsingTest(unittest.TestCase):
         self.assertFalse(normalized.mlp_bias)
         self.assertFalse(normalized.attention_bias)
 
+    def test_normalize_runtime_config_sets_qwen_runtime_defaults(self):
+        cfg = Qwen2MoeConfig()
+        delattr(cfg, "rope_theta")
+        delattr(cfg, "use_sliding_window")
+        delattr(cfg, "sliding_window")
+        delattr(cfg, "max_window_layers")
+        delattr(cfg, "attention_dropout")
+        normalized = normalize_runtime_config(cfg)
+        self.assertEqual(normalized.rope_theta, 10000.0)
+        self.assertFalse(normalized.use_sliding_window)
+        self.assertIsNone(normalized.sliding_window)
+        self.assertEqual(normalized.max_window_layers, 28)
+        self.assertEqual(normalized.attention_dropout, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -52,6 +52,21 @@ def parse_moe_architecture(config: PretrainedConfig) -> str:
 def normalize_runtime_config(config: PretrainedConfig) -> PretrainedConfig:
     arch = parse_moe_architecture(config)
 
+    if arch == "qwen":
+        default_values = {
+            "rope_theta": 10000.0,
+            "use_sliding_window": False,
+            "sliding_window": None,
+            "max_window_layers": 28,
+            "attention_dropout": 0.0,
+            "rope_scaling": None,
+        }
+        for key, value in default_values.items():
+            if not hasattr(config, key):
+                setattr(config, key, value)
+        if getattr(config, "use_sliding_window", False) and getattr(config, "sliding_window", None) is None:
+            setattr(config, "sliding_window", 4096)
+
     if arch in {"deepseek_v2", "deepseek_v3"}:
         default_values = {
             "attention_bias": False,
