@@ -200,19 +200,18 @@ def run_upper_bound_probe(args, state_file, output_dir):
     for mem_ratio in args.memory_ratios:
         baseline_row = baseline.simulate_with_config(mem_ratio, 0, reset_mode=args.reset_mode)
 
+        single_analyzer = build_analyzer(
+            state_file=state_file,
+            output_dir=output_dir,
+            expert_size_mb=args.expert_size_mb,
+            h2d_bandwidth_gbps=args.h2d_bandwidth_gbps,
+            gpu_compute_time_ms=args.gpu_compute_time_ms,
+            mode="oracle",
+            cache_layout="single",
+        )
         single_rows = []
         for window in args.oracle_windows:
-            single_rows.append(
-                build_analyzer(
-                    state_file=state_file,
-                    output_dir=output_dir,
-                    expert_size_mb=args.expert_size_mb,
-                    h2d_bandwidth_gbps=args.h2d_bandwidth_gbps,
-                    gpu_compute_time_ms=args.gpu_compute_time_ms,
-                    mode="oracle",
-                    cache_layout="single",
-                ).simulate_with_config(mem_ratio, window, reset_mode=args.reset_mode)
-            )
+            single_rows.append(single_analyzer.simulate_with_config(mem_ratio, window, reset_mode=args.reset_mode))
         best_single = best_by_throughput(single_rows)
 
         two_pool_rows = []
