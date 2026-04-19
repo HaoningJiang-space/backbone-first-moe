@@ -584,6 +584,8 @@ class ModuleServiceGroupContext:
     begun_by_module: tuple
     expert_blocks: int = 0
     token_assignments: int = 0
+    no_control: bool = False
+    begun_tensors: tuple = ()
 
 
 class OffloadEngine(object):
@@ -639,6 +641,8 @@ class OffloadEngine(object):
         self._runtime_budget_override_source = ""
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
+        self.no_control_mode = False
+        self._module_group_service_plans = {}
         self._reset_resident_registry()
         self.runtime_profile = RuntimeProfile()
 
@@ -1058,6 +1062,26 @@ class OffloadEngine(object):
                 seen_service_modules.add(current_id)
                 current._archer_manual_service_active = enabled
 
+    def _get_module_group_service_plan(self, modules):
+        unique_modules = tuple(self._iter_unique_modules(modules))
+        plan_key = tuple(id(module) for module in unique_modules)
+        service_plan = self._module_group_service_plans.get(plan_key)
+        if service_plan is not None:
+            return service_plan
+
+        flat_tensors = []
+        for module in unique_modules:
+            self._attach_module_service_metadata(module)
+            flat_tensors.extend(module._archer_service_params)
+            flat_tensors.extend(module._archer_service_buffers)
+
+        service_plan = {
+            "unique_modules": unique_modules,
+            "flat_tensors": tuple(flat_tensors),
+        }
+        self._module_group_service_plans[plan_key] = service_plan
+        return service_plan
+
     def _tensor_in_offload_set(self, tensor):
         return tensor.data_ptr() in self.offload_set
 
@@ -1210,19 +1234,35 @@ class OffloadEngine(object):
 
     def begin_module_group(self, modules, *, expert_blocks=0, token_assignments=0):
         module_list = tuple(modules)
-        unique_module_count = len(tuple(self._iter_unique_modules(module_list)))
+        service_plan = self._get_module_group_service_plan(module_list)
+        unique_module_count = len(service_plan["unique_modules"])
         if not module_list:
             return ModuleServiceGroupContext(
                 modules=(),
                 begun_by_module=(),
                 expert_blocks=int(expert_blocks),
                 token_assignments=int(token_assignments),
+                no_control=bool(self.no_control_mode),
+                begun_tensors=(),
             )
 
         group_begin_t0 = time.perf_counter()
         self._set_manual_service_active_group(module_list, True)
         try:
-            begun_by_module = self._begin_module_subtrees_group(module_list)
+            if self.no_control_mode:
+                begun_tensors = []
+                for tensor in service_plan["flat_tensors"]:
+                    if self._tensor_in_offload_set(tensor):
+                        begun_tensors.append(tensor)
+                    else:
+                        self._move_tensor_to_service_device(tensor)
+                begun_tensors = tuple(begun_tensors)
+                if begun_tensors:
+                    self._begin_manual_service_tensors_group(begun_tensors)
+                begun_by_module = ()
+            else:
+                begun_tensors = ()
+                begun_by_module = self._begin_module_subtrees_group(module_list)
         except Exception:
             self._set_manual_service_active_group(module_list, False)
             raise
@@ -1238,6 +1278,8 @@ class OffloadEngine(object):
             begun_by_module=begun_by_module,
             expert_blocks=int(expert_blocks),
             token_assignments=int(token_assignments),
+            no_control=bool(self.no_control_mode),
+            begun_tensors=begun_tensors,
         )
 
     def run_module_group(self, service_ctx, args_list, kwargs_list=None):
@@ -1259,7 +1301,11 @@ class OffloadEngine(object):
             return
         t0 = time.perf_counter()
         try:
-            self._end_module_subtrees_group(service_ctx.begun_by_module)
+            if service_ctx.no_control:
+                if service_ctx.begun_tensors:
+                    self._end_manual_service_tensors_group(service_ctx.begun_tensors)
+            else:
+                self._end_module_subtrees_group(service_ctx.begun_by_module)
         finally:
             self._set_manual_service_active_group(service_ctx.modules, False)
             self.runtime_profile.record_tail_group_service(
@@ -1462,6 +1508,7 @@ class OffloadEngine(object):
         )
 
         self.archer_config = _archer_config
+        self.no_control_mode = bool(getattr(_archer_config, "no_control_mode", False))
         if getattr(_archer_config, "sparse_budget_bytes_override", 0):
             self._runtime_budget_override_bytes = int(_archer_config.sparse_budget_bytes_override)
             self._runtime_budget_override_source = "runtime_sparse_budget_override"

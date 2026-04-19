@@ -31,6 +31,8 @@ class ResidentRegistryTest(unittest.TestCase):
         engine.archer_config = SimpleNamespace(resident_expert_ids_file="")
         engine.resident_expert_ids = []
         engine.resident_expert_ids_set = set()
+        engine.no_control_mode = False
+        engine._module_group_service_plans = {}
         OffloadEngine._reset_resident_registry(engine)
         return engine
 
@@ -253,6 +255,44 @@ class ResidentRegistryTest(unittest.TestCase):
         engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
         engine.device = "cpu"
         engine.request_id = 9
+
+        class _GroupedArcherEngine:
+            def __init__(self):
+                self.begin_group_calls = 0
+                self.end_group_calls = 0
+
+            def begin_group(self, request_id, tensors):
+                self.begin_group_calls += 1
+
+            def end_group(self, request_id, tensors):
+                self.end_group_calls += 1
+
+        engine.archer_engine = _GroupedArcherEngine()
+        modules = [nn.Linear(4, 4), nn.Linear(4, 4)]
+        engine.offload_set = {
+            param.data_ptr()
+            for module in modules
+            for param in module.parameters()
+        }
+        inputs = [torch.zeros(1, 4), torch.zeros(1, 4)]
+
+        outputs = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+
+        self.assertEqual(len(outputs), 2)
+        self.assertEqual(engine.archer_engine.begin_group_calls, 1)
+        self.assertEqual(engine.archer_engine.end_group_calls, 1)
+        payload = OffloadEngine.get_runtime_profile(engine)
+        self.assertEqual(payload["tail_group_begin_calls"], 1)
+        self.assertEqual(payload["tail_group_end_calls"], 1)
+        self.assertEqual(payload["manual_subtree_begin_calls"], 0)
+        self.assertEqual(payload["manual_subtree_end_calls"], 0)
+
+    def test_run_module_demand_lane_group_no_control_mode_uses_group_begin_end(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 10
+        engine.no_control_mode = True
 
         class _GroupedArcherEngine:
             def __init__(self):

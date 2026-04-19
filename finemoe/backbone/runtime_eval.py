@@ -31,6 +31,7 @@ class RuntimeEvalConfig:
     min_new_tokens: int = 1
     store_capacity: int = 1000
     batch_prefetch: bool = False
+    no_control_mode: bool = False
     tag: str = "runtime_eval"
 
 
@@ -59,6 +60,7 @@ def build_model(runtime_cfg):
             "device_memory_ratio": runtime_cfg.device_memory_ratio,
             "resident_expert_ids_file": runtime_cfg.resident_expert_ids_file,
             "sparse_budget_bytes_override": runtime_cfg.sparse_budget_bytes_override,
+            "no_control_mode": runtime_cfg.no_control_mode,
             "prefetch_distance": runtime_cfg.prefetch_distance,
             "store_capacity": runtime_cfg.store_capacity,
             "device": runtime_cfg.device,
@@ -173,6 +175,7 @@ def evaluate_runtime(runtime_cfg):
         "store_prefix": runtime_cfg.store_prefix,
         "resident_expert_ids_file": runtime_cfg.resident_expert_ids_file,
         "sparse_budget_bytes_override": int(runtime_cfg.sparse_budget_bytes_override),
+        "no_control_mode": bool(runtime_cfg.no_control_mode),
         "device_memory_ratio": float(runtime_cfg.device_memory_ratio),
         "prefetch_distance": int(runtime_cfg.prefetch_distance),
         "num_prompts": len(prompts),

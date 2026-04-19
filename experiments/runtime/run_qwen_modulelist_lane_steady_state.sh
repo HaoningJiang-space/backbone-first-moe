@@ -19,6 +19,7 @@ MIN_NEW_TOKENS="${MIN_NEW_TOKENS:-1}"
 STORE_CAPACITY="${STORE_CAPACITY:-1000}"
 SEED="${SEED:-42}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
+NO_CONTROL_MODE="${NO_CONTROL_MODE:-0}"
 
 cd "${REPO_ROOT}"
 source /home/ziheng/miniconda3/bin/activate mxmoe
@@ -36,6 +37,10 @@ run_eval() {
   local output_path="$1"
   local resident_file="$2"
   local budget_override="$3"
+  local extra_flags=()
+  if [ "${NO_CONTROL_MODE}" = "1" ]; then
+    extra_flags+=(--no-control-mode)
+  fi
   python -m finemoe.entrypoints.backbone_runtime_eval \
     --model-path "${MODEL_PATH}" \
     --offload-path "${OFFLOAD_PATH}" \
@@ -55,6 +60,7 @@ run_eval() {
     --max-new-tokens "${MAX_NEW_TOKENS}" \
     --min-new-tokens "${MIN_NEW_TOKENS}" \
     --store-capacity "${STORE_CAPACITY}" \
+    "${extra_flags[@]}" \
     --tag runtime_eval
 }
 

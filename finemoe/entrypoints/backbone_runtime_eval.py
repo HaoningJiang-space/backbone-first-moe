@@ -29,6 +29,8 @@ def build_parser():
     parser.add_argument("--store-capacity", type=int, default=1000)
     parser.add_argument("--batch-prefetch", action="store_true",
                         help="Enable batch-aware prefetch (one call per layer instead of per-sequence)")
+    parser.add_argument("--no-control-mode", action="store_true",
+                        help="Disable module-level service control path for machine-side control ceiling experiments")
     parser.add_argument("--tag", type=str, default="runtime_eval")
     return parser
 
@@ -56,6 +58,7 @@ def main():
         min_new_tokens=args.min_new_tokens,
         store_capacity=args.store_capacity,
         batch_prefetch=args.batch_prefetch,
+        no_control_mode=args.no_control_mode,
         tag=args.tag,
     )
     payload = evaluate_runtime(runtime_cfg)

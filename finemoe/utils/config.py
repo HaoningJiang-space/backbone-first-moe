@@ -28,6 +28,10 @@ class ArcherConfig:
         default=0,
         metadata={"help": "Optional explicit sparse-budget override in bytes"},
     )
+    no_control_mode: bool = field(
+        default=False,
+        metadata={"help": "Approximate machine-side control ceiling by minimizing Python-side module service orchestration"},
+    )
     # master_addr: str = field(
     #     default="127.0.0.1",
     #     metadata={"help": "Hosts for running archer"},
