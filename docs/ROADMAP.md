@@ -68,6 +68,33 @@ The new roadmap is:
 
 This is a project-level shift, not a tuning shift.
 
+### Important interpretation update: simulator vs runtime
+
+The simulator should now be treated as:
+
+- an `idealized structural oracle`
+- an `upper-bound generator`
+
+It should **not** be treated as a faithful quantitative runtime predictor.
+
+That distinction matters because the current evidence now has two layers:
+
+1. `structure layer`
+   - `Qwen` observation still shows very large idealized headroom
+   - e.g. `oracle two-pool ~16x`, `zero-loading upper bound ~18x`, `loading_share ~0.94`
+   - this means the structure is still consistent with a strong memory-side opportunity
+
+2. `realization layer`
+   - fair real-machine throughput gains are much smaller
+   - even after splitting modulelist into `resident lane + demand lane`, current long-workflow `Qwen 0.10` gains are only in the `~+5%` range
+   - this means current runtimes are still far from the idealized structure-level ceiling
+
+Therefore the correct interpretation is:
+
+- simulator numbers justify continued systems work
+- simulator numbers do **not** justify writing unrealistic throughput claims
+- the gap between simulator ceilings and real-machine gains must be explained by runtime attribution
+
 ---
 
 ## 2.1 Related Work and Positioning

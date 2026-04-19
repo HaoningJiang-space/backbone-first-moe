@@ -10,9 +10,14 @@
 ## Current Fair Results
 
 - `Qwen @ 0.10`
-  - `A = 14.0118 tok/s`
-  - `C = 14.3550 tok/s`
-  - `+2.45%`
+  - old fair unified runtime:
+    - `A = 14.0118 tok/s`
+    - `C = 14.3550 tok/s`
+    - `+2.45%`
+  - current modulelist two-lane runtime:
+    - long-workflow gains observed at `+6.25%`, `+4.69%`, `+3.46%`
+    - current mean is `~+4.8%`
+    - this is a stable positive result, but still only medium-strength throughput evidence
   - `resident_admitted_count = 165`
   - `resident_registry.budget_bytes = sparse_budget_bytes = 4735686246`
 - `Qwen @ 0.07`
@@ -29,11 +34,33 @@
 
 - The old gains were partly inflated by unfair or weakly calibrated budget accounting.
 - The new fair pipeline is more credible but much more conservative.
+- The latest `Qwen 0.10` result shows that runtime bifurcation matters:
+  - structural backbone signal is real
+  - unified generic runtime was hiding much of that signal
+  - modulelist `resident lane + demand lane` raises fair long-workflow gains from `+2.45%` to roughly `+5%`
 - We still do not know whether MoE serving is fundamentally memory-bound enough to justify another round of memory-hierarchy design.
 - The main unanswered question is now:
   - how much of the end-to-end time is actually load stall
   - what the realistic zero-loading / oracle ceiling looks like
   - whether current weak gains come from a bad method or a low memory-optimization ceiling
+
+## Simulator Interpretation
+
+- The simulator is still useful, but only in a limited role:
+  - it is an `idealized structure oracle`
+  - it is an `upper-bound generator`
+- It is **not** a faithful quantitative runtime predictor.
+- In particular, the `Qwen` observation results:
+  - `oracle_two_pool_speedup ~16x`
+  - `zero_loading_speedup ~18x`
+  - `loading_share ~0.94`
+  should be read as evidence that:
+  - the structural headroom is not obviously exhausted
+  - current runtime gains are far below the idealized ceiling
+- Those numbers should **not** be written as realistic expected deployment gains.
+- The correct way to use the simulator now is:
+  - use observation to establish structural headroom and failure of single-cache abstractions
+  - use real-machine attribution to explain how much of that headroom is currently lost to runtime realization costs
 
 ## Priority
 
@@ -57,6 +84,9 @@ Concrete work:
   - improved memory hierarchy
   - tail service/runtime work
   - or a more fundamental pivot away from cache-style thinking
+- Keep the interpretation disciplined:
+  - simulator outputs are for structural comparison and idealized ceilings
+  - real-machine attribution remains the authority for quantitative runtime claims
 
 Why:
 - This is the right EuroSys move now.
