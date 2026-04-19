@@ -24,7 +24,7 @@ def test_qwen_prepare_inputs_handles_missing_cache_position():
         attention_mask=torch.ones_like(inputs),
         cache_position=None,
     )
-    assert prepared["input_ids"].tolist() == [[3]]
+    assert prepared["input_ids"].tolist() == [[1, 2, 3]]
 
 
 def test_olmoe_prepare_inputs_handles_missing_cache_position():
@@ -35,6 +35,28 @@ def test_olmoe_prepare_inputs_handles_missing_cache_position():
         past_key_values=object(),
         attention_mask=torch.ones_like(inputs),
         cache_position=None,
+    )
+    assert prepared["input_ids"].tolist() == [[4, 5, 6]]
+
+
+def test_qwen_prepare_inputs_respects_next_sequence_length():
+    model = object.__new__(Qwen2MoeForCausalLM)
+    inputs = torch.tensor([[1, 2, 3]])
+    prepared = model.prepare_inputs_for_generation(
+        input_ids=inputs,
+        next_sequence_length=1,
+        attention_mask=torch.ones_like(inputs),
+    )
+    assert prepared["input_ids"].tolist() == [[3]]
+
+
+def test_olmoe_prepare_inputs_respects_next_sequence_length():
+    model = object.__new__(OlmoeForCausalLM)
+    inputs = torch.tensor([[4, 5, 6]])
+    prepared = model.prepare_inputs_for_generation(
+        input_ids=inputs,
+        next_sequence_length=1,
+        attention_mask=torch.ones_like(inputs),
     )
     assert prepared["input_ids"].tolist() == [[6]]
 

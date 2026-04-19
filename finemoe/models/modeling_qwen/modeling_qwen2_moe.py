@@ -19,6 +19,7 @@
 # limitations under the License.
 """PyTorch Qwen2MoE model."""
 
+import inspect
 import math
 from typing import List, Optional, Tuple, Union
 
@@ -65,6 +66,16 @@ def _get_cache_length(past_key_value, layer_idx: int, kv_seq_len: int) -> int:
     if hasattr(past_key_value, "get_seq_length"):
         return past_key_value.get_seq_length(layer_idx)
     return kv_seq_len
+
+
+def _get_past_seen_tokens(past_key_values) -> int:
+    if past_key_values is None:
+        return 0
+    if hasattr(past_key_values, "get_seq_length"):
+        return int(past_key_values.get_seq_length())
+    if hasattr(past_key_values, "seen_tokens"):
+        return int(past_key_values.seen_tokens)
+    return 0
 
 
 # Copied from transformers.models.llama.modeling_llama._prepare_4d_causal_attention_mask_with_cache_position
@@ -1552,78 +1563,60 @@ class Qwen2MoeForCausalLM(Qwen2MoePreTrainedModel, GenerationMixin):
     def prepare_inputs_for_generation(
         self,
         input_ids,
+        next_sequence_length=None,
         past_key_values=None,
         attention_mask=None,
         inputs_embeds=None,
-        cache_position=None,
-        position_ids=None,
-        use_cache=True,
+        is_first_iteration: bool | None = False,
         **kwargs,
     ):
-        has_cache_position = cache_position is not None
+        model_inputs = {}
 
-        # If we have cache: let's slice `input_ids` through `cache_position`, to keep only the unprocessed tokens
-        # Exception 1: when passing input_embeds, input_ids may be missing entries
-        # Exception 2: some generation methods do special slicing of input_ids, so we don't need to do it here
+        if inputs_embeds is not None and is_first_iteration:
+            prompt_embeds = (
+                inputs_embeds[:, -next_sequence_length:, :]
+                if next_sequence_length is not None
+                else inputs_embeds
+            )
+            model_inputs["input_ids"] = None
+            model_inputs["inputs_embeds"] = prompt_embeds.clone(memory_format=torch.contiguous_format)
+            sequence_length = prompt_embeds.shape[1]
+            input_device = prompt_embeds.device
+        else:
+            input_ids = input_ids[:, -next_sequence_length:] if next_sequence_length is not None else input_ids
+            model_inputs["input_ids"] = input_ids.clone(memory_format=torch.contiguous_format)
+            model_inputs["inputs_embeds"] = None
+            sequence_length = input_ids.shape[1]
+            input_device = input_ids.device
+
         if past_key_values is not None:
-            if has_cache_position and inputs_embeds is not None:  # Exception 1
-                input_ids = input_ids[:, -cache_position.shape[0]:]
-            # Default case (the "else", a no op, is Exception 2)
-            elif has_cache_position and input_ids.shape[1] != cache_position.shape[0]:
-                input_ids = input_ids[:, cache_position]
-            elif input_ids is not None and input_ids.shape[1] > 1:
-                input_ids = input_ids[:, -1:]
+            model_inputs["past_key_values"] = past_key_values
 
-        if attention_mask is not None and position_ids is None:
-            # create position_ids on the fly for batch generation
+        position_ids = kwargs.pop("position_ids", None)
+        if position_ids is None and attention_mask is not None:
             position_ids = attention_mask.long().cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
-            if past_key_values:
-                position_ids = position_ids[:, -input_ids.shape[1]:]
+        if position_ids is not None and position_ids.shape[-1] != sequence_length:
+            position_ids = position_ids[..., -sequence_length:].clone(memory_format=torch.contiguous_format)
 
-                # This `clone` call is needed to avoid recapturing cuda graphs with `torch.compile`'s  `mode="reduce-overhead`, as otherwise the input `position_ids` would have various stride during the decoding. Here, simply using `.contiguous()` is not sufficient as in the batch size = 1 case, `position_ids` is already contiguous but with varying stride which retriggers a capture.
-                position_ids = position_ids.clone(
-                    memory_format=torch.contiguous_format)
-
-        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
-        if inputs_embeds is not None and (not has_cache_position or cache_position[0] == 0):
-            model_inputs = {"inputs_embeds": inputs_embeds, "input_ids": None}
-        else:
-            # The clone here is for the same reason as for `position_ids`.
-            model_inputs = {"input_ids": input_ids.clone(
-                memory_format=torch.contiguous_format), "inputs_embeds": None}
-
-        if has_cache_position and isinstance(past_key_values, StaticCache) and attention_mask.ndim == 2:
-            if model_inputs["inputs_embeds"] is not None:
-                batch_size, sequence_length, _ = model_inputs["inputs_embeds"].shape
-                device = model_inputs["inputs_embeds"].device
-            else:
-                batch_size, sequence_length = model_inputs["input_ids"].shape
-                device = model_inputs["input_ids"].device
-
-            dtype = self.lm_head.weight.dtype
-            min_dtype = torch.finfo(dtype).min
-
-            attention_mask = _prepare_4d_causal_attention_mask_with_cache_position(
-                attention_mask,
-                sequence_length=sequence_length,
-                target_length=past_key_values.get_max_cache_shape(),
-                dtype=dtype,
-                device=device,
-                min_dtype=min_dtype,
-                cache_position=cache_position,
-                batch_size=batch_size,
-            )
+        cache_position = kwargs.pop("cache_position", None)
+        if cache_position is None and "cache_position" in set(inspect.signature(self.forward).parameters):
+            past_seen_tokens = _get_past_seen_tokens(past_key_values)
+            cache_position = torch.arange(sequence_length, device=input_device) + past_seen_tokens
 
         model_inputs.update(
             {
                 "position_ids": position_ids,
                 "cache_position": cache_position,
-                "past_key_values": past_key_values,
-                "use_cache": use_cache,
                 "attention_mask": attention_mask,
             }
         )
+
+        kwargs_to_avoid_forwarding = {"labels", "next_sequence_length", "is_first_iteration"}
+        for key, value in kwargs.items():
+            if key not in model_inputs and key not in kwargs_to_avoid_forwarding:
+                model_inputs[key] = value
+
         return model_inputs
 
 
