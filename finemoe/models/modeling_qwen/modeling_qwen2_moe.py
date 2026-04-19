@@ -36,6 +36,7 @@ from transformers.modeling_outputs import (
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
+from transformers.generation import GenerationMixin
 from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import (
     add_start_docstrings,
@@ -1393,7 +1394,7 @@ class Qwen2MoeModel(Qwen2MoePreTrainedModel):
         return causal_mask
 
 
-class Qwen2MoeForCausalLM(Qwen2MoePreTrainedModel):
+class Qwen2MoeForCausalLM(Qwen2MoePreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):

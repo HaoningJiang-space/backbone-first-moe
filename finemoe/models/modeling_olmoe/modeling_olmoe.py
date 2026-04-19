@@ -20,6 +20,7 @@ from torch import nn
 
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
+from transformers.generation import GenerationMixin
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.modeling_outputs import (
     MoeCausalLMOutputWithPast,
@@ -980,7 +981,7 @@ class OlmoeModel(OlmoePreTrainedModel):
 
 
 @add_start_docstrings("The OLMoE Model with a language modeling head on top.", OLMOE_START_DOCSTRING)
-class OlmoeForCausalLM(OlmoePreTrainedModel):
+class OlmoeForCausalLM(OlmoePreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):
