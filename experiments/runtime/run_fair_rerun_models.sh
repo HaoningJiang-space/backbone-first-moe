@@ -62,6 +62,21 @@ run_select() {
   run_python "${py_path}" experiments/simulation/select_adaptive_resident_set.py "$@"
 }
 
+read_sparse_budget_bytes() {
+  local json_path="$1"
+  python - "$json_path" <<'PY'
+import json
+import sys
+path = sys.argv[1]
+with open(path, "r") as fh:
+    payload = json.load(fh)
+value = payload.get("sparse_budget_bytes")
+if value in (None, "", 0):
+    raise SystemExit(f"Missing sparse_budget_bytes in {path}")
+print(int(value))
+PY
+}
+
 run_eval() {
   local py_path="$1"
   local model_path="$2"
@@ -79,23 +94,26 @@ run_eval() {
 # Qwen: use repo-local backend. The newer DeepSeek backend removes GenerationMixin
 # from the legacy Qwen model class, so we keep Qwen on the environment that
 # previously produced the validated runtime results.
-run_select "${REPO_PYTHONPATH}" \
-  --state-file "${QWEN_STATE_FILE}" \
-  --model-path "${QWEN_MODEL_PATH}" \
-  --output-dir "${RES_DIR}" \
-  --output-prefix qwen_current \
-  --memory-ratios 0.07,0.10 \
-  --selection-method frontier_prefix \
-  --profile-fraction 0.2 \
-  --prefetch-windows 0
-
 for mem in 0.07 0.10; do
   tag="${mem/./p}"
-  run_eval "${REPO_PYTHONPATH}" "${QWEN_MODEL_PATH}" "${QWEN_OFFLOAD_PATH}" "${RUN_DIR}/qwen_A_mem${tag}_current.json" \
+  qwen_a_output="${RUN_DIR}/qwen_A_mem${tag}_current.json"
+  qwen_c_output="${RUN_DIR}/qwen_C_mem${tag}_current.json"
+  run_eval "${REPO_PYTHONPATH}" "${QWEN_MODEL_PATH}" "${QWEN_OFFLOAD_PATH}" "${qwen_a_output}" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "" \
     --device cuda:0 --eval-mode offline --batch-size 8 --num-prompts 16 --seed 42 \
     --max-length 256 --max-new-tokens 64 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
-  run_eval "${REPO_PYTHONPATH}" "${QWEN_MODEL_PATH}" "${QWEN_OFFLOAD_PATH}" "${RUN_DIR}/qwen_C_mem${tag}_current.json" \
+  qwen_budget_bytes="$(read_sparse_budget_bytes "${qwen_a_output}")"
+  run_select "${REPO_PYTHONPATH}" \
+    --state-file "${QWEN_STATE_FILE}" \
+    --model-path "${QWEN_MODEL_PATH}" \
+    --output-dir "${RES_DIR}" \
+    --output-prefix qwen_current \
+    --memory-ratios "${mem}" \
+    --selection-method frontier_prefix \
+    --profile-fraction 0.2 \
+    --prefetch-windows 0 \
+    --sparse-budget-bytes "${qwen_budget_bytes}"
+  run_eval "${REPO_PYTHONPATH}" "${QWEN_MODEL_PATH}" "${QWEN_OFFLOAD_PATH}" "${qwen_c_output}" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/qwen_current_mem${tag}.json" \
     --device cuda:0 --eval-mode offline --batch-size 8 --num-prompts 16 --seed 42 \
     --max-length 256 --max-new-tokens 64 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
@@ -108,46 +126,52 @@ done
 # footprint than the runtime actually pinned. With the corrected 12MB/expert
 # accounting, those points collapse to resident=0. We therefore rerun OLMoE on
 # a stricter but still non-zero-resident range.
-run_select "${REPO_PYTHONPATH}" \
-  --state-file "${OLMOE_STATE_FILE}" \
-  --model-path "${OLMOE_MODEL_PATH}" \
-  --output-dir "${RES_DIR}" \
-  --output-prefix "${OLMOE_OUTPUT_PREFIX}" \
-  --memory-ratios "$(echo "${OLMOE_FAIR_MEMORY_RATIOS}" | tr ' ' ',')" \
-  --selection-method frontier_prefix \
-  --profile-fraction 0.2 \
-  --prefetch-windows 0
-
 for mem in ${OLMOE_FAIR_MEMORY_RATIOS}; do
   tag="${mem/./p}"
-  run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${RUN_DIR}/olmoe_A_mem${tag}_current.json" \
+  olmoe_a_output="${RUN_DIR}/olmoe_A_mem${tag}_current.json"
+  olmoe_c_output="${RUN_DIR}/olmoe_C_mem${tag}_current.json"
+  run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${olmoe_a_output}" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "" \
     --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
     --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
-  run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${RUN_DIR}/olmoe_C_mem${tag}_current.json" \
+  olmoe_budget_bytes="$(read_sparse_budget_bytes "${olmoe_a_output}")"
+  run_select "${REPO_PYTHONPATH}" \
+    --state-file "${OLMOE_STATE_FILE}" \
+    --model-path "${OLMOE_MODEL_PATH}" \
+    --output-dir "${RES_DIR}" \
+    --output-prefix "${OLMOE_OUTPUT_PREFIX}" \
+    --memory-ratios "${mem}" \
+    --selection-method frontier_prefix \
+    --profile-fraction 0.2 \
+    --prefetch-windows 0 \
+    --sparse-budget-bytes "${olmoe_budget_bytes}"
+  run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${olmoe_c_output}" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/${OLMOE_OUTPUT_PREFIX}_mem${tag}.json" \
     --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
     --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
 done
 
 # DeepSeek: requires the newer backend that provides transformers.models.deepseek_v2/v3.
-run_select "${DEEPSEEK_PYTHONPATH}" \
-  --state-file "${DEEPSEEK_STATE_FILE}" \
-  --model-path "${DEEPSEEK_MODEL_PATH}" \
-  --output-dir "${RES_DIR}" \
-  --output-prefix deepseek_current \
-  --memory-ratios 0.07,0.10 \
-  --selection-method frontier_prefix \
-  --profile-fraction 0.2 \
-  --prefetch-windows 0
-
 for mem in 0.07 0.10; do
   tag="${mem/./p}"
-  run_eval "${DEEPSEEK_PYTHONPATH}" "${DEEPSEEK_MODEL_PATH}" "${DEEPSEEK_OFFLOAD_PATH}" "${RUN_DIR}/deepseek_A_mem${tag}_current.json" \
+  deepseek_a_output="${RUN_DIR}/deepseek_A_mem${tag}_current.json"
+  deepseek_c_output="${RUN_DIR}/deepseek_C_mem${tag}_current.json"
+  run_eval "${DEEPSEEK_PYTHONPATH}" "${DEEPSEEK_MODEL_PATH}" "${DEEPSEEK_OFFLOAD_PATH}" "${deepseek_a_output}" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "" \
     --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
     --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
-  run_eval "${DEEPSEEK_PYTHONPATH}" "${DEEPSEEK_MODEL_PATH}" "${DEEPSEEK_OFFLOAD_PATH}" "${RUN_DIR}/deepseek_C_mem${tag}_current.json" \
+  deepseek_budget_bytes="$(read_sparse_budget_bytes "${deepseek_a_output}")"
+  run_select "${DEEPSEEK_PYTHONPATH}" \
+    --state-file "${DEEPSEEK_STATE_FILE}" \
+    --model-path "${DEEPSEEK_MODEL_PATH}" \
+    --output-dir "${RES_DIR}" \
+    --output-prefix deepseek_current \
+    --memory-ratios "${mem}" \
+    --selection-method frontier_prefix \
+    --profile-fraction 0.2 \
+    --prefetch-windows 0 \
+    --sparse-budget-bytes "${deepseek_budget_bytes}"
+  run_eval "${DEEPSEEK_PYTHONPATH}" "${DEEPSEEK_MODEL_PATH}" "${DEEPSEEK_OFFLOAD_PATH}" "${deepseek_c_output}" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/deepseek_current_mem${tag}.json" \
     --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
     --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval

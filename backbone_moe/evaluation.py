@@ -382,6 +382,13 @@ def cache_capacity_for_mem_ratio(mem_ratio, expert_size_mb, total_gpu_memory_mb=
     return max(0, int(available_memory_mb / float(expert_size_mb)))
 
 
+def cache_capacity_for_budget_bytes(budget_bytes, expert_size_mb):
+    if expert_size_mb <= 0:
+        return 0
+    expert_size_bytes = float(expert_size_mb) * 1024.0 * 1024.0
+    return max(0, int(float(budget_bytes) / expert_size_bytes))
+
+
 def rank_resident_candidates(
     analyzer,
     cache_capacity,

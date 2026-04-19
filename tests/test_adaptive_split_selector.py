@@ -1,7 +1,9 @@
 import unittest
+from types import SimpleNamespace
 
 from backbone_moe.evaluation import (
     build_batch_union_demand_steps,
+    cache_capacity_for_budget_bytes,
     cache_capacity_for_mem_ratio,
     compute_capacity_knee,
     compute_residual_demand_frontier_curve,
@@ -10,7 +12,7 @@ from backbone_moe.evaluation import (
     select_feasible_resident_prefix,
     summarize_resident_applicability,
 )
-from experiments.simulation.select_adaptive_resident_set import format_mem_tag
+from experiments.simulation.select_adaptive_resident_set import format_mem_tag, resolve_cache_capacity
 
 
 class AdaptiveSplitSelectorTest(unittest.TestCase):
@@ -23,6 +25,23 @@ class AdaptiveSplitSelectorTest(unittest.TestCase):
 
     def test_cache_capacity_for_mem_ratio(self):
         self.assertEqual(cache_capacity_for_mem_ratio(0.10, 17.2), 476)
+
+    def test_cache_capacity_for_budget_bytes(self):
+        self.assertEqual(cache_capacity_for_budget_bytes(5956711219, 16.5), 344)
+
+    def test_resolve_cache_capacity_prefers_runtime_budget_when_present(self):
+        args = SimpleNamespace(expert_size_mb=16.5, sparse_budget_bytes=5956711219)
+        capacity, budget_bytes, source = resolve_cache_capacity(0.07, args)
+        self.assertEqual(capacity, 344)
+        self.assertEqual(budget_bytes, 5956711219)
+        self.assertEqual(source, "runtime_sparse_budget_bytes")
+
+    def test_resolve_cache_capacity_falls_back_to_theoretical_mem_ratio(self):
+        args = SimpleNamespace(expert_size_mb=17.2, sparse_budget_bytes=None)
+        capacity, budget_bytes, source = resolve_cache_capacity(0.10, args)
+        self.assertEqual(capacity, 476)
+        self.assertIsNone(budget_bytes)
+        self.assertEqual(source, "device_memory_ratio_theory")
 
     def test_compute_capacity_knee_returns_internal_cutoff(self):
         ranked = [((0, idx), float(100 - idx)) for idx in range(100)]

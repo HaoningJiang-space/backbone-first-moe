@@ -7,6 +7,7 @@ from transformers import AutoConfig
 
 from backbone_moe.evaluation import (
     best_by_throughput,
+    cache_capacity_for_budget_bytes,
     cache_capacity_for_mem_ratio,
     compute_capacity_knee,
     evaluate_with_fixed_resident_layout,
@@ -39,6 +40,20 @@ def resolve_expert_size_mb(args):
         config = normalize_runtime_config(config)
         return float(infer_routed_expert_size_mb(config)), f"model:{args.model_path}"
     return 17.2, "default"
+
+
+def resolve_cache_capacity(mem_ratio, args):
+    if args.sparse_budget_bytes is not None:
+        return (
+            cache_capacity_for_budget_bytes(args.sparse_budget_bytes, args.expert_size_mb),
+            int(args.sparse_budget_bytes),
+            "runtime_sparse_budget_bytes",
+        )
+    return (
+        cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb),
+        None,
+        "device_memory_ratio_theory",
+    )
 
 
 def build_profile_subset(state_file, profile_fraction, temp_dir):
@@ -77,7 +92,7 @@ def select_frontier_prefix(profile_state_file, mem_ratio, args):
     3. Choose the largest feasible prefix k* such that k + F(k) <= B.
     4. Run one simulator evaluation at k* as a sanity check only.
     """
-    cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
+    cache_capacity, _, _ = resolve_cache_capacity(mem_ratio, args)
     profile_analyzer = build_analyzer(profile_state_file, args, resident_ratio=0.5)
     ranked = rank_resident_candidates(
         analyzer=profile_analyzer,
@@ -146,7 +161,7 @@ def search_best_capacity(profile_state_file, mem_ratio, args):
     Kept only for comparison against the analytic frontier selector. This is not
     the main method and should not be used for paper claims.
     """
-    cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
+    cache_capacity, _, _ = resolve_cache_capacity(mem_ratio, args)
     profile_analyzer = build_analyzer(profile_state_file, args, resident_ratio=0.5)
     ranked = rank_resident_candidates(
         analyzer=profile_analyzer,
@@ -236,12 +251,16 @@ def search_best_ratio(profile_state_file, mem_ratio, args):
     return candidates[0], candidates
 
 
-def export_selected_resident_set(full_state_file, mem_ratio, best_ratio, args, best_capacity=None):
+def export_selected_resident_set(full_state_file, mem_ratio, best_ratio, args, best_capacity=None, cache_capacity_override=None):
     analyzer = build_analyzer(full_state_file, args, best_ratio)
     if best_capacity is None:
         return analyzer.get_resident_set(mem_ratio, reset_mode=args.reset_mode)
 
-    cache_capacity = cache_capacity_for_mem_ratio(mem_ratio, args.expert_size_mb)
+    cache_capacity = (
+        int(cache_capacity_override)
+        if cache_capacity_override is not None
+        else resolve_cache_capacity(mem_ratio, args)[0]
+    )
     ranked = rank_resident_candidates(
         analyzer=analyzer,
         cache_capacity=cache_capacity,
@@ -294,9 +313,12 @@ def main():
     parser.add_argument("--reset-mode", type=str, default="shared", choices=["shared", "per_sequence"])
     parser.add_argument("--model-path", type=str, default="")
     parser.add_argument("--expert-size-mb", type=float, default=None)
+    parser.add_argument("--sparse-budget-bytes", type=int, default=None)
     parser.add_argument("--h2d-bandwidth-gbps", type=float, default=16.0)
     parser.add_argument("--gpu-compute-time-ms", type=float, default=2.0)
     args = parser.parse_args()
+    if args.sparse_budget_bytes is not None and args.selection_method == "ratio_grid":
+        raise ValueError("ratio_grid does not support runtime-calibrated sparse budgets")
     args.expert_size_mb, expert_size_source = resolve_expert_size_mb(args)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -308,6 +330,7 @@ def main():
         "selection_method": args.selection_method,
         "expert_size_mb": float(args.expert_size_mb),
         "expert_size_source": expert_size_source,
+        "sparse_budget_bytes": int(args.sparse_budget_bytes) if args.sparse_budget_bytes is not None else None,
         "frontier_percentile": float(args.frontier_percentile),
         "frontier_horizon": int(args.frontier_horizon),
         "candidate_ratios": [float(x) for x in args.candidate_ratios],
@@ -320,6 +343,7 @@ def main():
         summary["profile_sequences"] = len(profile_keys)
 
         for mem_ratio in args.memory_ratios:
+            cache_capacity, selection_budget_bytes, selection_budget_source = resolve_cache_capacity(mem_ratio, args)
             if args.selection_method == "frontier_prefix":
                 best_row, candidates, cache_capacity = select_frontier_prefix(profile_state_file, mem_ratio, args)
                 resident_info = export_selected_resident_set(
@@ -328,6 +352,7 @@ def main():
                     best_row["resident_ratio"],
                     args,
                     best_capacity=best_row["resident_capacity"],
+                    cache_capacity_override=cache_capacity,
                 )
             elif args.selection_method == "capacity_search":
                 best_row, candidates, cache_capacity = search_best_capacity(profile_state_file, mem_ratio, args)
@@ -337,15 +362,16 @@ def main():
                     best_row["resident_ratio"],
                     args,
                     best_capacity=best_row["resident_capacity"],
+                    cache_capacity_override=cache_capacity,
                 )
             else:
                 best_row, candidates = search_best_ratio(profile_state_file, mem_ratio, args)
-                cache_capacity = None
                 resident_info = export_selected_resident_set(
                     args.state_file,
                     mem_ratio,
                     best_row["resident_ratio"],
                     args,
+                    cache_capacity_override=cache_capacity,
                 )
 
             mem_tag = format_mem_tag(mem_ratio)
@@ -361,6 +387,8 @@ def main():
                 "selection_frontier_percentile": float(best_row.get("frontier_percentile", args.frontier_percentile)),
                 "selection_frontier_horizon": int(best_row.get("frontier_horizon", args.frontier_horizon)),
                 "selection_knee_capacity": int(best_row.get("knee_capacity", 0)),
+                "selection_budget_bytes": int(selection_budget_bytes) if selection_budget_bytes is not None else None,
+                "selection_budget_source": selection_budget_source,
                 "expert_size_mb": float(args.expert_size_mb),
                 "expert_size_source": expert_size_source,
                 "selection_candidates": candidates,
@@ -375,6 +403,8 @@ def main():
                     "profile_throughput_tokens_per_sec": float(best_row["throughput_tokens_per_sec"]),
                     "frontier_capacity": int(best_row.get("frontier_capacity", 0)),
                     "frontier_horizon": int(best_row.get("frontier_horizon", args.frontier_horizon)),
+                    "selection_budget_bytes": int(selection_budget_bytes) if selection_budget_bytes is not None else None,
+                    "selection_budget_source": selection_budget_source,
                     "cache_capacity": int(cache_capacity or resident_info["cache_capacity"]),
                     "resident_capacity": int(resident_info["resident_capacity"]),
                     "speculative_capacity": int(resident_info["speculative_capacity"]),
