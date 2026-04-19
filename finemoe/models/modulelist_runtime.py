@@ -94,10 +94,23 @@ def _run_modulelist_demand_lane(
 
     t0 = time.perf_counter()
     if grouped_runner is not None:
-        outputs = grouped_runner(
-            [expert_module for _, _, _, expert_module, _ in payloads],
-            [current_state for _, _, _, _, current_state in payloads],
-        )
+        modules = [expert_module for _, _, _, expert_module, _ in payloads]
+        inputs = [current_state for _, _, _, _, current_state in payloads]
+        begin_group = getattr(offload_engine, "begin_module_group", None)
+        run_group = getattr(offload_engine, "run_module_group", None)
+        end_group = getattr(offload_engine, "end_module_group", None)
+        if begin_group is not None and run_group is not None and end_group is not None:
+            service_ctx = begin_group(
+                modules,
+                expert_blocks=len(payloads),
+                token_assignments=sum(int(end - start) for start, end, *_ in payloads),
+            )
+            try:
+                outputs = run_group(service_ctx, inputs)
+            finally:
+                end_group(service_ctx)
+        else:
+            outputs = grouped_runner(modules, inputs)
     else:
         outputs = []
         for _, _, _, expert_module, current_state in payloads:

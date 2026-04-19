@@ -386,6 +386,14 @@ class RuntimeProfile:
     manual_subtree_end_calls: int = 0
     manual_subtree_begin_wall_time_sec: float = 0.0
     manual_subtree_end_wall_time_sec: float = 0.0
+    tail_group_begin_calls: int = 0
+    tail_group_end_calls: int = 0
+    tail_group_module_count: int = 0
+    tail_group_expert_blocks: int = 0
+    tail_group_token_assignments: int = 0
+    tail_group_begin_wall_time_sec: float = 0.0
+    tail_group_end_wall_time_sec: float = 0.0
+    tail_group_compute_wall_time_sec: float = 0.0
 
     modulelist_dispatch_calls: int = 0
     modulelist_active_expert_blocks: int = 0
@@ -397,6 +405,9 @@ class RuntimeProfile:
     modulelist_expert_compute_wall_time_sec: float = 0.0
     modulelist_resident_compute_wall_time_sec: float = 0.0
     modulelist_demand_compute_wall_time_sec: float = 0.0
+    resident_lane_expert_blocks: int = 0
+    resident_lane_token_assignments: int = 0
+    resident_lane_compute_wall_time_sec: float = 0.0
 
     packed_dispatch_calls: int = 0
     packed_resident_expert_blocks: int = 0
@@ -447,6 +458,27 @@ class RuntimeProfile:
         self.manual_subtree_begin_wall_time_sec += float(begin_wall_time_sec)
         self.manual_subtree_end_wall_time_sec += float(end_wall_time_sec)
 
+    def record_tail_group_service(
+        self,
+        *,
+        begin_calls=0,
+        end_calls=0,
+        module_count=0,
+        expert_blocks=0,
+        token_assignments=0,
+        begin_wall_time_sec=0.0,
+        end_wall_time_sec=0.0,
+        compute_wall_time_sec=0.0,
+    ):
+        self.tail_group_begin_calls += int(begin_calls)
+        self.tail_group_end_calls += int(end_calls)
+        self.tail_group_module_count += int(module_count)
+        self.tail_group_expert_blocks += int(expert_blocks)
+        self.tail_group_token_assignments += int(token_assignments)
+        self.tail_group_begin_wall_time_sec += float(begin_wall_time_sec)
+        self.tail_group_end_wall_time_sec += float(end_wall_time_sec)
+        self.tail_group_compute_wall_time_sec += float(compute_wall_time_sec)
+
     def record_modulelist_dispatch(
         self,
         *,
@@ -470,6 +502,9 @@ class RuntimeProfile:
         self.modulelist_expert_compute_wall_time_sec += float(expert_compute_wall_time_sec)
         self.modulelist_resident_compute_wall_time_sec += float(resident_compute_wall_time_sec)
         self.modulelist_demand_compute_wall_time_sec += float(demand_compute_wall_time_sec)
+        self.resident_lane_expert_blocks += int(resident_expert_blocks)
+        self.resident_lane_token_assignments += int(resident_token_assignments)
+        self.resident_lane_compute_wall_time_sec += float(resident_compute_wall_time_sec)
 
     def record_packed_dispatch(
         self,
@@ -507,6 +542,14 @@ class RuntimeProfile:
             "manual_subtree_end_calls": int(self.manual_subtree_end_calls),
             "manual_subtree_begin_wall_time_sec": float(self.manual_subtree_begin_wall_time_sec),
             "manual_subtree_end_wall_time_sec": float(self.manual_subtree_end_wall_time_sec),
+            "tail_group_begin_calls": int(self.tail_group_begin_calls),
+            "tail_group_end_calls": int(self.tail_group_end_calls),
+            "tail_group_module_count": int(self.tail_group_module_count),
+            "tail_group_expert_blocks": int(self.tail_group_expert_blocks),
+            "tail_group_token_assignments": int(self.tail_group_token_assignments),
+            "tail_group_begin_wall_time_sec": float(self.tail_group_begin_wall_time_sec),
+            "tail_group_end_wall_time_sec": float(self.tail_group_end_wall_time_sec),
+            "tail_group_compute_wall_time_sec": float(self.tail_group_compute_wall_time_sec),
             "modulelist_dispatch_calls": int(self.modulelist_dispatch_calls),
             "modulelist_active_expert_blocks": int(self.modulelist_active_expert_blocks),
             "modulelist_resident_expert_blocks": int(self.modulelist_resident_expert_blocks),
@@ -517,6 +560,9 @@ class RuntimeProfile:
             "modulelist_expert_compute_wall_time_sec": float(self.modulelist_expert_compute_wall_time_sec),
             "modulelist_resident_compute_wall_time_sec": float(self.modulelist_resident_compute_wall_time_sec),
             "modulelist_demand_compute_wall_time_sec": float(self.modulelist_demand_compute_wall_time_sec),
+            "resident_lane_expert_blocks": int(self.resident_lane_expert_blocks),
+            "resident_lane_token_assignments": int(self.resident_lane_token_assignments),
+            "resident_lane_compute_wall_time_sec": float(self.resident_lane_compute_wall_time_sec),
             "packed_dispatch_calls": int(self.packed_dispatch_calls),
             "packed_resident_expert_blocks": int(self.packed_resident_expert_blocks),
             "packed_demand_expert_blocks": int(self.packed_demand_expert_blocks),
@@ -526,6 +572,14 @@ class RuntimeProfile:
             "packed_dispatch_wait_calls": int(self.packed_dispatch_wait_calls),
             "packed_dispatch_wait_wall_time_sec": float(self.packed_dispatch_wait_wall_time_sec),
         }
+
+
+@dataclass(frozen=True)
+class ModuleServiceGroupContext:
+    modules: tuple
+    begun_by_module: tuple
+    expert_blocks: int = 0
+    token_assignments: int = 0
 
 
 class OffloadEngine(object):
@@ -1084,6 +1138,64 @@ class OffloadEngine(object):
             end_wall_time_sec=time.perf_counter() - t0,
         )
 
+    def begin_module_group(self, modules, *, expert_blocks=0, token_assignments=0):
+        module_list = tuple(modules)
+        if not module_list:
+            return ModuleServiceGroupContext(
+                modules=(),
+                begun_by_module=(),
+                expert_blocks=int(expert_blocks),
+                token_assignments=int(token_assignments),
+            )
+
+        group_begin_t0 = time.perf_counter()
+        self._set_manual_service_active_group(module_list, True)
+        try:
+            begun_by_module = self._begin_module_subtrees_group(module_list)
+        except Exception:
+            self._set_manual_service_active_group(module_list, False)
+            raise
+        self.runtime_profile.record_tail_group_service(
+            begin_calls=1,
+            module_count=len(module_list),
+            expert_blocks=int(expert_blocks),
+            token_assignments=int(token_assignments),
+            begin_wall_time_sec=time.perf_counter() - group_begin_t0,
+        )
+        return ModuleServiceGroupContext(
+            modules=module_list,
+            begun_by_module=begun_by_module,
+            expert_blocks=int(expert_blocks),
+            token_assignments=int(token_assignments),
+        )
+
+    def run_module_group(self, service_ctx, args_list, kwargs_list=None):
+        if kwargs_list is None:
+            kwargs_list = [None] * len(service_ctx.modules)
+        t0 = time.perf_counter()
+        outputs = []
+        for module, args, kwargs in zip(service_ctx.modules, args_list, kwargs_list):
+            call_args = args if isinstance(args, tuple) else (args,)
+            call_kwargs = kwargs or {}
+            outputs.append(module(*call_args, **call_kwargs))
+        self.runtime_profile.record_tail_group_service(
+            compute_wall_time_sec=time.perf_counter() - t0,
+        )
+        return outputs
+
+    def end_module_group(self, service_ctx):
+        if not service_ctx.modules:
+            return
+        t0 = time.perf_counter()
+        try:
+            self._end_module_subtrees_group(service_ctx.begun_by_module)
+        finally:
+            self._set_manual_service_active_group(service_ctx.modules, False)
+            self.runtime_profile.record_tail_group_service(
+                end_calls=1,
+                end_wall_time_sec=time.perf_counter() - t0,
+            )
+
     def run_module_demand_lane(self, module, *args, **kwargs):
         begun_tensors = None
         self._set_manual_service_active(module, True)
@@ -1103,23 +1215,20 @@ class OffloadEngine(object):
             return []
         if kwargs_list is None:
             kwargs_list = [None] * len(module_list)
-
-        begun_by_module = None
-        self._set_manual_service_active_group(module_list, True)
+        token_assignments = 0
+        for args in args_list:
+            first_arg = args[0] if isinstance(args, tuple) else args
+            if hasattr(first_arg, "shape") and len(first_arg.shape) > 0:
+                token_assignments += int(first_arg.shape[0])
+        service_ctx = self.begin_module_group(
+            module_list,
+            expert_blocks=len(module_list),
+            token_assignments=token_assignments,
+        )
         try:
-            begun_by_module = self._begin_module_subtrees_group(module_list)
-            outputs = []
-            for module, args, kwargs in zip(module_list, args_list, kwargs_list):
-                call_args = args if isinstance(args, tuple) else (args,)
-                call_kwargs = kwargs or {}
-                outputs.append(module(*call_args, **call_kwargs))
-            return outputs
+            return self.run_module_group(service_ctx, args_list, kwargs_list=kwargs_list)
         finally:
-            try:
-                if begun_by_module is not None:
-                    self._end_module_subtrees_group(begun_by_module)
-            finally:
-                self._set_manual_service_active_group(module_list, False)
+            self.end_module_group(service_ctx)
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.

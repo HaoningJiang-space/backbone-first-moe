@@ -29,6 +29,8 @@ class _FakeOffloadEngine:
     def __init__(self):
         self.calls = []
         self.group_calls = []
+        self.group_begins = []
+        self.group_ends = []
 
     def run_module_demand_lane(self, module, x):
         self.calls.append(module)
@@ -37,6 +39,17 @@ class _FakeOffloadEngine:
     def run_module_demand_lane_group(self, modules, inputs):
         self.group_calls.append(tuple(modules))
         return [module(x) for module, x in zip(modules, inputs)]
+
+    def begin_module_group(self, modules, *, expert_blocks=0, token_assignments=0):
+        self.group_begins.append((tuple(modules), expert_blocks, token_assignments))
+        return {"modules": tuple(modules)}
+
+    def run_module_group(self, service_ctx, inputs, kwargs_list=None):
+        self.group_calls.append(service_ctx["modules"])
+        return [module(x) for module, x in zip(service_ctx["modules"], inputs)]
+
+    def end_module_group(self, service_ctx):
+        self.group_ends.append(service_ctx["modules"])
 
 
 def _reference_dispatch(hidden_states, selected_experts, routing_weights, experts):
@@ -182,6 +195,8 @@ class ModulelistRuntimeTest(unittest.TestCase):
         self.assertEqual(experts[1].forward_calls, 1)
         self.assertEqual(fake_engine.calls, [])
         self.assertEqual(fake_engine.group_calls, [(experts[0],)])
+        self.assertEqual(fake_engine.group_begins, [((experts[0],), 1, 3)])
+        self.assertEqual(fake_engine.group_ends, [(experts[0],)])
 
     def test_dispatch_groups_multiple_demand_experts(self):
         hidden_states = torch.tensor(
@@ -242,6 +257,8 @@ class ModulelistRuntimeTest(unittest.TestCase):
         self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
         self.assertEqual(fake_engine.calls, [])
         self.assertEqual(fake_engine.group_calls, [(experts[0], experts[1])])
+        self.assertEqual(fake_engine.group_begins, [((experts[0], experts[1]), 2, 4)])
+        self.assertEqual(fake_engine.group_ends, [(experts[0], experts[1])])
 
 
 if __name__ == "__main__":
