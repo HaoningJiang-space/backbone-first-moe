@@ -110,6 +110,9 @@ The right applicability questions are:
 For a paper-facing runtime table that already resolves the `OLMoE` fairness issue, see:
 - [results/runtime_formal/paper_runtime_table.md](results/runtime_formal/paper_runtime_table.md)
 
+For a paper-facing note that explicitly separates `Qwen`'s idealized structural headroom from its current fair-runtime realization, see:
+- [results/runtime_formal/qwen/qwen_realization_gap.md](results/runtime_formal/qwen/qwen_realization_gap.md)
+
 ## Validated Real-Hardware Results
 
 Qwen1.5-MoE-A2.7B-Chat, `batch=8`, same GPU (`cuda:0`), `prefetch_distance=0`, 16 prompts, 64 new tokens.
