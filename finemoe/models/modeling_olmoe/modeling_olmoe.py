@@ -861,11 +861,13 @@ class OlmoeModel(OlmoePreTrainedModel):
         if self.gradient_checkpointing and self.training and use_cache:
             use_cache = False
 
+        use_legacy_cache = False
+        if use_cache and not isinstance(past_key_values, Cache) and not self.training:
+            use_legacy_cache = True
+            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
-
-        if past_key_values is not None and not isinstance(past_key_values, Cache):
-            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
 
         # === Expert tracing hooks for prefetch ===
         prefetch_enabled = (
@@ -942,10 +944,9 @@ class OlmoeModel(OlmoePreTrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
+        next_cache = None
         if use_cache:
-            next_cache = next_decoder_cache.to_legacy_cache() if isinstance(next_decoder_cache, Cache) else next_decoder_cache
-        else:
-            next_cache = None
+            next_cache = next_decoder_cache.to_legacy_cache() if use_legacy_cache else next_decoder_cache
 
         if not return_dict:
             return tuple(
