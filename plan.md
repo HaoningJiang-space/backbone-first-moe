@@ -22,32 +22,45 @@
   - runtime-calibrated selector returns `resident = 0`
   - `C` degenerates to baseline
 - `DeepSeek`
-  - fair-budget rerun is in progress
+  - `0.07 / 0.10` fair-budget reruns both return `resident = 0`
+  - `C` degenerates to baseline
 
 ## Main Diagnosis
 
 - The old gains were partly inflated by unfair or weakly calibrated budget accounting.
 - The new fair pipeline is more credible but much more conservative.
-- The main problem is no longer "can we pin experts?".
-- The main problem is:
-  - resident bytes are underutilized in some feasible regimes
-  - the tail service model is too conservative
-  - resident hits still do not realize enough runtime advantage
+- We still do not know whether MoE serving is fundamentally memory-bound enough to justify another round of memory-hierarchy design.
+- The main unanswered question is now:
+  - how much of the end-to-end time is actually load stall
+  - what the realistic zero-loading / oracle ceiling looks like
+  - whether current weak gains come from a bad method or a low memory-optimization ceiling
 
 ## Priority
 
-### 1. Finish Fair Reruns
+### 1. Observation-First Bottleneck Attribution
 
 Goal:
-- Close the current experiment queue on the fair workflow before changing the method again.
+- Measure whether MoE serving is sufficiently memory-bound to justify another serving abstraction.
 
 Concrete work:
-- Finish `DeepSeek` fresh-clone fair rerun.
-- Keep the `Qwen @ 0.10` fair result as the current reference point.
-- Treat `OLMoE @ 0.045 / 0.05` as threshold-finding evidence, not final positive points.
+- Run simulator-backed observation experiments on the calibrated fair traces.
+- Produce three outputs per model:
+  - bottleneck breakdown: compute time vs residual stall
+  - upper bounds:
+    - compute-only / zero-loading theoretical ceiling
+    - oracle single-cache ceiling
+    - oracle two-pool ceiling
+  - trace structure:
+    - reuse-distance distribution
+    - working-set statistics
+- Use these observations to decide whether the next step should be:
+  - improved memory hierarchy
+  - tail service/runtime work
+  - or a more fundamental pivot away from cache-style thinking
 
 Why:
-- We need one clean baseline before claiming any further runtime gain.
+- This is the right EuroSys move now.
+- It prevents us from over-optimizing a method whose ceiling may already be low.
 
 ### 2. Runtime-Calibrated Service Envelope
 
@@ -127,13 +140,22 @@ Why:
 
 ### Running Now
 
-- `DeepSeek` fresh-clone fair rerun on `172`
+- `Qwen fair64` observation sweep on `172`
+  - bottleneck attribution
+  - compute-only ceiling
+  - oracle single/two-pool ceilings
+  - reuse / working-set statistics
 
 ### Next Immediate Runs
 
-- If `DeepSeek` also degenerates to zero resident, keep the result as-is and do not fake a positive `C`.
-- After the current reruns finish, do threshold-finding runs only where the calibrated selector starts producing nonzero resident prefixes.
-- For `OLMoE`, raise the budget gradually above `0.05` to identify the first nonzero fair regime.
+- Run the same observation pipeline on:
+  - `DeepSeek fair64`
+  - `OLMoE fair64`
+  - `Mixtral fair64`
+- Use those results to decide whether the next engineering step is:
+  - service-envelope recalibration
+  - runtime tail coalescing
+  - or a larger method pivot
 
 ## Not Planned
 
