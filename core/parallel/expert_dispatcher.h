@@ -50,15 +50,15 @@ public:
 
     void SetInputs(const torch::Tensor& hidden_states, const torch::Tensor& router_mask)
     {
-        hidden_states_ = hidden_states.clone();
-        router_mask_ = router_mask.clone();
+        hidden_states_ = hidden_states;
+        router_mask_ = router_mask;
     }
     void SetAssignments(const std::vector<int>& expert_indices,
                         const std::vector<torch::Tensor>& token_indices)
     {
         assignment_tokens_.clear();
         size_t limit = std::min(expert_indices.size(), token_indices.size());
-        for (size_t i = 0; i < limit; ++i) { assignment_tokens_[expert_indices[i]] = token_indices[i].clone(); }
+        for (size_t i = 0; i < limit; ++i) { assignment_tokens_[expert_indices[i]] = token_indices[i]; }
     }
 
     void DispatchBatch(const torch::Tensor& hidden_states,
