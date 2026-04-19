@@ -23,6 +23,8 @@ QWEN_STATE_FILE="${QWEN_STATE_FILE:-/data/ziheng/FineMoE-EuroSys26/demo/states/Q
 OLMOE_MODEL_PATH="${OLMOE_MODEL_PATH:-/data/ziheng/models/OLMoE-1B-7B-0924}"
 OLMOE_OFFLOAD_PATH="${OLMOE_OFFLOAD_PATH:-/data/finemoe_offloads/OLMoE-1B-7B-0924}"
 OLMOE_STATE_FILE="${OLMOE_STATE_FILE:-${REPO_ROOT}/states/OLMoE-1B-7B-0924~lmsys-chat-1m-fair~64.pkl}"
+OLMOE_FAIR_MEMORY_RATIOS="${OLMOE_FAIR_MEMORY_RATIOS:-0.045 0.05}"
+OLMOE_OUTPUT_PREFIX="${OLMOE_OUTPUT_PREFIX:-olmoe_current_refair}"
 
 DEEPSEEK_MODEL_PATH="${DEEPSEEK_MODEL_PATH:-/data/ziheng/Efficient_AI/models/DeepSeek-V2-Lite}"
 DEEPSEEK_OFFLOAD_PATH="${DEEPSEEK_OFFLOAD_PATH:-/data/finemoe_offloads/DeepSeek-V2-Lite}"
@@ -101,24 +103,29 @@ done
 
 # OLMoE: same backend treatment as Qwen; this keeps modulelist runtime behavior
 # on the path that produced the earlier validated results.
+#
+# The older 0.012/0.014/0.016 "fair" sweep assumed a much smaller expert
+# footprint than the runtime actually pinned. With the corrected 12MB/expert
+# accounting, those points collapse to resident=0. We therefore rerun OLMoE on
+# a stricter but still non-zero-resident range.
 run_select "${REPO_PYTHONPATH}" \
   --state-file "${OLMOE_STATE_FILE}" \
   --model-path "${OLMOE_MODEL_PATH}" \
   --output-dir "${RES_DIR}" \
-  --output-prefix olmoe_current_fair \
-  --memory-ratios 0.012,0.014,0.016 \
+  --output-prefix "${OLMOE_OUTPUT_PREFIX}" \
+  --memory-ratios "$(echo "${OLMOE_FAIR_MEMORY_RATIOS}" | tr ' ' ',')" \
   --selection-method frontier_prefix \
   --profile-fraction 0.2 \
   --prefetch-windows 0
 
-for mem in 0.012 0.014 0.016; do
+for mem in ${OLMOE_FAIR_MEMORY_RATIOS}; do
   tag="${mem/./p}"
   run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${RUN_DIR}/olmoe_A_mem${tag}_current.json" \
     --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "" \
     --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
     --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
   run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${RUN_DIR}/olmoe_C_mem${tag}_current.json" \
-    --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/olmoe_current_fair_mem${tag}.json" \
+    --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/${OLMOE_OUTPUT_PREFIX}_mem${tag}.json" \
     --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
     --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
 done
