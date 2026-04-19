@@ -156,6 +156,9 @@ def evaluate_runtime(runtime_cfg):
     resident_registry = None
     if hasattr(model.engine, "get_resident_registry"):
         resident_registry = model.engine.get_resident_registry()
+    sparse_budget_info = {"budget_bytes": 0, "budget_source": ""}
+    if hasattr(model.engine, "get_sparse_budget_info"):
+        sparse_budget_info = model.engine.get_sparse_budget_info()
 
     payload = {
         "tag": runtime_cfg.tag,
@@ -175,6 +178,8 @@ def evaluate_runtime(runtime_cfg):
         "generated_tokens_per_sec": float(total_generated_tokens / total_elapsed) if total_elapsed > 0 else 0.0,
         "end_to_end_tokens_per_sec": float((total_prompt_tokens + total_generated_tokens) / total_elapsed) if total_elapsed > 0 else 0.0,
         "peak_memory_mb": peak_memory_mb,
+        "sparse_budget_bytes": int(sparse_budget_info.get("budget_bytes", 0)),
+        "sparse_budget_source": sparse_budget_info.get("budget_source", ""),
         "resident_count": (
             resident_registry["admitted_count"]
             if resident_registry is not None

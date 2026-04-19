@@ -110,6 +110,7 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(registry["requested_bytes"], 448)
         self.assertEqual(registry["admitted_bytes"], 448)
         self.assertEqual(registry["budget_bytes"], 0)
+        self.assertEqual(registry["budget_source"], "")
         self.assertTrue(registry["clipped"])
 
     def test_collect_unique_node_stats_deduplicates_packed_tensor_ids(self):
@@ -220,6 +221,17 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(admitted_experts, [(0, 0), (0, 1)])
         self.assertEqual(admitted_tensors, [10, 11])
         self.assertEqual(engine.resident_registry.budget_bytes, 256)
+        self.assertEqual(engine.resident_registry.budget_source, "free_device_memory_ratio")
+
+    def test_sparse_budget_info_is_available_without_resident_admission(self):
+        engine = self._build_engine_stub()
+        engine.device = "cuda:0"
+        engine.archer_engine = self._fake_archer_engine({}, sparse_cache_limit=4096)
+
+        budget = OffloadEngine.get_sparse_budget_info(engine)
+
+        self.assertEqual(budget["budget_bytes"], 4096)
+        self.assertEqual(budget["budget_source"], "free_device_memory_ratio")
 
 
 if __name__ == "__main__":

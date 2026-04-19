@@ -335,6 +335,7 @@ class ResidentRegistry:
     requested_bytes: int = 0
     admitted_bytes: int = 0
     budget_bytes: int = 0
+    budget_source: str = ""
     fast_path_modules: int = 0
     fast_path_expert_count: int = 0
     clipped: bool = False
@@ -354,6 +355,7 @@ class ResidentRegistry:
             "requested_bytes": int(self.requested_bytes),
             "admitted_bytes": int(self.admitted_bytes),
             "budget_bytes": int(self.budget_bytes),
+            "budget_source": self.budget_source,
             "fast_path_modules": int(self.fast_path_modules),
             "fast_path_expert_count": int(self.fast_path_expert_count),
             "clipped": bool(self.clipped),
@@ -578,6 +580,7 @@ class OffloadEngine(object):
         self.resident_registry.admitted_tensor_count = 0
         self.resident_registry.admitted_bytes = 0
         self.resident_registry.budget_bytes = 0
+        self.resident_registry.budget_source = ""
         self.resident_registry.fast_path_modules = 0
         self.resident_registry.fast_path_expert_count = 0
         self.resident_registry.clipped = False
@@ -655,9 +658,16 @@ class OffloadEngine(object):
             return 0
         return int(getter(torch.device(self.device)))
 
+    def get_sparse_budget_info(self):
+        return {
+            "budget_bytes": int(self._get_sparse_budget_bytes()),
+            "budget_source": "free_device_memory_ratio",
+        }
+
     def _clip_resident_prefix_to_sparse_budget(self, resident_expert_ids, expert_tensor_ids):
         budget_bytes = self._get_sparse_budget_bytes()
         self.resident_registry.budget_bytes = budget_bytes
+        self.resident_registry.budget_source = "free_device_memory_ratio"
         if budget_bytes <= 0:
             tensor_ids = [tensor_id for group in expert_tensor_ids for tensor_id in group]
             return list(resident_expert_ids), tensor_ids

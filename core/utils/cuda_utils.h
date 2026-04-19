@@ -14,5 +14,5 @@ std::size_t GetTotalDeviceMemory(int device_id);
 std::size_t GetFreeDeviceMemory(int device_id);
 std::size_t GetBusyDeviceMemory(int device_id);
 
-#define DEVICE_CACHE_LIMIT(gid) GetTotalDeviceMemory(gid) * 0.7
+#define DEVICE_CACHE_LIMIT(gid) GetFreeDeviceMemory(gid) * 0.7
 #define NUM_DEVICES GetDeviceCount()
