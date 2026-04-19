@@ -177,6 +177,29 @@ class ResidentRegistryTest(unittest.TestCase):
         )
         self.assertFalse(getattr(module, "_archer_manual_service_active", True))
 
+    def test_run_module_demand_lane_clears_manual_flag_when_end_fails(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 3
+
+        module = nn.Linear(4, 4)
+        with mock.patch.object(
+            OffloadEngine,
+            "_begin_module_subtree",
+            autospec=True,
+            return_value=(object(),),
+        ), mock.patch.object(
+            OffloadEngine,
+            "_end_module_subtree",
+            autospec=True,
+            side_effect=RuntimeError("end boom"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "end boom"):
+                OffloadEngine.run_module_demand_lane(engine, module, torch.zeros(1, 4))
+
+        self.assertFalse(getattr(module, "_archer_manual_service_active", True))
+
     def test_begin_module_subtree_moves_non_offloaded_buffers(self):
         engine = self._build_engine_stub()
         engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()

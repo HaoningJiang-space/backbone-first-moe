@@ -1032,9 +1032,11 @@ class OffloadEngine(object):
             begun_tensors = self._begin_module_subtree(module)
             return module(*args, **kwargs)
         finally:
-            if begun_tensors is not None:
-                self._end_module_subtree(module, begun_tensors=begun_tensors)
-            self._set_manual_service_active(module, False)
+            try:
+                if begun_tensors is not None:
+                    self._end_module_subtree(module, begun_tensors=begun_tensors)
+            finally:
+                self._set_manual_service_active(module, False)
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.
