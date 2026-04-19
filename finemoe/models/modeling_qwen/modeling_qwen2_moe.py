@@ -59,6 +59,14 @@ _CHECKPOINT_FOR_DOC = "Qwen/Qwen1.5-MoE-A2.7B"
 _CONFIG_FOR_DOC = "Qwen2MoeConfig"
 
 
+def _get_cache_length(past_key_value, layer_idx: int, kv_seq_len: int) -> int:
+    if hasattr(past_key_value, "get_usable_length"):
+        return past_key_value.get_usable_length(kv_seq_len, layer_idx)
+    if hasattr(past_key_value, "get_seq_length"):
+        return past_key_value.get_seq_length(layer_idx)
+    return kv_seq_len
+
+
 # Copied from transformers.models.llama.modeling_llama._prepare_4d_causal_attention_mask_with_cache_position
 def _prepare_4d_causal_attention_mask_with_cache_position(
     attention_mask: torch.Tensor,
@@ -422,8 +430,8 @@ class Qwen2MoeAttention(nn.Module):
                     "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
                     "with a layer index."
                 )
-            kv_seq_len += past_key_value.get_usable_length(
-                kv_seq_len, self.layer_idx)
+            kv_seq_len += _get_cache_length(
+                past_key_value, self.layer_idx, kv_seq_len)
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         query_states, key_states = apply_rotary_pos_emb(
             query_states, key_states, cos, sin, position_ids)
@@ -526,8 +534,8 @@ class Qwen2MoeFlashAttention2(Qwen2MoeAttention):
                     "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
                     "with a layer index."
                 )
-            kv_seq_len += past_key_value.get_usable_length(
-                kv_seq_len, self.layer_idx)
+            kv_seq_len += _get_cache_length(
+                past_key_value, self.layer_idx, kv_seq_len)
 
         # Because the input can be padded, the absolute sequence length depends on the max position id.
         rotary_seq_len = (
@@ -688,8 +696,8 @@ class Qwen2MoeSdpaAttention(Qwen2MoeAttention):
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
-            kv_seq_len += past_key_value.get_usable_length(
-                kv_seq_len, self.layer_idx)
+            kv_seq_len += _get_cache_length(
+                past_key_value, self.layer_idx, kv_seq_len)
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
         query_states, key_states = apply_rotary_pos_emb(

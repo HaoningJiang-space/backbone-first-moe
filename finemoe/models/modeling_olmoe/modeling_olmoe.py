@@ -43,6 +43,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from transformers import PreTrainedModel
 
+
+def _get_cache_length(past_key_value, layer_idx: int, kv_seq_len: int) -> int:
+    if hasattr(past_key_value, "get_usable_length"):
+        return past_key_value.get_usable_length(kv_seq_len, layer_idx)
+    if hasattr(past_key_value, "get_seq_length"):
+        return past_key_value.get_seq_length(layer_idx)
+    return kv_seq_len
+
 try:
     from transformers.configuration_olmoe import OlmoeConfig
 except ImportError:
@@ -319,7 +327,7 @@ class OlmoeAttention(nn.Module):
         if past_key_value is not None:
             if self.layer_idx is None:
                 raise ValueError("layer_idx is required for caching")
-            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+            kv_seq_len += _get_cache_length(past_key_value, self.layer_idx, kv_seq_len)
 
         # Compute RoPE: either from position_embeddings parameter (native OLMoE style)
         # or from internal rotary_emb (Qwen-style, used by finemoe generate)
@@ -402,7 +410,7 @@ class OlmoeFlashAttention2(OlmoeAttention):
         else:
             kv_seq_len = key_states.shape[-2]
             if past_key_value is not None:
-                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+                kv_seq_len += _get_cache_length(past_key_value, self.layer_idx, kv_seq_len)
             cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
             if position_ids is None:
                 if cache_position is not None:
@@ -477,7 +485,7 @@ class OlmoeSdpaAttention(OlmoeAttention):
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
-            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+            kv_seq_len += _get_cache_length(past_key_value, self.layer_idx, kv_seq_len)
 
         if position_embeddings is not None:
             cos, sin = position_embeddings
