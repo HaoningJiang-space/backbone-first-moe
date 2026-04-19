@@ -701,6 +701,8 @@ class SyncOlmoeSparseMoeBlock(nn.Module):
             selected_experts=selected_experts,
             routing_weights=routing_weights,
             experts=self.experts,
+            resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
+            runtime_profile=getattr(self, "runtime_profile", None),
         )
 
         final_hidden_states = final_hidden_states.reshape(batch_size, sequence_length, hidden_dim)
