@@ -1,122 +1,154 @@
 # Current Plan
 
-## Done
+## Ground Truth
 
-- Added a runtime-visible resident registry in [finemoe/runtime/model_offload.py](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/finemoe/runtime/model_offload.py).
-- Resident loading now preserves prefix order from the resident JSON instead of collapsing it into a sorted set.
-- Runtime now records resident admission metadata:
-  - `requested_count`
-  - `admitted_count`
-  - `requested_tensor_count`
-  - `admitted_tensor_count`
-  - `clipped`
-  - `selection_rule`
-  - `source_file`
-- Runtime evaluation output now exposes this state in [finemoe/backbone/runtime_eval.py](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/finemoe/backbone/runtime_eval.py).
-- Added resident-registry tests in [tests/test_resident_registry.py](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/tests/test_resident_registry.py).
-- Added a modulelist resident fast path:
-  - resident expert subtrees are marked once after pinning
-  - generic pre/post hook bookkeeping now bypasses those marked resident subtrees
-- Added grouped modulelist expert dispatch:
-  - `Qwen` and `OLMoE` now dispatch active experts by sorted expert blocks
-  - removed the hot-path `one_hot + torch.where` loop from modulelist MoE execution
-- Added grouped packed expert dispatch:
-  - `Mixtral` / `DeepSeek` now build active packed expert assignments once per step
-  - removed the hot-path per-expert `torch.where(router_mask[:, expert_idx])` lookup
-- Aligned packed model `device` semantics with runtime execution device:
-  - packed runtime models now expose the configured runtime device to `generate()`
-  - removed the `input_ids on cuda / model on cpu` warning on packed tiny probes
-- Added an explicit packed resident fast-path contract:
-  - runtime now assigns `resident_fastpath_local_expert_ids` per layer
-  - packed execution consumes that explicit set instead of guessing from container type
-  - `ModuleList`-backed packed paths now safely fall back to demand execution
-- Resident admission is now clipped by real sparse-budget bytes:
-  - runtime asks the native topology for `sparse_cache_limit`
-  - resident prefixes are admitted in file order until the real node-byte budget is exhausted
-  - result JSON now records `budget_bytes` alongside requested/admitted bytes
-- Simulation-side resident selection can now infer routed-expert size from `--model-path`:
-  - `select_adaptive_resident_set.py` and `analyze_applicability.py` accept `--model-path`
-  - if `--expert-size-mb` is omitted, they derive expert size from the model config
-  - output JSON now records both `expert_size_mb` and its source
+- `fresh clone` on `172` is now end-to-end runnable for `Qwen`, `OLMoE`, and `DeepSeek` smoke.
+- Fair-budget runtime now uses `free_device_memory_ratio` instead of total-memory ratio.
+- Selector now supports `--sparse-budget-bytes` and can be calibrated from the runtime `A` run.
+- Zero-resident cases now explicitly degenerate to baseline outputs instead of pretending to run a meaningful `C`.
 
-## Next
+## Current Fair Results
 
-### 1. Fairness Revalidation
+- `Qwen @ 0.10`
+  - `A = 14.0118 tok/s`
+  - `C = 14.3550 tok/s`
+  - `+2.45%`
+  - `resident_admitted_count = 165`
+  - `resident_registry.budget_bytes = sparse_budget_bytes = 4735686246`
+- `Qwen @ 0.07`
+  - runtime-calibrated selector returns `resident = 0`
+  - `C` degenerates to baseline
+- `OLMoE @ 0.045 / 0.05`
+  - runtime-calibrated selector returns `resident = 0`
+  - `C` degenerates to baseline
+- `DeepSeek`
+  - fair-budget rerun is in progress
+
+## Main Diagnosis
+
+- The old gains were partly inflated by unfair or weakly calibrated budget accounting.
+- The new fair pipeline is more credible but much more conservative.
+- The main problem is no longer "can we pin experts?".
+- The main problem is:
+  - resident bytes are underutilized in some feasible regimes
+  - the tail service model is too conservative
+  - resident hits still do not realize enough runtime advantage
+
+## Priority
+
+### 1. Finish Fair Reruns
 
 Goal:
-- Re-run the models whose earlier results predate byte-clipped resident admission and confirm the fair-budget story with the current runtime.
+- Close the current experiment queue on the fair workflow before changing the method again.
 
 Concrete work:
-- Re-run `Mixtral full` with regenerated resident files using config-derived expert size.
-- Re-run at least one representative `Qwen` and `DeepSeek` point on the current branch so their JSON includes `budget_bytes`.
-- Keep `OLMoE` on the fair coverage-matched regime for cross-model comparison.
+- Finish `DeepSeek` fresh-clone fair rerun.
+- Keep the `Qwen @ 0.10` fair result as the current reference point.
+- Treat `OLMoE @ 0.045 / 0.05` as threshold-finding evidence, not final positive points.
 
 Why:
-- Fixed-mem CLI parity is not enough; the runtime must now prove that admitted resident bytes stay inside one sparse budget.
-- This turns “same ratio” into an actually defensible fairness claim.
+- We need one clean baseline before claiming any further runtime gain.
 
-### 2. Resident Fast Path
+### 2. Runtime-Calibrated Service Envelope
 
 Goal:
-- Make resident experts a true runtime fast path instead of letting them share as much bookkeeping as ordinary offloaded experts.
+- Replace the current overly hard frontier interpretation with a calibrated tail service model.
 
 Concrete work:
-- Separate resident-hit handling from generic `begin()/end()` hook logic.
-- Make resident metadata queryable without walking Python module state.
-- Add a true resident-hit fast path for packed experts, not just grouped demand dispatch.
+- Keep the same feasibility formulation:
+  - `bytes(R_k) + S_tail(k) <= B`
+- Redefine `S_tail(k)` as a runtime-calibrated service envelope instead of a raw hard-max burst.
+- Use runtime-observed budgets and runtime-observed feasibility boundaries to calibrate the envelope.
+- Treat percentile-like knobs only as calibration internals, not as the public paper method.
 
 Why:
-- The story stays the same: resident backbone is the main source of throughput gain.
-- This is a runtime realization improvement, not a new selector heuristic.
+- This keeps the method principled.
+- It avoids falling back to ratio tuning or heuristic sweeping.
+- It is a better EuroSys story than "we changed max to P95".
 
-### 3. Demand Tail Coalescing
+### 3. Utility-Per-Byte Resident Ranking
 
 Goal:
-- Keep `demand-only tail fallback`, but make it cheaper under batch traffic.
+- Improve resident quality without introducing hand-tuned per-layer heuristics.
 
 Concrete work:
-- Reuse grouped packed/modulelist demand metadata across repeated warm-path decode steps when possible.
-- Reuse warm-path artifacts to reduce repeated setup cost.
+- Replace plain frequency-only ranking with a `stall_reduction_per_byte` style score.
+- Keep bytes in the ranking objective so packed and modulelist models share one metric.
+- Do not introduce manual layer weights such as "early layers = 1.5".
 
 Why:
-- This improves throughput without bringing speculative prefetch back into the critical path.
-- It matches the current paper story and EuroSys positioning.
+- This stays aligned with the budgeted systems formulation.
+- It is easier to defend than weighted-frequency heuristics.
 
-### 4. Resident Admission in Core Runtime
+### 4. Batch-Aware Tail Coalescing
 
 Goal:
-- Move requested/admitted/clipped/slack semantics closer to the core runtime and eventually expose them from C++.
+- Make `demand-only tail fallback` cheaper under batch traffic.
 
 Concrete work:
-- Surface resident admission stats from the native engine if possible.
-- Replace Python-side approximation with runtime-native accounting.
-- Keep result JSON stable while changing the source of truth.
+- Coalesce per-step tail demand into a batch-level union.
+- Reuse grouped demand metadata on repeated decode steps when possible.
+- Keep this strictly as coalesced demand service, not speculative prefetch.
 
 Why:
-- This is the right C++ work for the current stage.
-- It strengthens the system abstraction instead of adding controller logic.
+- This is the most likely runtime change to recover real throughput.
+- It stays fully within the current paper story.
 
-### 5. Packed Runtime Cleanup
+### 5. Resident Fast Path
 
 Goal:
-- Reduce overhead on packed MoE paths (`Mixtral`, `DeepSeek`) without changing the serving abstraction.
+- Make resident hits materially cheaper than ordinary offloaded expert hits.
 
 Concrete work:
-- Clean synthetic-slice lookup and registration paths.
-- Reduce packed hook overhead.
-- Finish full-model runtime validation when assets are available.
+- Reduce generic hook bookkeeping on resident hits.
+- Make resident metadata queryable without repeated Python-side walks.
+- Extend the true fast path to packed experts once budget/accounting are stable.
 
 Why:
-- Packed models already show positive `A -> C` direction.
-- The current gap is runtime efficiency and asset completeness, not selector design.
+- The backbone story only pays off if resident hits are cheap enough.
+
+### 6. Budget Accounting in Core Runtime
+
+Goal:
+- Keep budget semantics stable and make them easier to audit.
+
+Concrete work:
+- Push more of requested/admitted/clipped accounting into the core runtime.
+- Preserve stable JSON payloads:
+  - `sparse_budget_bytes`
+  - `sparse_budget_source`
+  - `resident_registry.*`
+- Ensure selector-side and runtime-side budgets cannot drift again.
+
+Why:
+- This is necessary for a defensible fairness claim.
+
+## Experiment Queue
+
+### Running Now
+
+- `DeepSeek` fresh-clone fair rerun on `172`
+
+### Next Immediate Runs
+
+- If `DeepSeek` also degenerates to zero resident, keep the result as-is and do not fake a positive `C`.
+- After the current reruns finish, do threshold-finding runs only where the calibrated selector starts producing nonzero resident prefixes.
+- For `OLMoE`, raise the budget gradually above `0.05` to identify the first nonzero fair regime.
 
 ## Not Planned
 
-- No new ratio sweeps as the main method.
+- No ratio sweeps as the main method.
+- No "P95 frontier" story as a standalone paper method.
+- No manual layer-weight heuristics.
 - No speculative prefetch as the main serving path.
-- No mode controller as the paper centerpiece.
+- No controller-heavy mode switching as the paper centerpiece.
+- No claiming gains from points that degenerate to `resident = 0`.
 
-The method stays:
-- utility-ranked backbone
-- burst-aware feasible resident prefix
-- resident backbone + demand-only tail fallback
+## Method Statement
+
+The method remains:
+
+- runtime-calibrated budget
+- utility-aware resident backbone
+- service-envelope-constrained feasible prefix
+- resident backbone + coalesced demand-only tail fallback
