@@ -8,6 +8,7 @@
 #include <torch/extension.h>
 #include <cstdint>
 #include <algorithm>
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <thread>
@@ -41,6 +42,9 @@ public:
     ~ExpertDispatcher()
     {
         main_thread_stop_flag_.store(true);
+        input_cv_.notify_all();
+        exec_cv_.notify_all();
+        pending_cv_.notify_all();
         for (auto& thread : threads_) { thread.join(); }
 
         for (auto& stream : fetch_streams_) { cudaStreamDestroy(stream); }
@@ -113,6 +117,9 @@ private:
     std::mutex output_mutex_;
     std::mutex exec_mutex_;
     std::mutex gpu_overload_mutex_;
+    std::condition_variable input_cv_;
+    std::condition_variable exec_cv_;
+    std::condition_variable pending_cv_;
 
     std::vector<cudaStream_t> fetch_streams_;
     std::vector<cudaStream_t> exec_streams_;

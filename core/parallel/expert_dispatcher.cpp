@@ -122,8 +122,6 @@ void ExpertDispatcher::EnqueueExpert(int layer_idx, int expert_idx, int gpu_id, 
 
 void ExpertDispatcher::Enqueue(const CallArgs& args)
 {
-    std::lock_guard<std::mutex> lock(input_mutex_);
-
     int layer_idx = args.layer_idx;
     int expert_idx = args.expert_idx;
     auto expert_node = experts_[expert_idx][layer_idx];
@@ -131,18 +129,22 @@ void ExpertDispatcher::Enqueue(const CallArgs& args)
     expert_node->node->mutex.lock();
     expert_node->node->last_access_time = MCIROSECONDS_SINCE_EPOCH;
 
-    input_queue_.push_back(std::move(args));
-    num_enqueued_.fetch_add(1);
+    {
+        std::lock_guard<std::mutex> lock(input_mutex_);
+        input_queue_.push_back(std::move(args));
+        num_enqueued_.fetch_add(1);
 
-    auto& a = input_queue_.back();
-    if (expert_node->node->device.is_cuda()) { a.gpu_id = expert_node->node->device.index(); }
-    ARCHER_LOG_DEBUG(
-        "ExpertDispatcher::Enqueue: num_enqueued_ ", num_enqueued_.load(),
-        "input_queue_ ", input_queue_.size(), \
-        "gpu_id ", a.gpu_id,
-        "layer_idx ", a.layer_idx,
-        "expert_idx ", a.expert_idx,
-        "remote ", a.remote);
+        auto& a = input_queue_.back();
+        if (expert_node->node->device.is_cuda()) { a.gpu_id = expert_node->node->device.index(); }
+        ARCHER_LOG_DEBUG(
+            "ExpertDispatcher::Enqueue: num_enqueued_ ", num_enqueued_.load(),
+            "input_queue_ ", input_queue_.size(), \
+            "gpu_id ", a.gpu_id,
+            "layer_idx ", a.layer_idx,
+            "expert_idx ", a.expert_idx,
+            "remote ", a.remote);
+    }
+    input_cv_.notify_all();
 }
 
 void ExpertDispatcher::RegisterExpert(int layer_idx,
@@ -164,7 +166,7 @@ void ExpertDispatcher::RegisterExpert(int layer_idx,
 void ExpertDispatcher::GPUThreadFunc(int gpu_id)
 {
     while (!main_thread_stop_flag_.load()) {
-        std::this_thread::sleep_for(std::chrono::microseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
@@ -172,10 +174,10 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
 {
     while (!main_thread_stop_flag_.load()) {
         std::unique_lock<std::mutex> lock(input_mutex_);
-        if (input_queue_.empty()) {
-            lock.unlock();
-            continue;
-        }
+        input_cv_.wait(lock, [this]() {
+            return main_thread_stop_flag_.load() || !input_queue_.empty();
+        });
+        if (main_thread_stop_flag_.load()) { break; }
 
         CallArgs args;
 
@@ -284,6 +286,7 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
             std::lock_guard<std::mutex> exec_lock(exec_mutex_);
             exec_queue_.emplace_back(std::move(exec_args));
         }
+        exec_cv_.notify_all();
     }
 }
 
@@ -291,10 +294,10 @@ void ExpertDispatcher::GPUExecFunc(int gpu_id)
 {
     while (!main_thread_stop_flag_.load()) {
         std::unique_lock<std::mutex> lock(exec_mutex_);
-        if (exec_queue_.empty()) {
-            lock.unlock();
-            continue;
-        }
+        exec_cv_.wait(lock, [this]() {
+            return main_thread_stop_flag_.load() || !exec_queue_.empty();
+        });
+        if (main_thread_stop_flag_.load()) { break; }
 
         ExecArgs args;
 
@@ -399,26 +402,14 @@ void ExpertDispatcher::OutputFunc(ExecArgs args, torch::Tensor output, int gpu_i
             gpu_id,
             args.hit, ")");
     }
-    pending_.fetch_sub(1);
+    if (pending_.fetch_sub(1) == 1) { pending_cv_.notify_all(); }
 }
 
 std::vector<ExpertDispatcher::CallResult> ExpertDispatcher::Wait()
 {
-    int wait_count = 0;
-    while (pending_.load() > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        wait_count++;
-        // if (wait_count % 1000 == 0) {
-        //     ARCHER_LOG_WARN(
-        //         "ExpertDispatcher::Wait: wait_count {} pending_ {} num_enqueued {} input_queue_ "
-        //         "{}, exec_queue_ {}",
-        //         wait_count,
-        //         pending_.load(),
-        //         num_enqueued_.load(),
-        //         input_queue_.size(),
-        //         exec_queue_.size());
-        // }
-    }
+    std::unique_lock<std::mutex> pending_lock(output_mutex_);
+    pending_cv_.wait(pending_lock, [this]() { return pending_.load() == 0; });
+    pending_lock.unlock();
     {
         std::lock_guard<std::mutex> input_lock(input_mutex_);
         input_queue_.clear();
