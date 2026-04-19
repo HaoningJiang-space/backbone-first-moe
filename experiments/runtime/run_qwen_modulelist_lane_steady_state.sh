@@ -33,6 +33,11 @@ export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 
 mkdir -p "${TMPDIR}" "${TORCH_EXTENSIONS_DIR}" "${OUT_ROOT}"
 
+log_stage() {
+  local stage="$1"
+  printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${stage}"
+}
+
 run_eval() {
   local output_path="$1"
   local resident_file="$2"
@@ -78,9 +83,12 @@ plan_a_json="${plan_dir}/qwen_A_plan_mem0p10.json"
 resident_json="${plan_dir}/qwen_lane_mem0p10.json"
 
 rm -f "${plan_a_json}" "${resident_json}"
+log_stage "plan_a:start output=${plan_a_json}"
 run_eval "${plan_a_json}" "" 0
+log_stage "plan_a:done output=${plan_a_json}"
 fixed_budget_bytes="$(read_budget "${plan_a_json}")"
 
+log_stage "resident_select:start budget_bytes=${fixed_budget_bytes}"
 python -m experiments.simulation.select_adaptive_resident_set \
   --state-file "${STATE_FILE}" \
   --model-path "${MODEL_PATH}" \
@@ -91,6 +99,7 @@ python -m experiments.simulation.select_adaptive_resident_set \
   --profile-fraction 0.2 \
   --prefetch-windows 0 \
   --sparse-budget-bytes "${fixed_budget_bytes}"
+log_stage "resident_select:done output=${resident_json}"
 
 resident_capacity="$(
   python - "${resident_json}" <<'PY'
@@ -103,11 +112,16 @@ PY
 
 warm_dir="${OUT_ROOT}/warmup"
 mkdir -p "${warm_dir}"
+log_stage "warmup_a:start output=${warm_dir}/qwen_A_warmup.json"
 run_eval "${warm_dir}/qwen_A_warmup.json" "" "${fixed_budget_bytes}"
+log_stage "warmup_a:done output=${warm_dir}/qwen_A_warmup.json"
 if [ "${resident_capacity}" -eq 0 ]; then
   cp "${warm_dir}/qwen_A_warmup.json" "${warm_dir}/qwen_C_warmup.json"
+  log_stage "warmup_c:skipped resident_capacity=0"
 else
+  log_stage "warmup_c:start output=${warm_dir}/qwen_C_warmup.json"
   run_eval "${warm_dir}/qwen_C_warmup.json" "${resident_json}" "${fixed_budget_bytes}"
+  log_stage "warmup_c:done output=${warm_dir}/qwen_C_warmup.json"
 fi
 
 for pair_idx in $(seq 1 "${NUM_MEASURED_PAIRS}"); do
@@ -118,19 +132,31 @@ for pair_idx in $(seq 1 "${NUM_MEASURED_PAIRS}"); do
   rm -f "${a_json}" "${c_json}"
 
   if [ $((pair_idx % 2)) -eq 1 ]; then
+    log_stage "pair${pair_idx}:A:start output=${a_json}"
     run_eval "${a_json}" "" "${fixed_budget_bytes}"
+    log_stage "pair${pair_idx}:A:done output=${a_json}"
     if [ "${resident_capacity}" -eq 0 ]; then
       cp "${a_json}" "${c_json}"
+      log_stage "pair${pair_idx}:C:skipped resident_capacity=0"
     else
+      log_stage "pair${pair_idx}:C:start output=${c_json}"
       run_eval "${c_json}" "${resident_json}" "${fixed_budget_bytes}"
+      log_stage "pair${pair_idx}:C:done output=${c_json}"
     fi
   else
     if [ "${resident_capacity}" -eq 0 ]; then
+      log_stage "pair${pair_idx}:A:start output=${a_json}"
       run_eval "${a_json}" "" "${fixed_budget_bytes}"
+      log_stage "pair${pair_idx}:A:done output=${a_json}"
       cp "${a_json}" "${c_json}"
+      log_stage "pair${pair_idx}:C:skipped resident_capacity=0"
     else
+      log_stage "pair${pair_idx}:C:start output=${c_json}"
       run_eval "${c_json}" "${resident_json}" "${fixed_budget_bytes}"
+      log_stage "pair${pair_idx}:C:done output=${c_json}"
+      log_stage "pair${pair_idx}:A:start output=${a_json}"
       run_eval "${a_json}" "" "${fixed_budget_bytes}"
+      log_stage "pair${pair_idx}:A:done output=${a_json}"
     fi
   fi
 
