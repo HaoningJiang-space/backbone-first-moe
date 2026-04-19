@@ -1552,15 +1552,19 @@ class Qwen2MoeForCausalLM(Qwen2MoePreTrainedModel, GenerationMixin):
         use_cache=True,
         **kwargs,
     ):
+        has_cache_position = cache_position is not None
+
         # If we have cache: let's slice `input_ids` through `cache_position`, to keep only the unprocessed tokens
         # Exception 1: when passing input_embeds, input_ids may be missing entries
         # Exception 2: some generation methods do special slicing of input_ids, so we don't need to do it here
         if past_key_values is not None:
-            if inputs_embeds is not None:  # Exception 1
+            if has_cache_position and inputs_embeds is not None:  # Exception 1
                 input_ids = input_ids[:, -cache_position.shape[0]:]
             # Default case (the "else", a no op, is Exception 2)
-            elif input_ids.shape[1] != cache_position.shape[0]:
+            elif has_cache_position and input_ids.shape[1] != cache_position.shape[0]:
                 input_ids = input_ids[:, cache_position]
+            elif input_ids is not None and input_ids.shape[1] > 1:
+                input_ids = input_ids[:, -1:]
 
         if attention_mask is not None and position_ids is None:
             # create position_ids on the fly for batch generation
@@ -1574,14 +1578,14 @@ class Qwen2MoeForCausalLM(Qwen2MoePreTrainedModel, GenerationMixin):
                     memory_format=torch.contiguous_format)
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
-        if inputs_embeds is not None and cache_position[0] == 0:
+        if inputs_embeds is not None and (not has_cache_position or cache_position[0] == 0):
             model_inputs = {"inputs_embeds": inputs_embeds, "input_ids": None}
         else:
             # The clone here is for the same reason as for `position_ids`.
             model_inputs = {"input_ids": input_ids.clone(
                 memory_format=torch.contiguous_format), "inputs_embeds": None}
 
-        if isinstance(past_key_values, StaticCache) and attention_mask.ndim == 2:
+        if has_cache_position and isinstance(past_key_values, StaticCache) and attention_mask.ndim == 2:
             if model_inputs["inputs_embeds"] is not None:
                 batch_size, sequence_length, _ = model_inputs["inputs_embeds"].shape
                 device = model_inputs["inputs_embeds"].device

@@ -1096,11 +1096,15 @@ class OlmoeForCausalLM(OlmoePreTrainedModel, GenerationMixin):
         use_cache=True,
         **kwargs,
     ):
+        has_cache_position = cache_position is not None
+
         if past_key_values is not None:
-            if inputs_embeds is not None:
+            if has_cache_position and inputs_embeds is not None:
                 input_ids = input_ids[:, -cache_position.shape[0]:]
-            elif input_ids.shape[1] != cache_position.shape[0]:
+            elif has_cache_position and input_ids.shape[1] != cache_position.shape[0]:
                 input_ids = input_ids[:, cache_position]
+            elif input_ids is not None and input_ids.shape[1] > 1:
+                input_ids = input_ids[:, -1:]
 
         if attention_mask is not None and position_ids is None:
             position_ids = attention_mask.long().cumsum(-1) - 1
@@ -1108,7 +1112,7 @@ class OlmoeForCausalLM(OlmoePreTrainedModel, GenerationMixin):
             if past_key_values:
                 position_ids = position_ids[:, -input_ids.shape[1]:]
 
-        if inputs_embeds is not None and cache_position[0] == 0:
+        if inputs_embeds is not None and (not has_cache_position or cache_position[0] == 0):
             model_inputs = {"inputs_embeds": inputs_embeds, "input_ids": None}
         else:
             model_inputs = {"input_ids": input_ids.clone(memory_format=torch.contiguous_format), "inputs_embeds": None}
