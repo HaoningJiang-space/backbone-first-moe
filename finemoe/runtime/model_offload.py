@@ -411,6 +411,8 @@ class OffloadEngine(object):
         self.moe_layers = []
         self.resident_expert_ids = []
         self.resident_expert_ids_set = set()
+        self._resident_budget_override_bytes = None
+        self._resident_budget_override_source = ""
         self._reset_resident_registry()
 
     def init_expert_map_matcher(self):
@@ -514,6 +516,8 @@ class OffloadEngine(object):
             payload = json.load(f)
 
         selection_rule = ""
+        selection_budget_bytes = None
+        selection_budget_source = ""
 
         if isinstance(payload, dict):
             selection_rule = (
@@ -522,6 +526,9 @@ class OffloadEngine(object):
                 or payload.get("method")
                 or ""
             )
+            if payload.get("selection_budget_bytes") is not None:
+                selection_budget_bytes = int(payload["selection_budget_bytes"])
+                selection_budget_source = payload.get("selection_budget_source", "") or ""
             if "resident_set" in payload:
                 payload = payload["resident_set"]
             elif "resident_expert_ids" in payload:
@@ -554,6 +561,8 @@ class OffloadEngine(object):
             resident_file=resident_file,
             resident_expert_ids=resident_ids,
             selection_rule=selection_rule,
+            selection_budget_bytes=selection_budget_bytes,
+            selection_budget_source=selection_budget_source,
         )
         return resident_ids
 
@@ -561,8 +570,17 @@ class OffloadEngine(object):
         self.resident_registry = ResidentRegistry(
             layout=parse_expert_layout(self.config),
         )
+        self._resident_budget_override_bytes = None
+        self._resident_budget_override_source = ""
 
-    def _record_requested_residents(self, resident_file, resident_expert_ids, selection_rule=""):
+    def _record_requested_residents(
+        self,
+        resident_file,
+        resident_expert_ids,
+        selection_rule="",
+        selection_budget_bytes=None,
+        selection_budget_source="",
+    ):
         self.resident_registry.enabled = bool(resident_expert_ids)
         self.resident_registry.source_file = resident_file or ""
         self.resident_registry.selection_rule = selection_rule or ""
@@ -584,6 +602,12 @@ class OffloadEngine(object):
         self.resident_registry.fast_path_modules = 0
         self.resident_registry.fast_path_expert_count = 0
         self.resident_registry.clipped = False
+        self._resident_budget_override_bytes = (
+            int(selection_budget_bytes)
+            if selection_budget_bytes is not None
+            else None
+        )
+        self._resident_budget_override_source = selection_budget_source or ""
 
     def _activate_resident_registry(self, resident_expert_ids, node_ids):
         tensor_ids = node_ids
@@ -656,18 +680,37 @@ class OffloadEngine(object):
         getter = getattr(self.archer_engine, "get_sparse_cache_limit", None)
         if getter is None:
             return 0
-        return int(getter(torch.device(self.device)))
+        runtime_budget_bytes = int(getter(torch.device(self.device)))
+        if (
+            self._resident_budget_override_bytes is not None
+            and self._resident_budget_override_bytes > 0
+        ):
+            if runtime_budget_bytes > 0:
+                return min(runtime_budget_bytes, int(self._resident_budget_override_bytes))
+            return int(self._resident_budget_override_bytes)
+        return runtime_budget_bytes
+
+    def _get_sparse_budget_source(self):
+        runtime_source = "free_device_memory_ratio"
+        if (
+            self._resident_budget_override_bytes is not None
+            and self._resident_budget_override_bytes > 0
+        ):
+            if self._resident_budget_override_source:
+                return f"min({runtime_source},{self._resident_budget_override_source})"
+            return f"min({runtime_source},resident_selection_budget_bytes)"
+        return runtime_source
 
     def get_sparse_budget_info(self):
         return {
             "budget_bytes": int(self._get_sparse_budget_bytes()),
-            "budget_source": "free_device_memory_ratio",
+            "budget_source": self._get_sparse_budget_source(),
         }
 
     def _clip_resident_prefix_to_sparse_budget(self, resident_expert_ids, expert_tensor_ids):
         budget_bytes = self._get_sparse_budget_bytes()
         self.resident_registry.budget_bytes = budget_bytes
-        self.resident_registry.budget_source = "free_device_memory_ratio"
+        self.resident_registry.budget_source = self._get_sparse_budget_source()
         if budget_bytes <= 0:
             tensor_ids = [tensor_id for group in expert_tensor_ids for tensor_id in group]
             return list(resident_expert_ids), tensor_ids

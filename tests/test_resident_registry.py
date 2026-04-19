@@ -59,6 +59,8 @@ class ResidentRegistryTest(unittest.TestCase):
                 json.dumps(
                     {
                         "selection_rule": "frontier_prefix",
+                        "selection_budget_bytes": 1024,
+                        "selection_budget_source": "runtime_sparse_budget_bytes",
                         "resident_set": [
                             [0, 2],
                             {"layer": 1, "expert": 3},
@@ -78,6 +80,8 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(registry["requested_count"], 3)
         self.assertEqual(registry["admitted_count"], 0)
         self.assertFalse(registry["clipped"])
+        self.assertEqual(engine._resident_budget_override_bytes, 1024)
+        self.assertEqual(engine._resident_budget_override_source, "runtime_sparse_budget_bytes")
 
     def test_activate_registry_tracks_requested_vs_admitted_counts(self):
         engine = self._build_engine_stub()
@@ -232,6 +236,21 @@ class ResidentRegistryTest(unittest.TestCase):
 
         self.assertEqual(budget["budget_bytes"], 4096)
         self.assertEqual(budget["budget_source"], "free_device_memory_ratio")
+
+    def test_sparse_budget_info_respects_resident_budget_override(self):
+        engine = self._build_engine_stub()
+        engine.device = "cuda:0"
+        engine.archer_engine = self._fake_archer_engine({}, sparse_cache_limit=4096)
+        engine._resident_budget_override_bytes = 1024
+        engine._resident_budget_override_source = "runtime_sparse_budget_bytes"
+
+        budget = OffloadEngine.get_sparse_budget_info(engine)
+
+        self.assertEqual(budget["budget_bytes"], 1024)
+        self.assertEqual(
+            budget["budget_source"],
+            "min(free_device_memory_ratio,runtime_sparse_budget_bytes)",
+        )
 
 
 if __name__ == "__main__":
