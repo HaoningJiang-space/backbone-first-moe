@@ -22,7 +22,8 @@ It separates:
 The goal is to make one point explicit:
 
 > `Qwen` does not currently look like a low-ceiling case.
-> The current `~+5%` fair-runtime gain is better explained as partial realization of a larger structural opportunity than as evidence that the memory-side ceiling is already exhausted.
+> But the most defensible warm steady-state throughput gain is only `~+2.4%`.
+> The higher `~+4.8%` mixed/semi-cold result should be read as sensitivity to colder offload regimes, not as the primary paper-facing runtime claim.
 
 ## 1. Structure-Level Headroom
 
@@ -48,7 +49,7 @@ Important scope limit:
 - these numbers are `idealized upper bounds`
 - they should be used as `structural evidence`, not as realistic throughput predictions
 
-## 2. Implementation-Level Realization
+## 2. Implementation-Level Realization: Mixed / Semi-Cold Long Workflow
 
 Current fair long-workflow `Qwen 0.10` results on the two-lane modulelist runtime:
 
@@ -83,8 +84,40 @@ Interpretation:
 - this is a `stable positive result`
 - it is stronger than the older fair unified-runtime result (`+2.45%`)
 - it is still only a `medium-strength throughput result`
+- it is best read as `mixed / semi-cold sensitivity`, not as the primary steady-state claim
 
-## 3. What Actually Improved
+## 3. Primary Warm Steady-State Result
+
+Warm steady-state protocol:
+
+- fix one `sparse_budget_bytes` from a planning `A` run
+- fix one resident plan from that budget
+- warm up `A` once and `C` once
+- measure `n=5` alternating `A/C` pairs under the same fixed budget and resident plan
+
+Warm steady-state `Qwen 0.10` results:
+
+| Pair | A gen tok/s | C gen tok/s | Gain |
+|---|---:|---:|---:|
+| Pair 1 | `12.9977` | `13.3220` | `+2.50%` |
+| Pair 2 | `12.9939` | `13.3172` | `+2.49%` |
+| Pair 3 | `13.0198` | `13.3194` | `+2.30%` |
+| Pair 4 | `12.9936` | `13.3078` | `+2.42%` |
+| Pair 5 | `13.0089` | `13.2974` | `+2.22%` |
+
+Warm steady-state summary:
+
+- mean gain: `+2.38%`
+- median gain: `+2.42%`
+- range: `+2.22%` to `+2.50%`
+
+Interpretation:
+
+- this is the most defensible primary quantitative claim for `Qwen`
+- it is a `stable positive result`, but clearly weaker than the mixed/semi-cold runs
+- this suggests a meaningful fraction of the larger mixed-state gain came from colder offload behavior, not just runtime control-path savings
+
+## 4. What Actually Improved
 
 Representative main run breakdown:
 
@@ -106,7 +139,7 @@ This supports the current systems interpretation:
 > the main problem is not absence of backbone signal;
 > the main problem is that unified generic runtimes fail to realize that signal cheaply.
 
-## 4. Paper-Facing Reading
+## 5. Paper-Facing Reading
 
 The correct paper-facing claim is:
 
@@ -115,13 +148,15 @@ The correct paper-facing claim is:
 - `systems claim`
   - current real runtimes only realize a small part of that headroom
   - splitting modulelist into `resident lane + demand lane` materially improves realization under fair budget
+  - the most defensible steady-state throughput gain is only `~+2.4%`, while mixed/semi-cold sensitivity is higher
 
 What should **not** be claimed:
 
 - that the simulator is a faithful throughput predictor
 - that `Qwen` already demonstrates a strong throughput story by itself
+- that mixed/semi-cold gains and warm steady-state gains should be averaged into one runtime number
 
-## 5. Implication
+## 6. Implication
 
 The next engineering priority is not more selector tuning.
 

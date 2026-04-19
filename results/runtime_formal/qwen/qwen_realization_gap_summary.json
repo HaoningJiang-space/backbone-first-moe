@@ -1,9 +1,11 @@
 {
   "model": "Qwen1.5-MoE-A2.7B-Chat",
   "scope": "fair-budget two-lane modulelist long workflow summary",
+  "primary_runtime_protocol": "warm_steady_state_fixed_budget_fixed_plan",
   "interpretation": {
     "structure_layer": "idealized structural headroom remains high, but the simulator should be treated only as an upper-bound generator, not as a quantitative runtime predictor",
-    "realization_layer": "the two-lane modulelist runtime improves fair-budget realization over the older unified runtime, but only to a medium-strength throughput gain"
+    "realization_layer": "the two-lane modulelist runtime improves fair-budget realization over the older unified runtime, but the primary warm steady-state gain is only a small stable improvement",
+    "regime_note": "mixed/semi-cold long-workflow gains are higher than warm steady-state gains and should be treated as sensitivity, not as the primary paper-facing runtime number"
   },
   "structure_headroom": {
     "workload": "Qwen fair64 @ mem=0.10",
@@ -21,6 +23,60 @@
     "c_generated_tokens_per_sec": 14.355,
     "gain_percent": 2.45,
     "note": "older fair-budget unified-runtime reference before the modulelist resident-lane + demand-lane split"
+  },
+  "warm_steady_state_protocol": {
+    "description": "fixed one sparse budget from a planning A run, fixed one resident plan from that budget, warmed up A and C once each, then measured five alternating A/C pairs under the same budget and resident plan",
+    "common_constraints": {
+      "device_memory_ratio": 0.1,
+      "batch_size": 8,
+      "num_prompts": 64,
+      "max_new_tokens": 16,
+      "total_generated_tokens": 1024,
+      "total_prompt_tokens": 9455,
+      "sparse_budget_bytes": 4735686246,
+      "resident_capacity": 165,
+      "admitted_count": 165,
+      "admitted_bytes": 2854748160,
+      "clipped": false
+    },
+    "pairs": [
+      {
+        "name": "pair1",
+        "a_generated_tokens_per_sec": 12.997684243703658,
+        "c_generated_tokens_per_sec": 13.321984316154996,
+        "gain_percent": 2.49506039976648
+      },
+      {
+        "name": "pair2",
+        "a_generated_tokens_per_sec": 12.993885817865872,
+        "c_generated_tokens_per_sec": 13.317155367936255,
+        "gain_percent": 2.4878589407481666
+      },
+      {
+        "name": "pair3",
+        "a_generated_tokens_per_sec": 13.019803165935876,
+        "c_generated_tokens_per_sec": 13.3193957822941,
+        "gain_percent": 2.301053345737647
+      },
+      {
+        "name": "pair4",
+        "a_generated_tokens_per_sec": 12.993596807816074,
+        "c_generated_tokens_per_sec": 13.307841249016262,
+        "gain_percent": 2.418456150733883
+      },
+      {
+        "name": "pair5",
+        "a_generated_tokens_per_sec": 13.008864685713064,
+        "c_generated_tokens_per_sec": 13.29739812763846,
+        "gain_percent": 2.2179755797004708
+      }
+    ],
+    "aggregates": {
+      "gain_percent_min": 2.2179755797004708,
+      "gain_percent_max": 2.49506039976648,
+      "gain_percent_mean": 2.3840808833373295,
+      "gain_percent_median": 2.418456150733883
+    }
   },
   "common_constraints": {
     "device_memory_ratio": 0.1,
@@ -94,5 +150,11 @@
     "gain_percent_min": 3.455244495798482,
     "gain_percent_max": 6.247993779559735,
     "gain_percent_mean": 4.7986681944041315
+  },
+  "current_reading": {
+    "primary_claim": "use the warm steady-state n=5 result as the main quantitative runtime claim",
+    "primary_gain_percent_mean": 2.3840808833373295,
+    "sensitivity_claim": "mixed/semi-cold long-workflow runs remain useful sensitivity evidence and show larger gains around ~4.8% mean",
+    "sensitivity_gain_percent_mean": 4.7986681944041315
   }
 }

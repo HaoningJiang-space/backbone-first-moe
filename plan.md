@@ -14,10 +14,14 @@
     - `A = 14.0118 tok/s`
     - `C = 14.3550 tok/s`
     - `+2.45%`
-  - current modulelist two-lane runtime:
+  - mixed / semi-cold modulelist two-lane runtime:
     - long-workflow gains observed at `+6.25%`, `+4.69%`, `+3.46%`
     - current mean is `~+4.8%`
-    - this is a stable positive result, but still only medium-strength throughput evidence
+    - this is now best treated as regime sensitivity, not as the primary runtime claim
+  - warm steady-state modulelist two-lane runtime:
+    - `n=5` alternating-pair gains observed at `+2.50%`, `+2.49%`, `+2.30%`, `+2.42%`, `+2.22%`
+    - current mean is `~+2.38%`
+    - this is the most defensible primary throughput claim today
   - `resident_admitted_count = 165`
   - `resident_registry.budget_bytes = sparse_budget_bytes = 4735686246`
 - `Qwen @ 0.07`
@@ -37,7 +41,7 @@
 - The latest `Qwen 0.10` result shows that runtime bifurcation matters:
   - structural backbone signal is real
   - unified generic runtime was hiding much of that signal
-  - modulelist `resident lane + demand lane` raises fair long-workflow gains from `+2.45%` to roughly `+5%`
+  - modulelist `resident lane + demand lane` raises the old unified fair runtime from `+2.45%` to `~+2.4%` under warm steady-state and to `~+4.8%` under mixed/semi-cold runs
 - We still do not know whether MoE serving is fundamentally memory-bound enough to justify another round of memory-hierarchy design.
 - The main unanswered question is now:
   - how much of the end-to-end time is actually load stall
@@ -134,6 +138,7 @@ Relevant code paths:
   should be read as evidence that:
   - the structural headroom is not obviously exhausted
   - current runtime gains are far below the idealized ceiling
+  - but the simulator is not a quantitative predictor of warm steady-state throughput
 - Those numbers should **not** be written as realistic expected deployment gains.
 - The correct way to use the simulator now is:
   - use observation to establish structural headroom and failure of single-cache abstractions

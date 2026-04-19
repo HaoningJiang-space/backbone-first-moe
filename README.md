@@ -113,6 +113,9 @@ For a paper-facing runtime table that already resolves the `OLMoE` fairness issu
 For a paper-facing note that explicitly separates `Qwen`'s idealized structural headroom from its current fair-runtime realization, see:
 - [results/runtime_formal/qwen/qwen_realization_gap.md](results/runtime_formal/qwen/qwen_realization_gap.md)
 
+Use the `warm steady-state` number in that note as the primary quantitative `Qwen` runtime claim.
+The larger mixed/semi-cold gains in the same note should be treated as regime sensitivity, not as the default headline throughput result.
+
 ## Historical Fixed-Runtime Results
 
 This section is kept as historical fixed-runtime reference material.
