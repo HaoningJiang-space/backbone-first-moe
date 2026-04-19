@@ -48,6 +48,35 @@ print(int(value))
 PY
 }
 
+read_selected_resident_capacity() {
+  local json_path="$1"
+  python - "$json_path" <<'PY'
+import json
+import sys
+path = sys.argv[1]
+with open(path, "r") as fh:
+    payload = json.load(fh)
+print(int(payload.get("selected_resident_capacity", payload.get("resident_capacity", 0))))
+PY
+}
+
+materialize_degenerate_c_result() {
+  local a_json="$1"
+  local c_json="$2"
+  local resident_file="$3"
+  python - "$a_json" "$c_json" "$resident_file" <<'PY'
+import json
+import sys
+a_path, c_path, resident_file = sys.argv[1:4]
+with open(a_path, "r") as fh:
+    payload = json.load(fh)
+payload["resident_expert_ids_file"] = resident_file
+payload["selection_degenerate_to_baseline"] = True
+with open(c_path, "w") as fh:
+    json.dump(payload, fh, indent=2)
+PY
+}
+
 for mem in ${OLMOE_FAIR_MEMORY_RATIOS}; do
   tag="${mem/./p}"
   a_output="${RUN_DIR}/olmoe_A_mem${tag}_refair.json"
@@ -83,24 +112,29 @@ for mem in ${OLMOE_FAIR_MEMORY_RATIOS}; do
     --profile-fraction 0.2 \
     --prefetch-windows 0 \
     --sparse-budget-bytes "${budget_bytes}"
-
-  python -m finemoe.entrypoints.backbone_runtime_eval \
-    --model-path "${OLMOE_MODEL_PATH}" \
-    --offload-path "${OLMOE_OFFLOAD_PATH}" \
-    --prompt-file "${PROMPT_FILE}" \
-    --output "${c_output}" \
-    --device-memory-ratio "${mem}" \
-    --prefetch-distance 0 \
-    --store-prefix "" \
-    --resident-expert-ids-file "${RES_DIR}/${OLMOE_OUTPUT_PREFIX}_mem${tag}.json" \
-    --device cuda:0 \
-    --eval-mode offline \
-    --batch-size 2 \
-    --num-prompts 2 \
-    --seed 42 \
-    --max-length 256 \
-    --max-new-tokens 8 \
-    --min-new-tokens 1 \
-    --store-capacity 1000 \
-    --tag runtime_eval
+  resident_file="${RES_DIR}/${OLMOE_OUTPUT_PREFIX}_mem${tag}.json"
+  resident_capacity="$(read_selected_resident_capacity "${resident_file}")"
+  if [ "${resident_capacity}" -eq 0 ]; then
+    materialize_degenerate_c_result "${a_output}" "${c_output}" "${resident_file}"
+  else
+    python -m finemoe.entrypoints.backbone_runtime_eval \
+      --model-path "${OLMOE_MODEL_PATH}" \
+      --offload-path "${OLMOE_OFFLOAD_PATH}" \
+      --prompt-file "${PROMPT_FILE}" \
+      --output "${c_output}" \
+      --device-memory-ratio "${mem}" \
+      --prefetch-distance 0 \
+      --store-prefix "" \
+      --resident-expert-ids-file "${resident_file}" \
+      --device cuda:0 \
+      --eval-mode offline \
+      --batch-size 2 \
+      --num-prompts 2 \
+      --seed 42 \
+      --max-length 256 \
+      --max-new-tokens 8 \
+      --min-new-tokens 1 \
+      --store-capacity 1000 \
+      --tag runtime_eval
+  fi
 done

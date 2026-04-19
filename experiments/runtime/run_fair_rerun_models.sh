@@ -77,6 +77,35 @@ print(int(value))
 PY
 }
 
+read_selected_resident_capacity() {
+  local json_path="$1"
+  python - "$json_path" <<'PY'
+import json
+import sys
+path = sys.argv[1]
+with open(path, "r") as fh:
+    payload = json.load(fh)
+print(int(payload.get("selected_resident_capacity", payload.get("resident_capacity", 0))))
+PY
+}
+
+materialize_degenerate_c_result() {
+  local a_json="$1"
+  local c_json="$2"
+  local resident_file="$3"
+  python - "$a_json" "$c_json" "$resident_file" <<'PY'
+import json
+import sys
+a_path, c_path, resident_file = sys.argv[1:4]
+with open(a_path, "r") as fh:
+    payload = json.load(fh)
+payload["resident_expert_ids_file"] = resident_file
+payload["selection_degenerate_to_baseline"] = True
+with open(c_path, "w") as fh:
+    json.dump(payload, fh, indent=2)
+PY
+}
+
 run_eval() {
   local py_path="$1"
   local model_path="$2"
@@ -113,10 +142,16 @@ for mem in 0.07 0.10; do
     --profile-fraction 0.2 \
     --prefetch-windows 0 \
     --sparse-budget-bytes "${qwen_budget_bytes}"
-  run_eval "${REPO_PYTHONPATH}" "${QWEN_MODEL_PATH}" "${QWEN_OFFLOAD_PATH}" "${qwen_c_output}" \
-    --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/qwen_current_mem${tag}.json" \
-    --device cuda:0 --eval-mode offline --batch-size 8 --num-prompts 16 --seed 42 \
-    --max-length 256 --max-new-tokens 64 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
+  qwen_resident_file="${RES_DIR}/qwen_current_mem${tag}.json"
+  qwen_resident_capacity="$(read_selected_resident_capacity "${qwen_resident_file}")"
+  if [ "${qwen_resident_capacity}" -eq 0 ]; then
+    materialize_degenerate_c_result "${qwen_a_output}" "${qwen_c_output}" "${qwen_resident_file}"
+  else
+    run_eval "${REPO_PYTHONPATH}" "${QWEN_MODEL_PATH}" "${QWEN_OFFLOAD_PATH}" "${qwen_c_output}" \
+      --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${qwen_resident_file}" \
+      --device cuda:0 --eval-mode offline --batch-size 8 --num-prompts 16 --seed 42 \
+      --max-length 256 --max-new-tokens 64 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
+  fi
 done
 
 # OLMoE: same backend treatment as Qwen; this keeps modulelist runtime behavior
@@ -145,10 +180,16 @@ for mem in ${OLMOE_FAIR_MEMORY_RATIOS}; do
     --profile-fraction 0.2 \
     --prefetch-windows 0 \
     --sparse-budget-bytes "${olmoe_budget_bytes}"
-  run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${olmoe_c_output}" \
-    --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/${OLMOE_OUTPUT_PREFIX}_mem${tag}.json" \
-    --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
-    --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
+  olmoe_resident_file="${RES_DIR}/${OLMOE_OUTPUT_PREFIX}_mem${tag}.json"
+  olmoe_resident_capacity="$(read_selected_resident_capacity "${olmoe_resident_file}")"
+  if [ "${olmoe_resident_capacity}" -eq 0 ]; then
+    materialize_degenerate_c_result "${olmoe_a_output}" "${olmoe_c_output}" "${olmoe_resident_file}"
+  else
+    run_eval "${REPO_PYTHONPATH}" "${OLMOE_MODEL_PATH}" "${OLMOE_OFFLOAD_PATH}" "${olmoe_c_output}" \
+      --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${olmoe_resident_file}" \
+      --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
+      --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
+  fi
 done
 
 # DeepSeek: requires the newer backend that provides transformers.models.deepseek_v2/v3.
@@ -171,8 +212,14 @@ for mem in 0.07 0.10; do
     --profile-fraction 0.2 \
     --prefetch-windows 0 \
     --sparse-budget-bytes "${deepseek_budget_bytes}"
-  run_eval "${DEEPSEEK_PYTHONPATH}" "${DEEPSEEK_MODEL_PATH}" "${DEEPSEEK_OFFLOAD_PATH}" "${deepseek_c_output}" \
-    --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${RES_DIR}/deepseek_current_mem${tag}.json" \
-    --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
-    --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
+  deepseek_resident_file="${RES_DIR}/deepseek_current_mem${tag}.json"
+  deepseek_resident_capacity="$(read_selected_resident_capacity "${deepseek_resident_file}")"
+  if [ "${deepseek_resident_capacity}" -eq 0 ]; then
+    materialize_degenerate_c_result "${deepseek_a_output}" "${deepseek_c_output}" "${deepseek_resident_file}"
+  else
+    run_eval "${DEEPSEEK_PYTHONPATH}" "${DEEPSEEK_MODEL_PATH}" "${DEEPSEEK_OFFLOAD_PATH}" "${deepseek_c_output}" \
+      --device-memory-ratio "${mem}" --prefetch-distance 0 --store-prefix "" --resident-expert-ids-file "${deepseek_resident_file}" \
+      --device cuda:0 --eval-mode offline --batch-size 2 --num-prompts 2 --seed 42 \
+      --max-length 256 --max-new-tokens 8 --min-new-tokens 1 --store-capacity 1000 --tag runtime_eval
+  fi
 done
