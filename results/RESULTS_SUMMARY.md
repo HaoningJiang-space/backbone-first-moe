@@ -20,11 +20,25 @@ The current positive/runtime boundary split is:
 |---|---|---|---|
 | Qwen1.5-MoE-A2.7B-Chat | validated | strong positive | compact backbone, clear throughput gain |
 | OLMoE-1B-7B-0924 | validated | strong positive | resident backbone dominates under current budgets |
-| DeepSeek-V2-Lite | validated with DeepSeek-capable transformers backend | weak positive / boundary | transferable hotspots exist, but gains are modest |
+| DeepSeek-V2-Lite | validated on clean checkout with `transformers>=5.5.0` runtime extra | weak positive / boundary | transferable hotspots exist, but gains are modest |
 | Mixtral | packed runtime tiny-probe only | boundary / applicability case | packed runtime is enabled and tiny `C > A`, but not yet a formal full-model positive case |
 
 For the compact paper-facing cross-model table, use:
 - [results/runtime_formal/paper_runtime_table.md](/home/abc/Placement/Efficient_AI/backbone-first-moe_git/results/runtime_formal/paper_runtime_table.md)
+
+### Fresh-Clone End-to-End Smoke on `10.16.52.172`
+
+Clean checkout:
+- `/data/ziheng/backbone-first-moe_fresh_e2e`
+- `pip install -e ".[runtime]"`
+
+Smoke outputs:
+
+| Model | mem | A gen tok/s | C gen tok/s | Notes |
+|---|---:|---:|---:|---|
+| Qwen1.5-MoE-A2.7B-Chat | 0.07 | 0.4436 | 0.5960 | `resident_count=325`, `admitted_bytes=5.62 GB`, `budget_bytes=5.96 GB` |
+| OLMoE-1B-7B-0924 | 0.05 | 0.1786 | 0.1911 | `resident_count=58`, `admitted_bytes=0.73 GB`, `budget_bytes=4.25 GB` |
+| DeepSeek-V2-Lite | 0.07 | 0.0825 | 0.0828 | current selector yields `resident_count=0`, so `C≈A` |
 
 ### Cross-Model Runtime Summary
 

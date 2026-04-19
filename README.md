@@ -54,7 +54,7 @@ DeepSeek note for `multi-model-runtime`:
   - `transformers.models.deepseek_v3`
 - `pip install -e ".[runtime]"` on this branch now requires `transformers>=5.5.0`, which satisfies that condition on a normal fresh clone.
 - If your environment is pinned to an older transformers build, `Qwen`, `OLMoE`, and `Mixtral` can still run, but `DeepSeek` will not.
-- On host `10.16.52.172`, use:
+- On a clean checkout on `10.16.52.172`, the normal `pip install -e ".[runtime]"` path is sufficient. The older fallback below is only needed if you intentionally keep an older shared environment and do not upgrade `transformers`:
 
 ```bash
 export PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-first-moe_lb:$PYTHONPATH
@@ -62,7 +62,18 @@ export PYTHONPATH=/data/ziheng/pydeps/transformers_5_5_4:/data/ziheng/backbone-f
 
 Fresh-clone validation that has already been exercised:
 - `v0.3.1`: local fresh clone install + full unit test pass + `Qwen/OLMoE` runtime smoke on `10.16.52.172`
-- `multi-model-runtime`: local fresh clone install + full unit test pass with `transformers>=5.5.0`; `DeepSeek-V2-Lite` full-model probes remain validated on `10.16.52.172` via the same DeepSeek-capable backend
+- `multi-model-runtime`: local fresh clone install + full unit test pass with `transformers>=5.5.0`; clean-checkout runtime smoke now runs on `10.16.52.172` for:
+  - `Qwen A/C @ mem=0.07`
+  - `OLMoE A/C @ mem=0.05`
+  - `DeepSeek-V2-Lite A/C @ mem=0.07`
+
+Fresh-clone smoke numbers from `/data/ziheng/backbone-first-moe_fresh_e2e/results/fresh_smoke` on `10.16.52.172`:
+
+| Model | mem | A gen tok/s | C gen tok/s | Notes |
+|---|---:|---:|---:|---|
+| Qwen1.5-MoE-A2.7B-Chat | 0.07 | 0.4436 | 0.5960 | `resident_count=325`, `admitted_bytes=5.62 GB`, `budget_bytes=5.96 GB` |
+| OLMoE-1B-7B-0924 | 0.05 | 0.1786 | 0.1911 | `resident_count=58`, `admitted_bytes=0.73 GB`, `budget_bytes=4.25 GB` |
+| DeepSeek-V2-Lite | 0.07 | 0.0825 | 0.0828 | current selector yields `resident_count=0`, so `C≈A` |
 
 ## What This Repository Claims
 
@@ -376,7 +387,7 @@ Before tagging a release, this repository should satisfy all of the following:
 
 For `multi-model-runtime`, the additional expectation is:
 - packed-runtime unit tests pass from a fresh clone
-- `DeepSeek-V2-Lite` full-model `A/C` probe runs on a clean checkout
+- `Qwen`, `OLMoE`, and `DeepSeek-V2-Lite` runtime smoke runs from a clean checkout on `10.16.52.172`
 
 ## Base Runtime Modifications vs FineMoE
 
