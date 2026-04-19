@@ -1140,6 +1140,7 @@ class OffloadEngine(object):
 
     def begin_module_group(self, modules, *, expert_blocks=0, token_assignments=0):
         module_list = tuple(modules)
+        unique_module_count = len(tuple(self._iter_unique_modules(module_list)))
         if not module_list:
             return ModuleServiceGroupContext(
                 modules=(),
@@ -1157,7 +1158,7 @@ class OffloadEngine(object):
             raise
         self.runtime_profile.record_tail_group_service(
             begin_calls=1,
-            module_count=len(module_list),
+            module_count=unique_module_count,
             expert_blocks=int(expert_blocks),
             token_assignments=int(token_assignments),
             begin_wall_time_sec=time.perf_counter() - group_begin_t0,
