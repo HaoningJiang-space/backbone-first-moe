@@ -261,6 +261,13 @@ class ResidentRegistryTest(unittest.TestCase):
             begin_wall_time_sec=0.25,
             skipped_fastpath=True,
         )
+        engine.runtime_profile.record_module_io(skipped_manual_service=True)
+        engine.runtime_profile.record_manual_subtree_service(
+            begin_calls=1,
+            end_calls=1,
+            begin_wall_time_sec=0.1,
+            end_wall_time_sec=0.2,
+        )
         engine.runtime_profile.record_modulelist_dispatch(
             active_expert_blocks=4,
             resident_expert_blocks=1,
@@ -269,6 +276,8 @@ class ResidentRegistryTest(unittest.TestCase):
             resident_token_assignments=2,
             demand_token_assignments=10,
             expert_compute_wall_time_sec=0.5,
+            resident_compute_wall_time_sec=0.2,
+            demand_compute_wall_time_sec=0.3,
         )
         engine.runtime_profile.record_packed_dispatch(
             resident_expert_blocks=2,
@@ -284,7 +293,10 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(payload["module_begin_calls"], 2)
         self.assertEqual(payload["param_begin_calls"], 3)
         self.assertEqual(payload["resident_fastpath_module_skips"], 1)
+        self.assertEqual(payload["manual_service_module_skips"], 1)
+        self.assertEqual(payload["manual_subtree_begin_calls"], 1)
         self.assertEqual(payload["modulelist_active_expert_blocks"], 4)
+        self.assertEqual(payload["modulelist_resident_compute_wall_time_sec"], 0.2)
         self.assertEqual(payload["packed_demand_expert_blocks"], 5)
         self.assertEqual(payload["packed_dispatch_wait_calls"], 1)
 

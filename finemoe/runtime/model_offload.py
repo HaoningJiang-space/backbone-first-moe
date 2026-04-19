@@ -381,6 +381,11 @@ class RuntimeProfile:
     module_begin_wall_time_sec: float = 0.0
     module_end_wall_time_sec: float = 0.0
     resident_fastpath_module_skips: int = 0
+    manual_service_module_skips: int = 0
+    manual_subtree_begin_calls: int = 0
+    manual_subtree_end_calls: int = 0
+    manual_subtree_begin_wall_time_sec: float = 0.0
+    manual_subtree_end_wall_time_sec: float = 0.0
 
     modulelist_dispatch_calls: int = 0
     modulelist_active_expert_blocks: int = 0
@@ -390,6 +395,8 @@ class RuntimeProfile:
     modulelist_resident_token_assignments: int = 0
     modulelist_demand_token_assignments: int = 0
     modulelist_expert_compute_wall_time_sec: float = 0.0
+    modulelist_resident_compute_wall_time_sec: float = 0.0
+    modulelist_demand_compute_wall_time_sec: float = 0.0
 
     packed_dispatch_calls: int = 0
     packed_resident_expert_blocks: int = 0
@@ -412,6 +419,7 @@ class RuntimeProfile:
         begin_wall_time_sec=0.0,
         end_wall_time_sec=0.0,
         skipped_fastpath=False,
+        skipped_manual_service=False,
     ):
         self.module_begin_calls += int(begin_calls)
         self.module_end_calls += int(end_calls)
@@ -423,6 +431,21 @@ class RuntimeProfile:
         self.module_end_wall_time_sec += float(end_wall_time_sec)
         if skipped_fastpath:
             self.resident_fastpath_module_skips += 1
+        if skipped_manual_service:
+            self.manual_service_module_skips += 1
+
+    def record_manual_subtree_service(
+        self,
+        *,
+        begin_calls=0,
+        end_calls=0,
+        begin_wall_time_sec=0.0,
+        end_wall_time_sec=0.0,
+    ):
+        self.manual_subtree_begin_calls += int(begin_calls)
+        self.manual_subtree_end_calls += int(end_calls)
+        self.manual_subtree_begin_wall_time_sec += float(begin_wall_time_sec)
+        self.manual_subtree_end_wall_time_sec += float(end_wall_time_sec)
 
     def record_modulelist_dispatch(
         self,
@@ -434,6 +457,8 @@ class RuntimeProfile:
         resident_token_assignments,
         demand_token_assignments,
         expert_compute_wall_time_sec,
+        resident_compute_wall_time_sec=0.0,
+        demand_compute_wall_time_sec=0.0,
     ):
         self.modulelist_dispatch_calls += 1
         self.modulelist_active_expert_blocks += int(active_expert_blocks)
@@ -443,6 +468,8 @@ class RuntimeProfile:
         self.modulelist_resident_token_assignments += int(resident_token_assignments)
         self.modulelist_demand_token_assignments += int(demand_token_assignments)
         self.modulelist_expert_compute_wall_time_sec += float(expert_compute_wall_time_sec)
+        self.modulelist_resident_compute_wall_time_sec += float(resident_compute_wall_time_sec)
+        self.modulelist_demand_compute_wall_time_sec += float(demand_compute_wall_time_sec)
 
     def record_packed_dispatch(
         self,
@@ -475,6 +502,11 @@ class RuntimeProfile:
             "module_begin_wall_time_sec": float(self.module_begin_wall_time_sec),
             "module_end_wall_time_sec": float(self.module_end_wall_time_sec),
             "resident_fastpath_module_skips": int(self.resident_fastpath_module_skips),
+            "manual_service_module_skips": int(self.manual_service_module_skips),
+            "manual_subtree_begin_calls": int(self.manual_subtree_begin_calls),
+            "manual_subtree_end_calls": int(self.manual_subtree_end_calls),
+            "manual_subtree_begin_wall_time_sec": float(self.manual_subtree_begin_wall_time_sec),
+            "manual_subtree_end_wall_time_sec": float(self.manual_subtree_end_wall_time_sec),
             "modulelist_dispatch_calls": int(self.modulelist_dispatch_calls),
             "modulelist_active_expert_blocks": int(self.modulelist_active_expert_blocks),
             "modulelist_resident_expert_blocks": int(self.modulelist_resident_expert_blocks),
@@ -483,6 +515,8 @@ class RuntimeProfile:
             "modulelist_resident_token_assignments": int(self.modulelist_resident_token_assignments),
             "modulelist_demand_token_assignments": int(self.modulelist_demand_token_assignments),
             "modulelist_expert_compute_wall_time_sec": float(self.modulelist_expert_compute_wall_time_sec),
+            "modulelist_resident_compute_wall_time_sec": float(self.modulelist_resident_compute_wall_time_sec),
+            "modulelist_demand_compute_wall_time_sec": float(self.modulelist_demand_compute_wall_time_sec),
             "packed_dispatch_calls": int(self.packed_dispatch_calls),
             "packed_resident_expert_blocks": int(self.packed_resident_expert_blocks),
             "packed_demand_expert_blocks": int(self.packed_demand_expert_blocks),
@@ -910,6 +944,73 @@ class OffloadEngine(object):
             marked += 1
             stack.extend(list(current.children()))
         return marked
+
+    def _attach_module_service_metadata(self, module):
+        if getattr(module, "_archer_service_metadata_ready", False):
+            return
+        module._archer_service_modules = tuple(module.modules())
+        module._archer_service_params = tuple(module.parameters(recurse=True))
+        module._archer_service_buffers = tuple(module.buffers(recurse=True))
+        module._archer_manual_service_active = False
+        module._archer_service_metadata_ready = True
+
+    def _set_manual_service_active(self, module, enabled: bool):
+        self._attach_module_service_metadata(module)
+        for current in module._archer_service_modules:
+            current._archer_manual_service_active = enabled
+
+    def _begin_module_subtree(self, module):
+        self._attach_module_service_metadata(module)
+        t0 = time.perf_counter()
+        for param in module._archer_service_params:
+            if param.data.data_ptr() not in self.offload_set:
+                param.data = param.data.to(self.device)
+                continue
+            self.offload_set.remove(param.data.data_ptr())
+            self.archer_engine.begin(self.request_id, param)
+            self.offload_set.add(param.data.data_ptr())
+        for buf in module._archer_service_buffers:
+            if buf.data_ptr() not in self.offload_set:
+                continue
+            self.offload_set.remove(buf.data_ptr())
+            self.archer_engine.begin(self.request_id, buf)
+            self.offload_set.add(buf.data_ptr())
+        self.runtime_profile.record_manual_subtree_service(
+            begin_calls=1,
+            begin_wall_time_sec=time.perf_counter() - t0,
+        )
+
+    def _end_module_subtree(self, module):
+        self._attach_module_service_metadata(module)
+        t0 = time.perf_counter()
+        for param in module._archer_service_params:
+            if param.data.data_ptr() not in self.offload_set:
+                continue
+            self.offload_set.remove(param.data.data_ptr())
+            self.archer_engine.end(self.request_id, param)
+            self.offload_set.add(param.data.data_ptr())
+        for buf in module._archer_service_buffers:
+            if buf.data_ptr() not in self.offload_set:
+                continue
+            self.offload_set.remove(buf.data_ptr())
+            self.archer_engine.end(self.request_id, buf)
+            self.offload_set.add(buf.data_ptr())
+        self.runtime_profile.record_manual_subtree_service(
+            end_calls=1,
+            end_wall_time_sec=time.perf_counter() - t0,
+        )
+
+    def run_module_demand_lane(self, module, *args, **kwargs):
+        begun = False
+        self._set_manual_service_active(module, True)
+        try:
+            self._begin_module_subtree(module)
+            begun = True
+            return module(*args, **kwargs)
+        finally:
+            if begun:
+                self._end_module_subtree(module)
+            self._set_manual_service_active(module, False)
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.
@@ -1465,6 +1566,7 @@ class OffloadEngine(object):
 
                     if isinstance(module, (Qwen2MoeMLP, OlmoeMLP)):
                         module.offload_engine = self
+                        self._attach_module_service_metadata(module)
 
                 self.setup_archer_hooks(model)
                 resident_expert_ids = self._load_resident_expert_ids()
@@ -1826,6 +1928,9 @@ class OffloadEngine(object):
             if getattr(module, "_archer_resident_fastpath", False):
                 self.runtime_profile.record_module_io(skipped_fastpath=True)
                 return
+            if getattr(module, "_archer_manual_service_active", False):
+                self.runtime_profile.record_module_io(skipped_manual_service=True)
+                return
             # if self.request_id_flag == False:
             #     self.request_id_flag = True
             #     # print(kwargs, args, type(module))
@@ -1877,6 +1982,9 @@ class OffloadEngine(object):
         def _post_forward_module_hook(module, input, output):
             if getattr(module, "_archer_resident_fastpath", False):
                 self.runtime_profile.record_module_io(skipped_fastpath=True)
+                return
+            if getattr(module, "_archer_manual_service_active", False):
+                self.runtime_profile.record_module_io(skipped_manual_service=True)
                 return
             device_list = []
             param_not_offload = set()
