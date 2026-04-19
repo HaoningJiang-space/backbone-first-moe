@@ -520,10 +520,15 @@ void ArcherTaskPool::GPUThreadFunc(int gpu_id, int thread_id)
 
         lock.unlock();
 
-        if (!task->on_demand) {
+        if (task->dst_device.is_cuda() && !node->device.is_cuda()) {
             bool success = RemoveCachedSparseNode(node);
             if (!success) {
-                ARCHER_LOG_DEBUG("{} evict failed, move to CPU", task->DebugString());
+                ARCHER_LOG_DEBUG("SetNodeDevice retry later due cache pressure: {}", task->DebugString());
+                {
+                    std::lock_guard<std::mutex> retry_lock(unified_mutex_);
+                    unified_queue_[task->priority].push_back(task);
+                }
+                std::this_thread::sleep_for(std::chrono::microseconds(10));
                 continue;
             }
         }
