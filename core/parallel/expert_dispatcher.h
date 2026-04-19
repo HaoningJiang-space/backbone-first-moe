@@ -7,6 +7,7 @@
 
 #include <torch/extension.h>
 #include <cstdint>
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <thread>
@@ -51,6 +52,13 @@ public:
     {
         hidden_states_ = hidden_states.clone();
         router_mask_ = router_mask.clone();
+    }
+    void SetAssignments(const std::vector<int>& expert_indices,
+                        const std::vector<torch::Tensor>& token_indices)
+    {
+        assignment_tokens_.clear();
+        size_t limit = std::min(expert_indices.size(), token_indices.size());
+        for (size_t i = 0; i < limit; ++i) { assignment_tokens_[expert_indices[i]] = token_indices[i].clone(); }
     }
 
     void EnqueueExpert(int layer_idx, int expert_idx, int gpu_id = -1, bool remote = false);
@@ -105,4 +113,5 @@ private:
 
     torch::Tensor hidden_states_;
     torch::Tensor router_mask_;
+    std::unordered_map<int, torch::Tensor> assignment_tokens_;
 };

@@ -4,6 +4,7 @@
 // TorchMoE Team
 
 #include <torch/extension.h>
+#include <pybind11/stl.h>
 #include "parallel/expert_dispatcher.h"
 #include "prefetch/archer_prefetch_handle.h"
 
@@ -88,6 +89,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("register_expert", &ExpertDispatcher::RegisterExpert)
         .def("enqueue_expert", &ExpertDispatcher::EnqueueExpert)
         .def("set_inputs", &ExpertDispatcher::SetInputs)
+        .def("set_assignments", &ExpertDispatcher::SetAssignments)
         .def("set_expected_queue", &ExpertDispatcher::SetExpectedQueue)
         .def("wait_expert", &ExpertDispatcher::WaitExpert);
 }

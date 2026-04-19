@@ -33,11 +33,18 @@ class FakePackedDispatcher:
         self.act_fn = act_fn
         self.hidden_states = None
         self.router_mask = None
+        self.assignments = {}
         self.queue = []
 
     def set_inputs(self, hidden_states, router_mask):
         self.hidden_states = hidden_states
         self.router_mask = router_mask
+
+    def set_assignments(self, expert_indices, token_indices):
+        self.assignments = {
+            int(expert_idx): token_idx
+            for expert_idx, token_idx in zip(expert_indices, token_indices)
+        }
 
     def set_expected_queue(self, n):
         return None
@@ -48,7 +55,9 @@ class FakePackedDispatcher:
     def wait_expert(self):
         results = []
         for layer_id, expert_idx in self.queue:
-            token_idx = torch.where(self.router_mask[:, expert_idx])[0]
+            token_idx = self.assignments.get(expert_idx)
+            if token_idx is None:
+                token_idx = torch.where(self.router_mask[:, expert_idx])[0]
             current_state = self.hidden_states[token_idx]
             gate, up = F.linear(
                 current_state, self.experts.gate_up_proj[expert_idx]
@@ -66,11 +75,16 @@ class TrackingPackedDispatcher(FakePackedDispatcher):
     def __init__(self, experts, act_fn):
         super().__init__(experts, act_fn)
         self.enqueued = []
+        self.assignment_keys = None
         self.wait_calls = 0
 
     def enqueue_expert(self, layer_id, expert_idx, gpu_id=-1, remote=False):
         self.enqueued.append((layer_id, expert_idx))
         super().enqueue_expert(layer_id, expert_idx, gpu_id, remote)
+
+    def set_assignments(self, expert_indices, token_indices):
+        self.assignment_keys = [int(expert_idx) for expert_idx in expert_indices]
+        super().set_assignments(expert_indices, token_indices)
 
     def wait_expert(self):
         self.wait_calls += 1
@@ -363,6 +377,7 @@ class PackedRuntimeForwardTest(unittest.TestCase):
         self.assertNotIn(next(iter(resident_ids)), dispatched)
         self.assertEqual(dispatched, set(active_experts) - resident_ids)
         self.assertEqual(dispatcher.wait_calls, 1)
+        self.assertEqual(dispatcher.assignment_keys, sorted(set(active_experts) - resident_ids))
 
     def test_trace_packed_batch_updates_each_sequence(self):
         hidden_states = torch.randn(2, 3, 4)

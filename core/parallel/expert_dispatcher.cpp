@@ -263,7 +263,13 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
 
         int expert_type = expert_type_;
         torch::Tensor input;
-        auto token_indices = router_mask_.index({"...", expert_idx}).to(torch::kBool);
+        torch::Tensor token_indices;
+        auto assignment_it = assignment_tokens_.find(expert_idx);
+        if (assignment_it != assignment_tokens_.end()) {
+            token_indices = assignment_it->second.to(expert_node->node->device);
+        } else {
+            token_indices = router_mask_.index({"...", expert_idx}).to(torch::kBool);
+        }
         switch (expert_type) {
             case SWITCH_TRANSFORMERS_DENSE_ACT_DENSE:
             case SWITCH_TRANSFORMERS_DENSE_GATED_ACT_DENSE:
@@ -436,6 +442,7 @@ std::vector<ExpertDispatcher::CallResult> ExpertDispatcher::Wait()
     }
     input_queue_.clear();
     exec_queue_.clear();
+    assignment_tokens_.clear();
     num_enqueued_.store(0);
     std::vector<CallResult> output_queue;
     {

@@ -117,6 +117,10 @@ def dispatch_packed_experts(
     dispatch_wait_calls = 0
     if demand_active:
         expert_dispatcher.set_inputs(hidden_states, router_mask)
+        expert_dispatcher.set_assignments(
+            [int(expert_idx) for expert_idx in demand_active],
+            [assignment_map[int(expert_idx)][0] for expert_idx in demand_active],
+        )
         expert_dispatcher.set_expected_queue(len(demand_active))
         gpu_id = hidden_states.device.index if hidden_states.is_cuda else -1
 
