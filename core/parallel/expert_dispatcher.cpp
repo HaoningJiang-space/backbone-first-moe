@@ -200,7 +200,6 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
             CallArgs args;
             ExpertNodePtr expert_node = nullptr;
             bool cache_hit = false;
-            bool success = true;
         };
 
         std::vector<PendingExecItem> pending_items;
@@ -212,21 +211,7 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
             auto expert_node = experts_[expert_idx][layer_idx];
 
             bool cache_hit = expert_node->node->device.is_cuda();
-            bool success = true;
             if (!expert_node->node->device.is_cuda()) {
-                success = kTaskPool->RemoveCachedSparseNode(expert_node->node, gpu_id);
-
-                int wait_count = 0;
-                while (!success && gpu_overload_[gpu_id]) {
-                    std::this_thread::sleep_for(std::chrono::microseconds(10));
-                    wait_count++;
-                }
-
-                if (!success && !gpu_overload_[gpu_id]) {
-                    std::lock_guard<std::mutex> overload_lock(gpu_overload_mutex_);
-                    gpu_overload_[gpu_id] = true;
-                }
-
                 auto task = std::make_shared<Task>();
                 task->priority = 0;
                 task->node = expert_node->node;
@@ -241,7 +226,6 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
             item.args = std::move(a);
             item.expert_node = expert_node;
             item.cache_hit = cache_hit;
-            item.success = success;
             pending_items.emplace_back(std::move(item));
         }
 
@@ -295,7 +279,7 @@ void ExpertDispatcher::GPUFetchFunc(int gpu_id)
             exec_args.out_gpu_id =
                 ((item.args.remote) ? CPU_DEVICE : hidden_states_.device()).index();
             exec_args.out_dtype = c10::typeMetaToScalarType(hidden_states_.dtype());
-            exec_args.evict = !item.success;
+            exec_args.evict = false;
             exec_args.hit = item.cache_hit;
             std::lock_guard<std::mutex> exec_lock(exec_mutex_);
             exec_queue_.emplace_back(std::move(exec_args));
