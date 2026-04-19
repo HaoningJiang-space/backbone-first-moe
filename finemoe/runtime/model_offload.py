@@ -959,6 +959,26 @@ class OffloadEngine(object):
         for current in module._archer_service_modules:
             current._archer_manual_service_active = enabled
 
+    def _iter_unique_modules(self, modules):
+        seen = set()
+        for module in modules:
+            module_id = id(module)
+            if module_id in seen:
+                continue
+            seen.add(module_id)
+            yield module
+
+    def _set_manual_service_active_group(self, modules, enabled: bool):
+        seen_service_modules = set()
+        for module in self._iter_unique_modules(modules):
+            self._attach_module_service_metadata(module)
+            for current in module._archer_service_modules:
+                current_id = id(current)
+                if current_id in seen_service_modules:
+                    continue
+                seen_service_modules.add(current_id)
+                current._archer_manual_service_active = enabled
+
     def _tensor_in_offload_set(self, tensor):
         return tensor.data_ptr() in self.offload_set
 
@@ -1012,6 +1032,35 @@ class OffloadEngine(object):
         )
         return tuple(begun_tensors)
 
+    def _begin_module_subtrees_group(self, modules):
+        unique_modules = tuple(self._iter_unique_modules(modules))
+        t0 = time.perf_counter()
+        begun_by_module = []
+        current_begun_tensors = []
+        try:
+            for module in unique_modules:
+                self._attach_module_service_metadata(module)
+                current_begun_tensors = []
+                for param in module._archer_service_params:
+                    if self._begin_manual_service_tensor(param):
+                        current_begun_tensors.append(param)
+                for buf in module._archer_service_buffers:
+                    if self._begin_manual_service_tensor(buf):
+                        current_begun_tensors.append(buf)
+                begun_by_module.append((module, tuple(current_begun_tensors)))
+        except Exception:
+            for tensor in reversed(current_begun_tensors):
+                self._end_manual_service_tensor(tensor)
+            for _, begun_tensors in reversed(begun_by_module):
+                for tensor in reversed(begun_tensors):
+                    self._end_manual_service_tensor(tensor)
+            raise
+        self.runtime_profile.record_manual_subtree_service(
+            begin_calls=1,
+            begin_wall_time_sec=time.perf_counter() - t0,
+        )
+        return tuple(begun_by_module)
+
     def _end_module_subtree(self, module, begun_tensors=None):
         self._attach_module_service_metadata(module)
         t0 = time.perf_counter()
@@ -1020,6 +1069,16 @@ class OffloadEngine(object):
             tensors = (*module._archer_service_params, *module._archer_service_buffers)
         for tensor in tensors:
             self._end_manual_service_tensor(tensor)
+        self.runtime_profile.record_manual_subtree_service(
+            end_calls=1,
+            end_wall_time_sec=time.perf_counter() - t0,
+        )
+
+    def _end_module_subtrees_group(self, begun_by_module):
+        t0 = time.perf_counter()
+        for _, begun_tensors in reversed(tuple(begun_by_module)):
+            for tensor in begun_tensors:
+                self._end_manual_service_tensor(tensor)
         self.runtime_profile.record_manual_subtree_service(
             end_calls=1,
             end_wall_time_sec=time.perf_counter() - t0,
@@ -1037,6 +1096,30 @@ class OffloadEngine(object):
                     self._end_module_subtree(module, begun_tensors=begun_tensors)
             finally:
                 self._set_manual_service_active(module, False)
+
+    def run_module_demand_lane_group(self, modules, args_list, kwargs_list=None):
+        module_list = tuple(modules)
+        if not module_list:
+            return []
+        if kwargs_list is None:
+            kwargs_list = [None] * len(module_list)
+
+        begun_by_module = None
+        self._set_manual_service_active_group(module_list, True)
+        try:
+            begun_by_module = self._begin_module_subtrees_group(module_list)
+            outputs = []
+            for module, args, kwargs in zip(module_list, args_list, kwargs_list):
+                call_args = args if isinstance(args, tuple) else (args,)
+                call_kwargs = kwargs or {}
+                outputs.append(module(*call_args, **call_kwargs))
+            return outputs
+        finally:
+            try:
+                if begun_by_module is not None:
+                    self._end_module_subtrees_group(begun_by_module)
+            finally:
+                self._set_manual_service_active_group(module_list, False)
 
     def pin_resident_experts(self, model, resident_expert_ids):
         """Pin backbone experts via runtime-native C++ API.

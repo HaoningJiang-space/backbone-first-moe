@@ -27,7 +27,7 @@ def _build_assignment_blocks(selected_experts: torch.Tensor, routing_weights: to
     return sorted_experts, sorted_tokens, sorted_weights, start_positions.tolist(), end_positions.tolist()
 
 
-def _run_modulelist_lane(
+def _run_modulelist_resident_lane(
     *,
     hidden_states: torch.Tensor,
     final_hidden_states: torch.Tensor,
@@ -36,7 +36,6 @@ def _run_modulelist_lane(
     sorted_weights: torch.Tensor,
     experts,
     blocks,
-    lane: str,
 ):
     compute_wall_time_sec = 0.0
     token_assignments = 0
@@ -48,16 +47,70 @@ def _run_modulelist_lane(
         current_state = hidden_states[token_idx]
         expert_module = experts[expert_idx]
         t0 = time.perf_counter()
-        if lane == "resident":
-            current_hidden_states = expert_module(current_state)
-        else:
-            offload_engine = getattr(expert_module, "offload_engine", None)
-            runner = getattr(offload_engine, "run_module_demand_lane", None)
-            if runner is None:
-                current_hidden_states = expert_module(current_state)
-            else:
-                current_hidden_states = runner(expert_module, current_state)
+        current_hidden_states = expert_module(current_state)
         compute_wall_time_sec += time.perf_counter() - t0
+        current_hidden_states = current_hidden_states.to(
+            device=final_hidden_states.device,
+            dtype=final_hidden_states.dtype,
+        )
+        current_hidden_states = current_hidden_states * sorted_weights[start:end].to(
+            device=final_hidden_states.device,
+            dtype=final_hidden_states.dtype,
+        ).unsqueeze(-1)
+        final_hidden_states.index_add_(0, token_idx, current_hidden_states)
+    return token_assignments, compute_wall_time_sec
+
+
+def _run_modulelist_demand_lane(
+    *,
+    hidden_states: torch.Tensor,
+    final_hidden_states: torch.Tensor,
+    sorted_experts: torch.Tensor,
+    sorted_tokens: torch.Tensor,
+    sorted_weights: torch.Tensor,
+    experts,
+    blocks,
+):
+    if not blocks:
+        return 0, 0.0
+
+    payloads = []
+    offload_engine = None
+    for start, end in blocks:
+        expert_idx = int(sorted_experts[start])
+        token_idx = sorted_tokens[start:end]
+        current_state = hidden_states[token_idx]
+        expert_module = experts[expert_idx]
+        payloads.append((start, end, token_idx, expert_module, current_state))
+        expert_engine = getattr(expert_module, "offload_engine", None)
+        if offload_engine is None:
+            offload_engine = expert_engine
+        elif offload_engine is not expert_engine:
+            offload_engine = False
+
+    grouped_runner = None
+    if offload_engine not in (None, False):
+        grouped_runner = getattr(offload_engine, "run_module_demand_lane_group", None)
+
+    t0 = time.perf_counter()
+    if grouped_runner is not None:
+        outputs = grouped_runner(
+            [expert_module for _, _, _, expert_module, _ in payloads],
+            [current_state for _, _, _, _, current_state in payloads],
+        )
+    else:
+        outputs = []
+        for _, _, _, expert_module, current_state in payloads:
+            runner = getattr(getattr(expert_module, "offload_engine", None), "run_module_demand_lane", None)
+            if runner is None:
+                outputs.append(expert_module(current_state))
+            else:
+                outputs.append(runner(expert_module, current_state))
+    compute_wall_time_sec = time.perf_counter() - t0
+
+    token_assignments = 0
+    for (start, end, token_idx, _, _), current_hidden_states in zip(payloads, outputs):
+        token_assignments += int(end - start)
         current_hidden_states = current_hidden_states.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
@@ -106,7 +159,7 @@ def dispatch_modulelist_experts(
         else:
             demand_blocks.append((start, end))
 
-    resident_token_assignments, resident_compute_wall_time_sec = _run_modulelist_lane(
+    resident_token_assignments, resident_compute_wall_time_sec = _run_modulelist_resident_lane(
         hidden_states=hidden_states,
         final_hidden_states=final_hidden_states,
         sorted_experts=sorted_experts,
@@ -114,9 +167,8 @@ def dispatch_modulelist_experts(
         sorted_weights=sorted_weights,
         experts=experts,
         blocks=resident_blocks,
-        lane="resident",
     )
-    demand_token_assignments, demand_compute_wall_time_sec = _run_modulelist_lane(
+    demand_token_assignments, demand_compute_wall_time_sec = _run_modulelist_demand_lane(
         hidden_states=hidden_states,
         final_hidden_states=final_hidden_states,
         sorted_experts=sorted_experts,
@@ -124,7 +176,6 @@ def dispatch_modulelist_experts(
         sorted_weights=sorted_weights,
         experts=experts,
         blocks=demand_blocks,
-        lane="demand",
     )
     active_expert_blocks = len(start_positions)
     token_assignments = int(sorted_experts.numel())

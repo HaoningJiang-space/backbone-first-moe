@@ -44,6 +44,83 @@
   - what the realistic zero-loading / oracle ceiling looks like
   - whether current weak gains come from a bad method or a low memory-optimization ceiling
 
+## Three-Layer Diagnosis
+
+Use the following order when judging weak throughput results:
+
+### 1. Pin What
+
+Question:
+- is the resident set itself valuable?
+
+Primary evidence:
+- `retained_gain_fraction`
+- `regret_vs_native`
+- `Jaccard` stability across folds
+- top-k stall coverage
+- per-expert `saved_stall_per_byte`
+
+Current judgment:
+- not the main problem on `Qwen`
+- backbone signal is stable and transferable enough that selector quality is not the first bottleneck
+
+Relevant code paths:
+- `experiments/simulation/select_adaptive_resident_set.py`
+- `backbone_moe/evaluation.py`
+
+### 2. Pin How Much
+
+Question:
+- is the feasibility rule too conservative, leaving too much budget unused?
+
+Primary evidence:
+- `sparse_budget_bytes`
+- `selection_budget_bytes`
+- `resident_registry.admitted_bytes`
+- `resident_registry.admitted_count`
+- `resident_registry.clipped`
+- `resident_bytes / budget_bytes`
+- zero-resident degeneration frequency
+
+Current judgment:
+- likely a real secondary problem
+- current service envelope is still conservative enough that some fair points collapse to `resident = 0`
+
+Relevant code paths:
+- `experiments/simulation/select_adaptive_resident_set.py`
+- `finemoe/runtime/model_offload.py`
+
+### 3. Pin Then Serve
+
+Question:
+- are resident hits and tail misses being served cheaply enough?
+
+Primary evidence for modulelist:
+- `module_begin_wall_time_sec`
+- `module_end_wall_time_sec`
+- `manual_subtree_begin_wall_time_sec`
+- `manual_subtree_end_wall_time_sec`
+- `modulelist_demand_compute_wall_time_sec`
+- `modulelist_resident_compute_wall_time_sec`
+- `resident_fastpath_module_skips`
+
+Primary evidence for packed:
+- `packed_dispatch_wait_wall_time_sec`
+- `packed_dispatch_wait_calls`
+- `packed_demand_expert_blocks`
+- `packed_demand_token_assignments`
+
+Current judgment:
+- this is the main problem today
+- `Qwen` improved when only the runtime path changed
+- `DeepSeek` is still dominated by packed dispatch/wait cost
+
+Relevant code paths:
+- `finemoe/models/modulelist_runtime.py`
+- `finemoe/runtime/model_offload.py`
+- `finemoe/models/packed_runtime.py`
+- `core/parallel/expert_dispatcher.cpp`
+
 ## Simulator Interpretation
 
 - The simulator is still useful, but only in a limited role:
@@ -137,6 +214,10 @@ Why:
 - This is the most likely runtime change to recover real throughput.
 - It stays fully within the current paper story.
 
+Immediate implementation note:
+- for `Qwen/modulelist`, the next concrete step is to replace per-expert subtree demand service with grouped demand-lane service so one lane activation can cover multiple demand experts in the same layer-step
+- for `DeepSeek/packed`, the next concrete step is to reduce grouped tail wait/sync boundaries and reuse dispatch metadata more aggressively
+
 ### 5. Resident Fast Path
 
 Goal:
@@ -198,9 +279,35 @@ Why:
 
 ## Method Statement
 
-The method remains:
+The method should now be read as a first-principles asymmetric service decomposition problem, not as a better cache heuristic.
 
-- runtime-calibrated budget
-- utility-aware resident backbone
-- service-envelope-constrained feasible prefix
-- resident backbone + coalesced demand-only tail fallback
+Problem:
+
+- under GPU memory budget `B`, split MoE traffic into:
+  - a `stable resident set` that amortizes future stall
+  - a `residual tail` that must remain dynamically serviceable
+
+Method:
+
+- choose resident set `R` to maximize expected future saved stall
+- subject to:
+  - `bytes(R) + S_tail(R) <= B`
+- where `S_tail(R)` is a runtime-calibrated residual tail service envelope, not a raw cache frontier heuristic
+
+Runtime:
+
+- serve `R` through a low-overhead `resident lane`
+- serve `E \\ R` through `grouped exact tail service`
+
+Implication:
+
+- the headline novelty is no longer "a better pinning heuristic"
+- the headline novelty is:
+  - asymmetric resource allocation by `saved stall`
+  - serviceability-constrained resident capacity
+  - bifurcated runtime realization
+
+Immediate next implementation step:
+
+- finish moving `Qwen/modulelist` from per-expert subtree demand service toward grouped exact tail service
+- then attack `DeepSeek/packed` dispatch/wait with the same bifurcated-runtime lens

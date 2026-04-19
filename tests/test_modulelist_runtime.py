@@ -28,10 +28,15 @@ class _AffineExpert(torch.nn.Module):
 class _FakeOffloadEngine:
     def __init__(self):
         self.calls = []
+        self.group_calls = []
 
     def run_module_demand_lane(self, module, x):
         self.calls.append(module)
         return module(x)
+
+    def run_module_demand_lane_group(self, modules, inputs):
+        self.group_calls.append(tuple(modules))
+        return [module(x) for module, x in zip(modules, inputs)]
 
 
 def _reference_dispatch(hidden_states, selected_experts, routing_weights, experts):
@@ -175,7 +180,68 @@ class ModulelistRuntimeTest(unittest.TestCase):
         self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
         self.assertEqual(experts[0].forward_calls, 1)
         self.assertEqual(experts[1].forward_calls, 1)
-        self.assertEqual(fake_engine.calls, [experts[0]])
+        self.assertEqual(fake_engine.calls, [])
+        self.assertEqual(fake_engine.group_calls, [(experts[0],)])
+
+    def test_dispatch_groups_multiple_demand_experts(self):
+        hidden_states = torch.tensor(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+            ],
+            dtype=torch.float32,
+        )
+        selected_experts = torch.tensor(
+            [
+                [0, 1],
+                [1, 2],
+                [2, 0],
+            ],
+            dtype=torch.long,
+        )
+        routing_weights = torch.tensor(
+            [
+                [0.7, 0.3],
+                [0.6, 0.4],
+                [0.8, 0.2],
+            ],
+            dtype=torch.float32,
+        )
+        experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=0.0),
+                _AffineExpert(scale=1.0, bias=1.0),
+                _AffineExpert(scale=-1.0, bias=0.5),
+            ]
+        )
+        reference_experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=0.0),
+                _AffineExpert(scale=1.0, bias=1.0),
+                _AffineExpert(scale=-1.0, bias=0.5),
+            ]
+        )
+        fake_engine = _FakeOffloadEngine()
+        for expert in experts:
+            expert.offload_engine = fake_engine
+
+        actual = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=experts,
+            resident_expert_ids={2},
+        )
+        expected = _reference_dispatch(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=reference_experts,
+        )
+        self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
+        self.assertEqual(fake_engine.calls, [])
+        self.assertEqual(fake_engine.group_calls, [(experts[0], experts[1])])
 
 
 if __name__ == "__main__":
