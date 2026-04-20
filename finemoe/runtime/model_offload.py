@@ -416,6 +416,9 @@ class RuntimeProfile:
     modulelist_demand_gather_wall_time_sec: float = 0.0
     modulelist_resident_merge_wall_time_sec: float = 0.0
     modulelist_demand_merge_wall_time_sec: float = 0.0
+    modulelist_output_buffer_cache_hits: int = 0
+    modulelist_output_buffer_cache_misses: int = 0
+    modulelist_output_buffer_prepare_wall_time_sec: float = 0.0
     resident_lane_expert_blocks: int = 0
     resident_lane_token_assignments: int = 0
     resident_lane_compute_wall_time_sec: float = 0.0
@@ -525,6 +528,9 @@ class RuntimeProfile:
         demand_gather_wall_time_sec=0.0,
         resident_merge_wall_time_sec=0.0,
         demand_merge_wall_time_sec=0.0,
+        output_buffer_cache_hit=False,
+        output_buffer_cache_miss=False,
+        output_buffer_prepare_wall_time_sec=0.0,
     ):
         self.modulelist_dispatch_calls += 1
         self.modulelist_active_expert_blocks += int(active_expert_blocks)
@@ -541,6 +547,9 @@ class RuntimeProfile:
         self.modulelist_demand_gather_wall_time_sec += float(demand_gather_wall_time_sec)
         self.modulelist_resident_merge_wall_time_sec += float(resident_merge_wall_time_sec)
         self.modulelist_demand_merge_wall_time_sec += float(demand_merge_wall_time_sec)
+        self.modulelist_output_buffer_cache_hits += int(bool(output_buffer_cache_hit))
+        self.modulelist_output_buffer_cache_misses += int(bool(output_buffer_cache_miss))
+        self.modulelist_output_buffer_prepare_wall_time_sec += float(output_buffer_prepare_wall_time_sec)
         self.resident_lane_expert_blocks += int(resident_expert_blocks)
         self.resident_lane_token_assignments += int(resident_token_assignments)
         self.resident_lane_compute_wall_time_sec += float(resident_compute_wall_time_sec)
@@ -612,6 +621,9 @@ class RuntimeProfile:
             "modulelist_demand_gather_wall_time_sec": float(self.modulelist_demand_gather_wall_time_sec),
             "modulelist_resident_merge_wall_time_sec": float(self.modulelist_resident_merge_wall_time_sec),
             "modulelist_demand_merge_wall_time_sec": float(self.modulelist_demand_merge_wall_time_sec),
+            "modulelist_output_buffer_cache_hits": int(self.modulelist_output_buffer_cache_hits),
+            "modulelist_output_buffer_cache_misses": int(self.modulelist_output_buffer_cache_misses),
+            "modulelist_output_buffer_prepare_wall_time_sec": float(self.modulelist_output_buffer_prepare_wall_time_sec),
             "resident_lane_expert_blocks": int(self.resident_lane_expert_blocks),
             "resident_lane_token_assignments": int(self.resident_lane_token_assignments),
             "resident_lane_compute_wall_time_sec": float(self.resident_lane_compute_wall_time_sec),

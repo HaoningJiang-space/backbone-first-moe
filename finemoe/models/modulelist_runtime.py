@@ -27,6 +27,38 @@ def _build_assignment_blocks(selected_experts: torch.Tensor, routing_weights: to
     return sorted_experts, sorted_tokens, sorted_weights, start_positions.tolist(), end_positions.tolist()
 
 
+def _acquire_output_buffer(hidden_states: torch.Tensor, runtime_cache=None):
+    tokens, hidden_dim = hidden_states.shape
+    prepare_t0 = time.perf_counter()
+    cache_hit = False
+    final_hidden_states = None
+    if runtime_cache is not None:
+        cached = runtime_cache.get("output_buffer")
+        if cached is not None:
+            cached_tensor = cached.get("tensor")
+            if (
+                cached_tensor is not None
+                and tuple(cached_tensor.shape) == (tokens, hidden_dim)
+                and cached_tensor.dtype == hidden_states.dtype
+                and cached_tensor.device == hidden_states.device
+            ):
+                final_hidden_states = cached_tensor
+                cache_hit = True
+
+    if final_hidden_states is None:
+        final_hidden_states = torch.empty(
+            (tokens, hidden_dim),
+            dtype=hidden_states.dtype,
+            device=hidden_states.device,
+        )
+        if runtime_cache is not None:
+            runtime_cache["output_buffer"] = {"tensor": final_hidden_states}
+
+    final_hidden_states.zero_()
+    prepare_wall_time_sec = time.perf_counter() - prepare_t0
+    return final_hidden_states, cache_hit, prepare_wall_time_sec
+
+
 def _run_modulelist_resident_lane(
     *,
     hidden_states: torch.Tensor,
@@ -156,13 +188,13 @@ def dispatch_modulelist_experts(
     experts,
     resident_expert_ids=None,
     runtime_profile=None,
+    runtime_cache=None,
 ) -> torch.Tensor:
     tokens, hidden_dim = hidden_states.shape
     top_k = selected_experts.shape[-1]
-    final_hidden_states = torch.zeros(
-        (tokens, hidden_dim),
-        dtype=hidden_states.dtype,
-        device=hidden_states.device,
+    final_hidden_states, output_buffer_cache_hit, output_buffer_prepare_wall_time_sec = _acquire_output_buffer(
+        hidden_states,
+        runtime_cache=runtime_cache,
     )
     if tokens == 0 or top_k == 0:
         return final_hidden_states
@@ -236,6 +268,9 @@ def dispatch_modulelist_experts(
             demand_gather_wall_time_sec=demand_gather_wall_time_sec,
             resident_merge_wall_time_sec=resident_merge_wall_time_sec,
             demand_merge_wall_time_sec=demand_merge_wall_time_sec,
+            output_buffer_cache_hit=output_buffer_cache_hit,
+            output_buffer_cache_miss=not output_buffer_cache_hit,
+            output_buffer_prepare_wall_time_sec=output_buffer_prepare_wall_time_sec,
         )
 
     return final_hidden_states

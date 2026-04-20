@@ -321,6 +321,66 @@ class ModulelistRuntimeTest(unittest.TestCase):
         self.assertEqual(payload["resident_expert_blocks"], 1)
         self.assertEqual(payload["demand_expert_blocks"], 2)
 
+    def test_dispatch_reuses_output_buffer_with_runtime_cache(self):
+        hidden_states = torch.tensor(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+            ],
+            dtype=torch.float32,
+        )
+        selected_experts = torch.tensor(
+            [
+                [0, 1],
+                [1, 0],
+            ],
+            dtype=torch.long,
+        )
+        routing_weights = torch.tensor(
+            [
+                [0.6, 0.4],
+                [0.7, 0.3],
+            ],
+            dtype=torch.float32,
+        )
+        experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=0.0),
+                _AffineExpert(scale=1.0, bias=1.0),
+            ]
+        )
+        runtime_cache = {}
+        calls = []
+        runtime_profile = SimpleNamespace(
+            record_modulelist_dispatch=lambda **kwargs: calls.append(kwargs)
+        )
+
+        first = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=experts,
+            runtime_profile=runtime_profile,
+            runtime_cache=runtime_cache,
+        )
+        first_ptr = first.data_ptr()
+        second = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=experts,
+            runtime_profile=runtime_profile,
+            runtime_cache=runtime_cache,
+        )
+
+        self.assertEqual(first_ptr, second.data_ptr())
+        self.assertEqual(calls[0]["output_buffer_cache_hit"], 0)
+        self.assertEqual(calls[0]["output_buffer_cache_miss"], 1)
+        self.assertEqual(calls[1]["output_buffer_cache_hit"], 1)
+        self.assertEqual(calls[1]["output_buffer_cache_miss"], 0)
+        self.assertGreaterEqual(calls[0]["output_buffer_prepare_wall_time_sec"], 0.0)
+        self.assertGreaterEqual(calls[1]["output_buffer_prepare_wall_time_sec"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

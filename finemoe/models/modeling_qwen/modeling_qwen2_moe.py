@@ -770,6 +770,7 @@ class Qwen2MoeSparseMoeBlock(nn.Module):
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
+        self._modulelist_runtime_cache = {}
 
         # gating
         self.gate = nn.Linear(config.hidden_size,
@@ -806,6 +807,7 @@ class Qwen2MoeSparseMoeBlock(nn.Module):
             experts=self.experts,
             resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
             runtime_profile=getattr(self, "runtime_profile", None),
+            runtime_cache=self._modulelist_runtime_cache,
         )
 
         shared_expert_output = self.shared_expert(hidden_states)
@@ -827,6 +829,7 @@ class SyncQwen2MoeSparseMoeBlock(nn.Module):
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
+        self._modulelist_runtime_cache = {}
 
         # gating
         self.gate = nn.Linear(config.hidden_size,
@@ -919,6 +922,7 @@ class SyncQwen2MoeSparseMoeBlock(nn.Module):
             experts=self.experts,
             resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
             runtime_profile=getattr(self, "runtime_profile", None),
+            runtime_cache=self._modulelist_runtime_cache,
         )
 
         shared_expert_output = self.shared_expert(hidden_states)

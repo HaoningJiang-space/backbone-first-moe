@@ -581,6 +581,7 @@ class OlmoeSparseMoeBlock(nn.Module):
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
+        self._modulelist_runtime_cache = {}
         self.gate = nn.Linear(config.hidden_size, self.num_experts, bias=False)
         self.experts = nn.ModuleList([OlmoeMLP(config) for _ in range(self.num_experts)])
 
@@ -602,6 +603,7 @@ class OlmoeSparseMoeBlock(nn.Module):
             experts=self.experts,
             resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
             runtime_profile=getattr(self, "runtime_profile", None),
+            runtime_cache=self._modulelist_runtime_cache,
         )
 
         final_hidden_states = final_hidden_states.reshape(batch_size, sequence_length, hidden_dim)
@@ -629,6 +631,7 @@ class SyncOlmoeSparseMoeBlock(nn.Module):
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
+        self._modulelist_runtime_cache = {}
         self.gate = nn.Linear(config.hidden_size, self.num_experts, bias=False)
         self.experts = nn.ModuleList([OlmoeMLP(config) for _ in range(self.num_experts)])
 
@@ -703,6 +706,7 @@ class SyncOlmoeSparseMoeBlock(nn.Module):
             experts=self.experts,
             resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
             runtime_profile=getattr(self, "runtime_profile", None),
+            runtime_cache=self._modulelist_runtime_cache,
         )
 
         final_hidden_states = final_hidden_states.reshape(batch_size, sequence_length, hidden_dim)
