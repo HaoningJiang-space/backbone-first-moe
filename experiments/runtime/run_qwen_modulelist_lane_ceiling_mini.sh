@@ -10,6 +10,7 @@ PROMPT_FILE="${PROMPT_FILE:-/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-cha
 STATE_FILE="${STATE_FILE:-/data/ziheng/FineMoE-EuroSys26/demo/states/Qwen1.5-MoE-A2.7B-Chat~lmsys-chat-1m~64.pkl}"
 
 NUM_PROMPTS="${NUM_PROMPTS:-8}"
+NUM_MEASURED_SLICES="${NUM_MEASURED_SLICES:-4}"
 DEVICE_MEMORY_RATIO="${DEVICE_MEMORY_RATIO:-0.10}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
 MAX_LENGTH="${MAX_LENGTH:-256}"
@@ -41,6 +42,7 @@ python experiments/runtime/run_qwen_modulelist_lane_ceiling_singleproc.py \
   --device cuda:0 \
   --batch-size "${BATCH_SIZE}" \
   --num-prompts "${NUM_PROMPTS}" \
+  --num-measured-slices "${NUM_MEASURED_SLICES}" \
   --max-length "${MAX_LENGTH}" \
   --max-new-tokens "${MAX_NEW_TOKENS}" \
   --min-new-tokens "${MIN_NEW_TOKENS}" \

@@ -36,6 +36,7 @@ def build_parser():
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--num-prompts", type=int, default=8)
+    parser.add_argument("--num-measured-slices", type=int, default=4)
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--max-new-tokens", type=int, default=16)
     parser.add_argument("--min-new-tokens", type=int, default=1)
@@ -90,38 +91,65 @@ def run_eval(cfg: RuntimeEvalConfig, prompts, tokenizer):
         cleanup_model(model)
 
 
-def prepare_prompt_subsets(prompt_file: Path, *, seed: int, num_prompts: int):
+def prepare_prompt_subsets(prompt_file: Path, *, seed: int, num_prompts: int, num_measured_slices: int):
     prompts = load_prompts(prompt_file)
     random.Random(seed).shuffle(prompts)
-    if len(prompts) < num_prompts * 2:
+    required = num_prompts * (1 + num_measured_slices)
+    if len(prompts) < required:
         raise RuntimeError(
-            f"Need at least {num_prompts * 2} prompts for warmup/pair split, got {len(prompts)}"
+            f"Need at least {required} prompts for warmup + {num_measured_slices} measured slices, got {len(prompts)}"
         )
-    pair_prompts = prompts[:num_prompts]
-    warmup_prompts = prompts[num_prompts:num_prompts * 2]
-    return pair_prompts, warmup_prompts
+    warmup_prompts = prompts[:num_prompts]
+    measured_slices = []
+    for slice_idx in range(num_measured_slices):
+        start = num_prompts * (slice_idx + 1)
+        measured_slices.append(prompts[start:start + num_prompts])
+    return warmup_prompts, measured_slices
 
 
-def run_persistent_model_pair(
+def _aggregate_window_results(warmup, measured_results):
+    total_generated_tokens = sum(item["total_generated_tokens"] for item in measured_results)
+    total_prompt_tokens = sum(item["total_prompt_tokens"] for item in measured_results)
+    total_elapsed = sum(item["total_elapsed_sec"] for item in measured_results)
+    generated_tps = total_generated_tokens / total_elapsed if total_elapsed > 0 else 0.0
+    end_to_end_tps = (total_prompt_tokens + total_generated_tokens) / total_elapsed if total_elapsed > 0 else 0.0
+    return {
+        "warmup": warmup,
+        "measured_slices": measured_results,
+        "num_measured_slices": len(measured_results),
+        "total_elapsed_sec": total_elapsed,
+        "total_prompt_tokens": total_prompt_tokens,
+        "total_generated_tokens": total_generated_tokens,
+        "generated_tokens_per_sec": generated_tps,
+        "end_to_end_tokens_per_sec": end_to_end_tps,
+    }
+
+
+def run_persistent_model_window(
     model,
     warmup_cfg: RuntimeEvalConfig,
-    pair_cfg: RuntimeEvalConfig,
+    measured_cfg_factory,
     warmup_prompts,
-    pair_prompts,
+    measured_prompt_slices,
     tokenizer,
 ):
     warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, warmup_prompts)
     reset_runtime_measurement_state(model, clear_dynamic_sparse_state=True)
-    pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, pair_prompts)
-    return warmup, pair
+    measured_results = []
+    for slice_idx, measured_prompts in enumerate(measured_prompt_slices, start=1):
+        measured_cfg = measured_cfg_factory(slice_idx)
+        measured_results.append(
+            evaluate_runtime_with_components(measured_cfg, model, tokenizer, measured_prompts)
+        )
+    return _aggregate_window_results(warmup, measured_results)
 
 
-def run_no_tail_wait_persistent_pair(
+def run_no_tail_wait_persistent_window(
     model,
     warmup_cfg: RuntimeEvalConfig,
-    pair_cfg: RuntimeEvalConfig,
+    measured_cfg_factory,
     warmup_prompts,
-    pair_prompts,
+    measured_prompt_slices,
     tokenizer,
 ):
     start_capture = getattr(model.engine, "start_no_tail_wait_capture", None)
@@ -137,10 +165,15 @@ def run_no_tail_wait_persistent_pair(
     activate()
     try:
         reset_runtime_measurement_state(model)
-        pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, pair_prompts)
+        measured_results = []
+        for slice_idx, measured_prompts in enumerate(measured_prompt_slices, start=1):
+            measured_cfg = measured_cfg_factory(slice_idx)
+            measured_results.append(
+                evaluate_runtime_with_components(measured_cfg, model, tokenizer, measured_prompts)
+            )
     finally:
         deactivate()
-    return warmup, pair
+    return _aggregate_window_results(warmup, measured_results)
 
 
 def select_resident(args, budget_bytes: int, output_dir: Path) -> Path:
@@ -172,13 +205,13 @@ def select_resident(args, budget_bytes: int, output_dir: Path) -> Path:
     return resident_json
 
 
-def run_mode(args, output_root: Path, warmup_prompts, pair_prompts, tokenizer, budget_bytes: int, resident_json: Path, *,
+def run_mode(args, output_root: Path, warmup_prompts, measured_prompt_slices, tokenizer, budget_bytes: int, resident_json: Path, *,
              mode_name: str, no_control_mode: bool, no_tail_wait_mode: bool = False):
     mode_root = output_root / mode_name
     warmup_dir = mode_root / "warmup"
-    pair_dir = mode_root / "pair1"
+    measured_dir = mode_root / "measured"
     warmup_dir.mkdir(parents=True, exist_ok=True)
-    pair_dir.mkdir(parents=True, exist_ok=True)
+    measured_dir.mkdir(parents=True, exist_ok=True)
 
     a_warmup_cfg = make_cfg(
         args,
@@ -197,40 +230,53 @@ def run_mode(args, output_root: Path, warmup_prompts, pair_prompts, tokenizer, b
         no_tail_wait_mode=no_tail_wait_mode,
         tag=f"{mode_name}_warmup_C",
     )
-    a_pair_cfg = make_cfg(
-        args,
-        pair_dir / "qwen_A_mem0p10_lane_long.json",
-        budget_override=budget_bytes,
-        no_control_mode=no_control_mode,
-        no_tail_wait_mode=no_tail_wait_mode,
-        tag=f"{mode_name}_pair1_A",
-    )
-    c_pair_cfg = make_cfg(
-        args,
-        pair_dir / "qwen_C_mem0p10_lane_long.json",
-        resident_file=str(resident_json),
-        budget_override=budget_bytes,
-        no_control_mode=no_control_mode,
-        no_tail_wait_mode=no_tail_wait_mode,
-        tag=f"{mode_name}_pair1_C",
-    )
+    def make_a_measured_cfg(slice_idx: int):
+        return make_cfg(
+            args,
+            measured_dir / f"slice{slice_idx}" / "qwen_A_mem0p10_lane_long.json",
+            budget_override=budget_bytes,
+            no_control_mode=no_control_mode,
+            no_tail_wait_mode=no_tail_wait_mode,
+            tag=f"{mode_name}_slice{slice_idx}_A",
+        )
+
+    def make_c_measured_cfg(slice_idx: int):
+        return make_cfg(
+            args,
+            measured_dir / f"slice{slice_idx}" / "qwen_C_mem0p10_lane_long.json",
+            resident_file=str(resident_json),
+            budget_override=budget_bytes,
+            no_control_mode=no_control_mode,
+            no_tail_wait_mode=no_tail_wait_mode,
+            tag=f"{mode_name}_slice{slice_idx}_C",
+        )
 
     log_stage(output_root, f"{mode_name}:build_a:start")
     a_model = build_model(a_warmup_cfg)
     log_stage(output_root, f"{mode_name}:build_a:done")
     try:
         log_stage(output_root, f"{mode_name}:warmup_a:start")
-        log_stage(output_root, f"{mode_name}:pair1_a:start")
+        log_stage(output_root, f"{mode_name}:measured_a:start")
         if no_tail_wait_mode:
-            a_warmup, a_pair = run_no_tail_wait_persistent_pair(
-                a_model, a_warmup_cfg, a_pair_cfg, warmup_prompts, pair_prompts, tokenizer
+            a_window = run_no_tail_wait_persistent_window(
+                a_model,
+                a_warmup_cfg,
+                make_a_measured_cfg,
+                warmup_prompts,
+                measured_prompt_slices,
+                tokenizer,
             )
         else:
-            a_warmup, a_pair = run_persistent_model_pair(
-                a_model, a_warmup_cfg, a_pair_cfg, warmup_prompts, pair_prompts, tokenizer
+            a_window = run_persistent_model_window(
+                a_model,
+                a_warmup_cfg,
+                make_a_measured_cfg,
+                warmup_prompts,
+                measured_prompt_slices,
+                tokenizer,
             )
         log_stage(output_root, f"{mode_name}:warmup_a:done")
-        log_stage(output_root, f"{mode_name}:pair1_a:done")
+        log_stage(output_root, f"{mode_name}:measured_a:done")
     finally:
         cleanup_model(a_model)
         log_stage(output_root, f"{mode_name}:cleanup_a:done")
@@ -240,25 +286,35 @@ def run_mode(args, output_root: Path, warmup_prompts, pair_prompts, tokenizer, b
     log_stage(output_root, f"{mode_name}:build_c:done")
     try:
         log_stage(output_root, f"{mode_name}:warmup_c:start")
-        log_stage(output_root, f"{mode_name}:pair1_c:start")
+        log_stage(output_root, f"{mode_name}:measured_c:start")
         if no_tail_wait_mode:
-            c_warmup, c_pair = run_no_tail_wait_persistent_pair(
-                c_model, c_warmup_cfg, c_pair_cfg, warmup_prompts, pair_prompts, tokenizer
+            c_window = run_no_tail_wait_persistent_window(
+                c_model,
+                c_warmup_cfg,
+                make_c_measured_cfg,
+                warmup_prompts,
+                measured_prompt_slices,
+                tokenizer,
             )
         else:
-            c_warmup, c_pair = run_persistent_model_pair(
-                c_model, c_warmup_cfg, c_pair_cfg, warmup_prompts, pair_prompts, tokenizer
+            c_window = run_persistent_model_window(
+                c_model,
+                c_warmup_cfg,
+                make_c_measured_cfg,
+                warmup_prompts,
+                measured_prompt_slices,
+                tokenizer,
             )
         log_stage(output_root, f"{mode_name}:warmup_c:done")
-        log_stage(output_root, f"{mode_name}:pair1_c:done")
+        log_stage(output_root, f"{mode_name}:measured_c:done")
     finally:
         cleanup_model(c_model)
         log_stage(output_root, f"{mode_name}:cleanup_c:done")
 
     gain = 0.0
-    if a_pair["generated_tokens_per_sec"] > 0:
+    if a_window["generated_tokens_per_sec"] > 0:
         gain = (
-            c_pair["generated_tokens_per_sec"] / a_pair["generated_tokens_per_sec"] - 1.0
+            c_window["generated_tokens_per_sec"] / a_window["generated_tokens_per_sec"] - 1.0
         ) * 100.0
 
     summary = {
@@ -267,8 +323,8 @@ def run_mode(args, output_root: Path, warmup_prompts, pair_prompts, tokenizer, b
         "no_tail_wait_mode": bool(no_tail_wait_mode),
         "sparse_budget_bytes": int(budget_bytes),
         "resident_expert_ids_file": str(resident_json),
-        "warmup": {"A": a_warmup, "C": c_warmup},
-        "pair1": {"A": a_pair, "C": c_pair, "gain_percent": gain},
+        "num_measured_slices": len(measured_prompt_slices),
+        "window": {"A": a_window, "C": c_window, "gain_percent": gain},
     }
     (mode_root / "summary.json").write_text(json.dumps(summary, indent=2))
     return summary
@@ -289,15 +345,16 @@ def main():
         tag="plan_A",
     )
 
-    pair_prompts, warmup_prompts = prepare_prompt_subsets(
+    warmup_prompts, measured_prompt_slices = prepare_prompt_subsets(
         args.prompt_file,
         seed=args.seed,
         num_prompts=args.num_prompts,
+        num_measured_slices=args.num_measured_slices,
     )
     tokenizer = build_tokenizer(plan_cfg)
 
     log_stage(output_root, "plan_a:start")
-    plan_payload = run_eval(plan_cfg, pair_prompts, tokenizer)
+    plan_payload = run_eval(plan_cfg, measured_prompt_slices[0], tokenizer)
     log_stage(output_root, "plan_a:done")
 
     budget_bytes = int(plan_payload["sparse_budget_bytes"])
@@ -309,7 +366,7 @@ def main():
         args,
         output_root,
         warmup_prompts,
-        pair_prompts,
+        measured_prompt_slices,
         tokenizer,
         budget_bytes,
         resident_json,
@@ -320,7 +377,7 @@ def main():
         args,
         output_root,
         warmup_prompts,
-        pair_prompts,
+        measured_prompt_slices,
         tokenizer,
         budget_bytes,
         resident_json,
@@ -331,7 +388,7 @@ def main():
         args,
         output_root,
         warmup_prompts,
-        pair_prompts,
+        measured_prompt_slices,
         tokenizer,
         budget_bytes,
         resident_json,
