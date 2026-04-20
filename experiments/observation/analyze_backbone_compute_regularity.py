@@ -57,6 +57,10 @@ def analyze_trace(state_dict, resident_set):
     resident_assignments = 0
     token_hits = 0
     layer_token_hits = 0
+    token_assignment_fractions = []
+    layer_token_assignment_fractions = []
+    per_layer_assignments = defaultdict(int)
+    per_layer_resident_assignments = defaultdict(int)
 
     for trace_entry in state_dict.values():
         iters = trace_entry.get("iters", [])
@@ -64,6 +68,8 @@ def analyze_trace(state_dict, resident_set):
             nodes = it["nodes"]
             total_tokens += 1
             token_has_backbone = False
+            token_assignments = 0
+            token_resident_assignments = 0
             num_layers = int(nodes.shape[0])
             for layer_idx in range(num_layers):
                 experts = torch.nonzero(nodes[layer_idx] > 0).squeeze(-1).tolist()
@@ -71,19 +77,33 @@ def analyze_trace(state_dict, resident_set):
                     continue
                 layer_token_steps += 1
                 layer_has_backbone = False
+                layer_assignments = 0
+                layer_resident_assignments = 0
                 step_counts = grouped[(iter_idx, layer_idx)]
                 for expert_idx in experts:
                     expert_key = (layer_idx, int(expert_idx))
                     step_counts[expert_key] += 1
                     total_assignments += 1
+                    token_assignments += 1
+                    layer_assignments += 1
+                    per_layer_assignments[layer_idx] += 1
                     if expert_key in resident_set:
                         resident_assignments += 1
+                        token_resident_assignments += 1
+                        layer_resident_assignments += 1
+                        per_layer_resident_assignments[layer_idx] += 1
                         layer_has_backbone = True
                         token_has_backbone = True
                 if layer_has_backbone:
                     layer_token_hits += 1
+                layer_token_assignment_fractions.append(
+                    layer_resident_assignments / max(1, layer_assignments)
+                )
             if token_has_backbone:
                 token_hits += 1
+            token_assignment_fractions.append(
+                token_resident_assignments / max(1, token_assignments)
+            )
 
     total_blocks = 0
     resident_blocks = 0
@@ -155,6 +175,12 @@ def analyze_trace(state_dict, resident_set):
     token_coverage = token_hits / max(1, total_tokens)
     layer_token_coverage = layer_token_hits / max(1, layer_token_steps)
     expert_block_coverage = resident_blocks / max(1, total_blocks)
+    per_layer_assignment_coverage = {
+        str(layer_idx): (
+            per_layer_resident_assignments[layer_idx] / max(1, per_layer_assignments[layer_idx])
+        )
+        for layer_idx in sorted(per_layer_assignments.keys())
+    }
 
     return {
         "totals": {
@@ -168,11 +194,16 @@ def analyze_trace(state_dict, resident_set):
         },
         "coverage": {
             "backbone_access_coverage": float(access_coverage),
-            "backbone_token_coverage": float(token_coverage),
-            "backbone_layer_token_coverage": float(layer_token_coverage),
+            "backbone_any_hit_token_coverage": float(token_coverage),
+            "backbone_any_hit_layer_token_coverage": float(layer_token_coverage),
             "backbone_expert_block_coverage": float(expert_block_coverage),
             "backbone_flop_coverage": float(access_coverage),
             "backbone_flop_coverage_assumption": "homogeneous_expert_ffn_cost",
+            "per_layer_assignment_coverage": per_layer_assignment_coverage,
+        },
+        "assignment_fraction": {
+            "per_token": summarize_distribution(token_assignment_fractions),
+            "per_layer_token": summarize_distribution(layer_token_assignment_fractions),
         },
         "active_expert_count_before_after_backbone": {
             "all": summarize_distribution(all_active_experts),
@@ -211,11 +242,27 @@ def build_markdown(summary):
     lines.append("")
     coverage = summary["coverage"]
     lines.append(f"- backbone_access_coverage: `{coverage['backbone_access_coverage']:.4f}`")
-    lines.append(f"- backbone_token_coverage: `{coverage['backbone_token_coverage']:.4f}`")
-    lines.append(f"- backbone_layer_token_coverage: `{coverage['backbone_layer_token_coverage']:.4f}`")
+    lines.append(f"- backbone_any_hit_token_coverage: `{coverage['backbone_any_hit_token_coverage']:.4f}`")
+    lines.append(f"- backbone_any_hit_layer_token_coverage: `{coverage['backbone_any_hit_layer_token_coverage']:.4f}`")
     lines.append(f"- backbone_expert_block_coverage: `{coverage['backbone_expert_block_coverage']:.4f}`")
     lines.append(f"- backbone_flop_coverage: `{coverage['backbone_flop_coverage']:.4f}`")
     lines.append(f"- backbone_flop_coverage_assumption: `{coverage['backbone_flop_coverage_assumption']}`")
+    lines.append("")
+    lines.append("## Assignment Fraction")
+    lines.append("")
+    assignment_fraction = summary["assignment_fraction"]
+    lines.append(
+        f"- backbone assignment fraction per token: "
+        f"`mean={assignment_fraction['per_token']['mean']:.4f}`, "
+        f"`p50={assignment_fraction['per_token']['p50']:.4f}`, "
+        f"`p95={assignment_fraction['per_token']['p95']:.4f}`"
+    )
+    lines.append(
+        f"- backbone assignment fraction per layer-token: "
+        f"`mean={assignment_fraction['per_layer_token']['mean']:.4f}`, "
+        f"`p50={assignment_fraction['per_layer_token']['p50']:.4f}`, "
+        f"`p95={assignment_fraction['per_layer_token']['p95']:.4f}`"
+    )
     lines.append("")
     lines.append("## Active Expert Reduction")
     lines.append("")
