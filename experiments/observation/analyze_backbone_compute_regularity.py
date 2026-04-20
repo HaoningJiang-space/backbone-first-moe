@@ -123,6 +123,10 @@ def analyze_trace(state_dict, resident_set):
     mean_group_size_backbone = []
     layer_shape_patterns = defaultdict(list)
     layer_exact_patterns = defaultdict(list)
+    layer_backbone_set_patterns = defaultdict(list)
+    layer_tail_set_patterns = defaultdict(list)
+    layer_backbone_count_patterns = defaultdict(list)
+    layer_tail_count_patterns = defaultdict(list)
     per_layer_active_all = defaultdict(list)
     per_layer_active_tail = defaultdict(list)
     per_layer_active_reduction = defaultdict(list)
@@ -149,6 +153,8 @@ def analyze_trace(state_dict, resident_set):
         all_values = list(counts.values())
         tail_values = list(tail_counts.values())
         resident_values = list(resident_counts.values())
+        resident_experts = tuple(sorted(expert_key[1] for expert_key in resident_counts.keys()))
+        tail_experts = tuple(sorted(expert_key[1] for expert_key in tail_counts.keys()))
 
         all_group_sizes.extend(all_values)
         tail_group_sizes.extend(tail_values)
@@ -167,6 +173,10 @@ def analyze_trace(state_dict, resident_set):
         layer_shape_patterns[layer_idx].append(
             tuple(sorted((int(value) for value in counts.values()), reverse=True))
         )
+        layer_backbone_set_patterns[layer_idx].append(resident_experts)
+        layer_tail_set_patterns[layer_idx].append(tail_experts)
+        layer_backbone_count_patterns[layer_idx].append(len(resident_experts))
+        layer_tail_count_patterns[layer_idx].append(len(tail_experts))
 
     def reuse_rate(patterns):
         if not patterns:
@@ -181,13 +191,44 @@ def analyze_trace(state_dict, resident_set):
         str(layer_idx): reuse_rate(patterns)
         for layer_idx, patterns in sorted(layer_exact_patterns.items())
     }
+    per_layer_backbone_set_reuse = {
+        str(layer_idx): reuse_rate(patterns)
+        for layer_idx, patterns in sorted(layer_backbone_set_patterns.items())
+    }
+    per_layer_tail_set_reuse = {
+        str(layer_idx): reuse_rate(patterns)
+        for layer_idx, patterns in sorted(layer_tail_set_patterns.items())
+    }
+    per_layer_backbone_count_reuse = {
+        str(layer_idx): reuse_rate(patterns)
+        for layer_idx, patterns in sorted(layer_backbone_count_patterns.items())
+    }
+    per_layer_tail_count_reuse = {
+        str(layer_idx): reuse_rate(patterns)
+        for layer_idx, patterns in sorted(layer_tail_count_patterns.items())
+    }
 
     weighted_shape_reuse = 0.0
+    weighted_exact_reuse = 0.0
+    weighted_backbone_set_reuse = 0.0
+    weighted_tail_set_reuse = 0.0
+    weighted_backbone_count_reuse = 0.0
+    weighted_tail_count_reuse = 0.0
     total_pattern_steps = 0
     for layer_idx, patterns in layer_shape_patterns.items():
         weighted_shape_reuse += reuse_rate(patterns) * len(patterns)
+        weighted_exact_reuse += reuse_rate(layer_exact_patterns[layer_idx]) * len(patterns)
+        weighted_backbone_set_reuse += reuse_rate(layer_backbone_set_patterns[layer_idx]) * len(patterns)
+        weighted_tail_set_reuse += reuse_rate(layer_tail_set_patterns[layer_idx]) * len(patterns)
+        weighted_backbone_count_reuse += reuse_rate(layer_backbone_count_patterns[layer_idx]) * len(patterns)
+        weighted_tail_count_reuse += reuse_rate(layer_tail_count_patterns[layer_idx]) * len(patterns)
         total_pattern_steps += len(patterns)
     weighted_shape_reuse /= max(1, total_pattern_steps)
+    weighted_exact_reuse /= max(1, total_pattern_steps)
+    weighted_backbone_set_reuse /= max(1, total_pattern_steps)
+    weighted_tail_set_reuse /= max(1, total_pattern_steps)
+    weighted_backbone_count_reuse /= max(1, total_pattern_steps)
+    weighted_tail_count_reuse /= max(1, total_pattern_steps)
 
     access_coverage = resident_assignments / max(1, total_assignments)
     token_coverage = token_hits / max(1, total_tokens)
@@ -218,6 +259,10 @@ def analyze_trace(state_dict, resident_set):
             "group_size_per_step_mean_backbone_only": summarize_distribution(per_layer_step_mean_group_backbone[layer_idx]),
             "shape_reuse_rate": float(reuse_rate(layer_shape_patterns[layer_idx])),
             "exact_reuse_rate": float(reuse_rate(layer_exact_patterns[layer_idx])),
+            "backbone_active_set_reuse_rate": float(reuse_rate(layer_backbone_set_patterns[layer_idx])),
+            "tail_active_set_reuse_rate": float(reuse_rate(layer_tail_set_patterns[layer_idx])),
+            "backbone_active_count_reuse_rate": float(reuse_rate(layer_backbone_count_patterns[layer_idx])),
+            "tail_active_count_reuse_rate": float(reuse_rate(layer_tail_count_patterns[layer_idx])),
         }
 
     return {
@@ -265,6 +310,17 @@ def analyze_trace(state_dict, resident_set):
             "per_layer_shape": per_layer_shape_reuse,
             "per_layer_exact": per_layer_exact_reuse,
         },
+        "coarse_group_reuse": {
+            "weighted_backbone_active_set_reuse_rate": float(weighted_backbone_set_reuse),
+            "weighted_tail_active_set_reuse_rate": float(weighted_tail_set_reuse),
+            "weighted_backbone_active_count_reuse_rate": float(weighted_backbone_count_reuse),
+            "weighted_tail_active_count_reuse_rate": float(weighted_tail_count_reuse),
+            "per_layer_backbone_active_set_reuse_rate": per_layer_backbone_set_reuse,
+            "per_layer_tail_active_set_reuse_rate": per_layer_tail_set_reuse,
+            "per_layer_backbone_active_count_reuse_rate": per_layer_backbone_count_reuse,
+            "per_layer_tail_active_count_reuse_rate": per_layer_tail_count_reuse,
+            "weighted_exact_assignment_reuse_rate": float(weighted_exact_reuse),
+        },
         "per_layer": per_layer_summary,
     }
 
@@ -298,6 +354,15 @@ def analyze_chunks(state_dict, resident_set, chunk_size):
                     result["group_size_before_after_backbone"]["per_step_mean"]["tail_only"]["mean"]
                 ),
                 "shape_reuse_weighted_mean": float(result["assignment_shape_reuse_rate"]["weighted_mean"]),
+                "backbone_active_set_reuse_weighted_mean": float(
+                    result["coarse_group_reuse"]["weighted_backbone_active_set_reuse_rate"]
+                ),
+                "backbone_active_count_reuse_weighted_mean": float(
+                    result["coarse_group_reuse"]["weighted_backbone_active_count_reuse_rate"]
+                ),
+                "tail_active_set_reuse_weighted_mean": float(
+                    result["coarse_group_reuse"]["weighted_tail_active_set_reuse_rate"]
+                ),
             }
         )
 
@@ -323,6 +388,15 @@ def analyze_chunks(state_dict, resident_set, chunk_size):
             ),
             "shape_reuse_weighted_mean": summarize_distribution(
                 [row["shape_reuse_weighted_mean"] for row in chunk_rows]
+            ),
+            "backbone_active_set_reuse_weighted_mean": summarize_distribution(
+                [row["backbone_active_set_reuse_weighted_mean"] for row in chunk_rows]
+            ),
+            "backbone_active_count_reuse_weighted_mean": summarize_distribution(
+                [row["backbone_active_count_reuse_weighted_mean"] for row in chunk_rows]
+            ),
+            "tail_active_set_reuse_weighted_mean": summarize_distribution(
+                [row["tail_active_set_reuse_weighted_mean"] for row in chunk_rows]
             ),
         },
     }
@@ -390,6 +464,26 @@ def build_markdown(summary):
         f"- weighted_mean assignment_shape_reuse_rate: "
         f"`{summary['assignment_shape_reuse_rate']['weighted_mean']:.4f}`"
     )
+    lines.append("")
+    lines.append("## Coarse Group Reuse")
+    lines.append("")
+    coarse = summary["coarse_group_reuse"]
+    lines.append(
+        f"- weighted backbone active-set reuse: "
+        f"`{coarse['weighted_backbone_active_set_reuse_rate']:.4f}`"
+    )
+    lines.append(
+        f"- weighted backbone active-count reuse: "
+        f"`{coarse['weighted_backbone_active_count_reuse_rate']:.4f}`"
+    )
+    lines.append(
+        f"- weighted tail active-set reuse: "
+        f"`{coarse['weighted_tail_active_set_reuse_rate']:.4f}`"
+    )
+    lines.append(
+        f"- weighted exact assignment reuse: "
+        f"`{coarse['weighted_exact_assignment_reuse_rate']:.4f}`"
+    )
     if summary.get("chunk_stability"):
         chunk = summary["chunk_stability"]
         lines.append("")
@@ -409,6 +503,12 @@ def build_markdown(summary):
             f"`mean={chunk['summary']['active_reduction_mean']['mean']:.4f}`, "
             f"`min={chunk['summary']['active_reduction_mean']['min']:.4f}`, "
             f"`p95={chunk['summary']['active_reduction_mean']['p95']:.4f}`"
+        )
+        lines.append(
+            f"- backbone active-set reuse across chunks: "
+            f"`mean={chunk['summary']['backbone_active_set_reuse_weighted_mean']['mean']:.4f}`, "
+            f"`min={chunk['summary']['backbone_active_set_reuse_weighted_mean']['min']:.4f}`, "
+            f"`p95={chunk['summary']['backbone_active_set_reuse_weighted_mean']['p95']:.4f}`"
         )
     return "\n".join(lines) + "\n"
 
