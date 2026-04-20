@@ -73,56 +73,62 @@ def build_shard(args, shard_idx, shard_items):
 
     write_prompt_items(prompts_path, shard_items)
 
-    prepare_cmd = [
-        sys.executable,
-        "demo/prepare_custom_data.py",
-        "--prompt-file",
-        str(prompts_path),
-        "--dataset-name",
-        shard_name,
-        "--sample-size",
-        str(len(shard_items)),
-        "--batch-size",
-        str(args.batch_size),
-        "--model-path",
-        args.model_path,
-    ]
-    run_cmd(prepare_cmd, REPO_ROOT)
-
     generated_state = derive_state_path(args.model_path, shard_name, len(shard_items))
-    if not generated_state.exists():
-        raise FileNotFoundError(f"Expected generated state: {generated_state}")
-
-    states_dir.mkdir(parents=True, exist_ok=True)
     local_state = states_dir / generated_state.name
-    shutil.copy2(generated_state, local_state)
-
-    select_cmd = [
-        sys.executable,
-        "-m",
-        "experiments.simulation.select_adaptive_resident_set",
-        "--state-file",
-        str(local_state),
-        "--model-path",
-        args.model_path,
-        "--output-dir",
-        str(resident_dir),
-        "--output-prefix",
-        "resident",
-        "--memory-ratios",
-        str(args.memory_ratio),
-        "--selection-method",
-        "frontier_prefix",
-        "--profile-fraction",
-        str(args.profile_fraction),
-        "--prefetch-windows",
-        "0",
-    ]
-    if args.sparse_budget_bytes is not None:
-        select_cmd.extend(["--sparse-budget-bytes", str(args.sparse_budget_bytes)])
-    run_cmd(select_cmd, REPO_ROOT)
-
     resident_path = derive_resident_path(resident_dir, "resident", args.memory_ratio)
+
+    if not (
+        args.reuse_existing
+        and local_state.exists()
+        and resident_path.exists()
+    ):
+        prepare_cmd = [
+            sys.executable,
+            "demo/prepare_custom_data.py",
+            "--prompt-file",
+            str(prompts_path),
+            "--dataset-name",
+            shard_name,
+            "--sample-size",
+            str(len(shard_items)),
+            "--batch-size",
+            str(args.batch_size),
+            "--model-path",
+            args.model_path,
+        ]
+        run_cmd(prepare_cmd, REPO_ROOT)
+
+        if not generated_state.exists():
+            raise FileNotFoundError(f"Expected generated state: {generated_state}")
+
+        states_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(generated_state, local_state)
+
+        select_cmd = [
+            sys.executable,
+            "-m",
+            "experiments.simulation.select_adaptive_resident_set",
+            "--state-file",
+            str(local_state),
+            "--model-path",
+            args.model_path,
+            "--output-dir",
+            str(resident_dir),
+            "--output-prefix",
+            "resident",
+            "--memory-ratios",
+            str(args.memory_ratio),
+            "--selection-method",
+            "frontier_prefix",
+            "--profile-fraction",
+            str(args.profile_fraction),
+            "--prefetch-windows",
+            "0",
+        ]
+        if args.sparse_budget_bytes is not None:
+            select_cmd.extend(["--sparse-budget-bytes", str(args.sparse_budget_bytes)])
+        run_cmd(select_cmd, REPO_ROOT)
+
     if not resident_path.exists():
         raise FileNotFoundError(f"Expected resident file: {resident_path}")
 
@@ -221,6 +227,7 @@ def main():
     parser.add_argument("--memory-ratio", type=float, default=0.10)
     parser.add_argument("--profile-fraction", type=float, default=0.2)
     parser.add_argument("--sparse-budget-bytes", type=int, default=None)
+    parser.add_argument("--reuse-existing", action="store_true")
     args = parser.parse_args()
 
     items = load_prompt_items(args.prompt_file)
@@ -258,16 +265,17 @@ def main():
             native_stats = test["native_stats"]
             j = resident_jaccard(train["resident_set"], test["resident_set"])
             retained_assignment = (
-                transfer_stats["assignment_fraction_per_token"]["mean"]
-                / max(1e-12, native_stats["assignment_fraction_per_token"]["mean"])
+                transfer_stats["assignment_fraction"]["per_token"]["mean"]
+                / max(1e-12, native_stats["assignment_fraction"]["per_token"]["mean"])
             )
             retained_any_hit = (
-                transfer_stats["backbone_any_hit_token_coverage"]
-                / max(1e-12, native_stats["backbone_any_hit_token_coverage"])
+                transfer_stats["coverage"]["backbone_any_hit_token_coverage"]
+                / max(1e-12, native_stats["coverage"]["backbone_any_hit_token_coverage"])
             )
-            native_active = native_stats["active_reduction_mean"]
+            native_active = native_stats["active_expert_count_before_after_backbone"]["reduction_fraction"]["mean"]
             retained_active = (
-                transfer_stats["active_reduction_mean"] / max(1e-12, native_active)
+                transfer_stats["active_expert_count_before_after_backbone"]["reduction_fraction"]["mean"]
+                / max(1e-12, native_active)
                 if native_active > 0
                 else 0.0
             )
@@ -275,13 +283,13 @@ def main():
                 "train_shard": train["shard_index"],
                 "test_shard": test["shard_index"],
                 "resident_jaccard": j,
-                "transfer_assignment_fraction_per_token_mean": transfer_stats["assignment_fraction_per_token"]["mean"],
-                "native_assignment_fraction_per_token_mean": native_stats["assignment_fraction_per_token"]["mean"],
+                "transfer_assignment_fraction_per_token_mean": transfer_stats["assignment_fraction"]["per_token"]["mean"],
+                "native_assignment_fraction_per_token_mean": native_stats["assignment_fraction"]["per_token"]["mean"],
                 "retained_assignment_fraction": retained_assignment,
-                "transfer_any_hit_token_coverage": transfer_stats["backbone_any_hit_token_coverage"],
-                "native_any_hit_token_coverage": native_stats["backbone_any_hit_token_coverage"],
+                "transfer_any_hit_token_coverage": transfer_stats["coverage"]["backbone_any_hit_token_coverage"],
+                "native_any_hit_token_coverage": native_stats["coverage"]["backbone_any_hit_token_coverage"],
                 "retained_any_hit_fraction": retained_any_hit,
-                "transfer_active_reduction_mean": transfer_stats["active_reduction_mean"],
+                "transfer_active_reduction_mean": transfer_stats["active_expert_count_before_after_backbone"]["reduction_fraction"]["mean"],
                 "native_active_reduction_mean": native_active,
                 "retained_active_reduction_fraction": retained_active,
             }
@@ -320,11 +328,11 @@ def main():
             "state_file": shard["state_file"],
             "resident_file": shard["resident_file"],
             "resident_count": len(shard["resident_set"]),
-            "assignment_fraction_per_token_mean": native["assignment_fraction_per_token"]["mean"],
-            "backbone_any_hit_token_coverage": native["backbone_any_hit_token_coverage"],
-            "active_reduction_mean": native["active_reduction_mean"],
-            "backbone_group_mean": native["group_size_before_after_backbone"]["backbone"]["mean"],
-            "tail_group_mean": native["group_size_before_after_backbone"]["tail"]["mean"],
+            "assignment_fraction_per_token_mean": native["assignment_fraction"]["per_token"]["mean"],
+            "backbone_any_hit_token_coverage": native["coverage"]["backbone_any_hit_token_coverage"],
+            "active_reduction_mean": native["active_expert_count_before_after_backbone"]["reduction_fraction"]["mean"],
+            "backbone_group_mean": native["group_size_before_after_backbone"]["per_step_mean"]["backbone_only"]["mean"],
+            "tail_group_mean": native["group_size_before_after_backbone"]["per_step_mean"]["tail_only"]["mean"],
         })
 
     json_path = args.output_dir / "real_machine_backbone_validation.json"
