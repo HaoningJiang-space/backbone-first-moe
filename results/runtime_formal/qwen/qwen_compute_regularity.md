@@ -8,10 +8,16 @@
 ## Main Numbers
 
 - `backbone_access_coverage = 0.8359`
+- `backbone_any_hit_token_coverage = 1.0000`
+- `backbone_any_hit_layer_token_coverage = 0.9958`
+- `backbone_expert_block_coverage = 0.3874`
 - `backbone_flop_coverage = 0.8359`
   - homogeneous-expert proxy; not a hardware FLOP counter
-- `backbone_expert_block_coverage = 0.3874`
-- mean `active_expert_count` reduction after removing backbone assignments = `0.4426`
+- backbone assignment fraction:
+  - per token mean `= 0.8359`
+  - per token p50 `= 0.8542`
+  - per token p95 `= 0.9271`
+- mean `active_expert_count` reduction after removing backbone assignments `= 0.4426`
 - per-step mean expert group size:
   - `all = 16.97`
   - `tail = 3.65`
@@ -23,6 +29,8 @@
 This supports a `compute regularity` story, but not an `exact plan cache` story.
 
 - The backbone covers most routed compute mass.
+- Almost every token iteration touches backbone at least once, but that field should be read as an `any-hit` indicator rather than a mass-coverage metric.
+- The stronger metric is assignment fraction per token, which is also high.
 - Removing backbone assignments makes the residual tail materially sparser.
 - Backbone groups are much larger than tail groups.
 - Exact assignment-shape reuse is weak.
