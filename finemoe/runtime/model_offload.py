@@ -1100,6 +1100,14 @@ class OffloadEngine(object):
     def get_runtime_profile(self):
         return self.runtime_profile.to_public_dict()
 
+    def reset_runtime_profile(self):
+        self.runtime_profile = RuntimeProfile()
+        for module in getattr(self, "expert_layer_modules", []):
+            try:
+                module.runtime_profile = self.runtime_profile
+            except Exception:
+                pass
+
     def _mark_module_resident_fastpath(self, module):
         """Mark a resident expert subtree to bypass generic hook bookkeeping."""
         marked = 0

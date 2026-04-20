@@ -598,6 +598,19 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(payload["packed_demand_expert_blocks"], 5)
         self.assertEqual(payload["packed_dispatch_wait_calls"], 1)
 
+    def test_reset_runtime_profile_rebinds_layer_modules(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        fake_layer = SimpleNamespace(runtime_profile=engine.runtime_profile)
+        engine.expert_layer_modules = [fake_layer]
+        engine.runtime_profile.record_module_io(begin_calls=3)
+
+        OffloadEngine.reset_runtime_profile(engine)
+
+        payload = OffloadEngine.get_runtime_profile(engine)
+        self.assertEqual(payload["module_begin_calls"], 0)
+        self.assertIs(fake_layer.runtime_profile, engine.runtime_profile)
+
 
 if __name__ == "__main__":
     unittest.main()

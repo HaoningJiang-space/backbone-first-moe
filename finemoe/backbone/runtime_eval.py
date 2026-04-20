@@ -232,6 +232,11 @@ def cleanup_model(model):
         torch.cuda.empty_cache()
 
 
+def reset_runtime_measurement_state(model):
+    if hasattr(model, "engine") and hasattr(model.engine, "reset_runtime_profile"):
+        model.engine.reset_runtime_profile()
+
+
 def evaluate_runtime(runtime_cfg):
     prompts = prepare_prompts(runtime_cfg)
     model = build_model(runtime_cfg)
