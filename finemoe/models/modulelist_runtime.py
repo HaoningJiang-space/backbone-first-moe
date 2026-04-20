@@ -38,17 +38,22 @@ def _run_modulelist_resident_lane(
     blocks,
 ):
     compute_wall_time_sec = 0.0
+    gather_wall_time_sec = 0.0
+    merge_wall_time_sec = 0.0
     token_assignments = 0
     for start, end in blocks:
         expert_idx = int(sorted_experts[start])
         token_idx = sorted_tokens[start:end]
         block_tokens = int(end - start)
         token_assignments += block_tokens
+        t0 = time.perf_counter()
         current_state = hidden_states[token_idx]
+        gather_wall_time_sec += time.perf_counter() - t0
         expert_module = experts[expert_idx]
         t0 = time.perf_counter()
         current_hidden_states = expert_module(current_state)
         compute_wall_time_sec += time.perf_counter() - t0
+        t0 = time.perf_counter()
         current_hidden_states = current_hidden_states.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
@@ -58,7 +63,8 @@ def _run_modulelist_resident_lane(
             dtype=final_hidden_states.dtype,
         ).unsqueeze(-1)
         final_hidden_states.index_add_(0, token_idx, current_hidden_states)
-    return token_assignments, compute_wall_time_sec
+        merge_wall_time_sec += time.perf_counter() - t0
+    return token_assignments, compute_wall_time_sec, gather_wall_time_sec, merge_wall_time_sec
 
 
 def _run_modulelist_demand_lane(
@@ -72,14 +78,17 @@ def _run_modulelist_demand_lane(
     blocks,
 ):
     if not blocks:
-        return 0, 0.0
+        return 0, 0.0, 0.0, 0.0
 
     payloads = []
     offload_engine = None
+    gather_wall_time_sec = 0.0
     for start, end in blocks:
         expert_idx = int(sorted_experts[start])
         token_idx = sorted_tokens[start:end]
+        t0 = time.perf_counter()
         current_state = hidden_states[token_idx]
+        gather_wall_time_sec += time.perf_counter() - t0
         expert_module = experts[expert_idx]
         payloads.append((start, end, token_idx, expert_module, current_state))
         expert_engine = getattr(expert_module, "offload_engine", None)
@@ -122,8 +131,10 @@ def _run_modulelist_demand_lane(
     compute_wall_time_sec = time.perf_counter() - t0
 
     token_assignments = 0
+    merge_wall_time_sec = 0.0
     for (start, end, token_idx, _, _), current_hidden_states in zip(payloads, outputs):
         token_assignments += int(end - start)
+        t0 = time.perf_counter()
         current_hidden_states = current_hidden_states.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
@@ -133,7 +144,8 @@ def _run_modulelist_demand_lane(
             dtype=final_hidden_states.dtype,
         ).unsqueeze(-1)
         final_hidden_states.index_add_(0, token_idx, current_hidden_states)
-    return token_assignments, compute_wall_time_sec
+        merge_wall_time_sec += time.perf_counter() - t0
+    return token_assignments, compute_wall_time_sec, gather_wall_time_sec, merge_wall_time_sec
 
 
 def dispatch_modulelist_experts(
@@ -155,6 +167,7 @@ def dispatch_modulelist_experts(
     if tokens == 0 or top_k == 0:
         return final_hidden_states
 
+    assignment_t0 = time.perf_counter()
     (
         sorted_experts,
         sorted_tokens,
@@ -162,6 +175,7 @@ def dispatch_modulelist_experts(
         start_positions,
         end_positions,
     ) = _build_assignment_blocks(selected_experts, routing_weights)
+    assignment_build_wall_time_sec = time.perf_counter() - assignment_t0
 
     resident_expert_ids = set(resident_expert_ids or ())
     resident_blocks = []
@@ -172,7 +186,12 @@ def dispatch_modulelist_experts(
         else:
             demand_blocks.append((start, end))
 
-    resident_token_assignments, resident_compute_wall_time_sec = _run_modulelist_resident_lane(
+    (
+        resident_token_assignments,
+        resident_compute_wall_time_sec,
+        resident_gather_wall_time_sec,
+        resident_merge_wall_time_sec,
+    ) = _run_modulelist_resident_lane(
         hidden_states=hidden_states,
         final_hidden_states=final_hidden_states,
         sorted_experts=sorted_experts,
@@ -181,7 +200,12 @@ def dispatch_modulelist_experts(
         experts=experts,
         blocks=resident_blocks,
     )
-    demand_token_assignments, demand_compute_wall_time_sec = _run_modulelist_demand_lane(
+    (
+        demand_token_assignments,
+        demand_compute_wall_time_sec,
+        demand_gather_wall_time_sec,
+        demand_merge_wall_time_sec,
+    ) = _run_modulelist_demand_lane(
         hidden_states=hidden_states,
         final_hidden_states=final_hidden_states,
         sorted_experts=sorted_experts,
@@ -207,6 +231,11 @@ def dispatch_modulelist_experts(
             expert_compute_wall_time_sec=compute_wall_time_sec,
             resident_compute_wall_time_sec=resident_compute_wall_time_sec,
             demand_compute_wall_time_sec=demand_compute_wall_time_sec,
+            assignment_build_wall_time_sec=assignment_build_wall_time_sec,
+            resident_gather_wall_time_sec=resident_gather_wall_time_sec,
+            demand_gather_wall_time_sec=demand_gather_wall_time_sec,
+            resident_merge_wall_time_sec=resident_merge_wall_time_sec,
+            demand_merge_wall_time_sec=demand_merge_wall_time_sec,
         )
 
     return final_hidden_states

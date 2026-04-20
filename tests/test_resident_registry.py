@@ -581,6 +581,19 @@ class ResidentRegistryTest(unittest.TestCase):
             expert_compute_wall_time_sec=0.5,
             resident_compute_wall_time_sec=0.2,
             demand_compute_wall_time_sec=0.3,
+            assignment_build_wall_time_sec=0.05,
+            resident_gather_wall_time_sec=0.06,
+            demand_gather_wall_time_sec=0.07,
+            resident_merge_wall_time_sec=0.08,
+            demand_merge_wall_time_sec=0.09,
+        )
+        engine.runtime_profile.record_tail_group_plan(
+            cache_hit=True,
+            cache_miss=True,
+            build_calls=1,
+            build_wall_time_sec=0.11,
+            metadata_prepare_calls=2,
+            metadata_prepare_wall_time_sec=0.12,
         )
         engine.runtime_profile.record_packed_dispatch(
             resident_expert_blocks=2,
@@ -600,6 +613,12 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(payload["manual_subtree_begin_calls"], 1)
         self.assertEqual(payload["modulelist_active_expert_blocks"], 4)
         self.assertEqual(payload["modulelist_resident_compute_wall_time_sec"], 0.2)
+        self.assertEqual(payload["modulelist_assignment_build_wall_time_sec"], 0.05)
+        self.assertEqual(payload["modulelist_resident_gather_wall_time_sec"], 0.06)
+        self.assertEqual(payload["modulelist_demand_merge_wall_time_sec"], 0.09)
+        self.assertEqual(payload["tail_group_plan_cache_hits"], 1)
+        self.assertEqual(payload["tail_group_plan_cache_misses"], 1)
+        self.assertEqual(payload["tail_group_metadata_prepare_calls"], 2)
         self.assertEqual(payload["packed_demand_expert_blocks"], 5)
         self.assertEqual(payload["packed_dispatch_wait_calls"], 1)
 

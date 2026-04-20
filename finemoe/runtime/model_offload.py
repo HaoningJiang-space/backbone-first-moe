@@ -394,6 +394,12 @@ class RuntimeProfile:
     tail_group_begin_wall_time_sec: float = 0.0
     tail_group_end_wall_time_sec: float = 0.0
     tail_group_compute_wall_time_sec: float = 0.0
+    tail_group_plan_build_calls: int = 0
+    tail_group_plan_cache_hits: int = 0
+    tail_group_plan_cache_misses: int = 0
+    tail_group_plan_build_wall_time_sec: float = 0.0
+    tail_group_metadata_prepare_calls: int = 0
+    tail_group_metadata_prepare_wall_time_sec: float = 0.0
 
     modulelist_dispatch_calls: int = 0
     modulelist_active_expert_blocks: int = 0
@@ -405,6 +411,11 @@ class RuntimeProfile:
     modulelist_expert_compute_wall_time_sec: float = 0.0
     modulelist_resident_compute_wall_time_sec: float = 0.0
     modulelist_demand_compute_wall_time_sec: float = 0.0
+    modulelist_assignment_build_wall_time_sec: float = 0.0
+    modulelist_resident_gather_wall_time_sec: float = 0.0
+    modulelist_demand_gather_wall_time_sec: float = 0.0
+    modulelist_resident_merge_wall_time_sec: float = 0.0
+    modulelist_demand_merge_wall_time_sec: float = 0.0
     resident_lane_expert_blocks: int = 0
     resident_lane_token_assignments: int = 0
     resident_lane_compute_wall_time_sec: float = 0.0
@@ -480,6 +491,23 @@ class RuntimeProfile:
         self.tail_group_end_wall_time_sec += float(end_wall_time_sec)
         self.tail_group_compute_wall_time_sec += float(compute_wall_time_sec)
 
+    def record_tail_group_plan(
+        self,
+        *,
+        cache_hit=False,
+        cache_miss=False,
+        build_calls=0,
+        build_wall_time_sec=0.0,
+        metadata_prepare_calls=0,
+        metadata_prepare_wall_time_sec=0.0,
+    ):
+        self.tail_group_plan_cache_hits += int(bool(cache_hit))
+        self.tail_group_plan_cache_misses += int(bool(cache_miss))
+        self.tail_group_plan_build_calls += int(build_calls)
+        self.tail_group_plan_build_wall_time_sec += float(build_wall_time_sec)
+        self.tail_group_metadata_prepare_calls += int(metadata_prepare_calls)
+        self.tail_group_metadata_prepare_wall_time_sec += float(metadata_prepare_wall_time_sec)
+
     def record_modulelist_dispatch(
         self,
         *,
@@ -492,6 +520,11 @@ class RuntimeProfile:
         expert_compute_wall_time_sec,
         resident_compute_wall_time_sec=0.0,
         demand_compute_wall_time_sec=0.0,
+        assignment_build_wall_time_sec=0.0,
+        resident_gather_wall_time_sec=0.0,
+        demand_gather_wall_time_sec=0.0,
+        resident_merge_wall_time_sec=0.0,
+        demand_merge_wall_time_sec=0.0,
     ):
         self.modulelist_dispatch_calls += 1
         self.modulelist_active_expert_blocks += int(active_expert_blocks)
@@ -503,6 +536,11 @@ class RuntimeProfile:
         self.modulelist_expert_compute_wall_time_sec += float(expert_compute_wall_time_sec)
         self.modulelist_resident_compute_wall_time_sec += float(resident_compute_wall_time_sec)
         self.modulelist_demand_compute_wall_time_sec += float(demand_compute_wall_time_sec)
+        self.modulelist_assignment_build_wall_time_sec += float(assignment_build_wall_time_sec)
+        self.modulelist_resident_gather_wall_time_sec += float(resident_gather_wall_time_sec)
+        self.modulelist_demand_gather_wall_time_sec += float(demand_gather_wall_time_sec)
+        self.modulelist_resident_merge_wall_time_sec += float(resident_merge_wall_time_sec)
+        self.modulelist_demand_merge_wall_time_sec += float(demand_merge_wall_time_sec)
         self.resident_lane_expert_blocks += int(resident_expert_blocks)
         self.resident_lane_token_assignments += int(resident_token_assignments)
         self.resident_lane_compute_wall_time_sec += float(resident_compute_wall_time_sec)
@@ -553,6 +591,12 @@ class RuntimeProfile:
             "tail_group_begin_wall_time_sec": float(self.tail_group_begin_wall_time_sec),
             "tail_group_end_wall_time_sec": float(self.tail_group_end_wall_time_sec),
             "tail_group_compute_wall_time_sec": float(self.tail_group_compute_wall_time_sec),
+            "tail_group_plan_build_calls": int(self.tail_group_plan_build_calls),
+            "tail_group_plan_cache_hits": int(self.tail_group_plan_cache_hits),
+            "tail_group_plan_cache_misses": int(self.tail_group_plan_cache_misses),
+            "tail_group_plan_build_wall_time_sec": float(self.tail_group_plan_build_wall_time_sec),
+            "tail_group_metadata_prepare_calls": int(self.tail_group_metadata_prepare_calls),
+            "tail_group_metadata_prepare_wall_time_sec": float(self.tail_group_metadata_prepare_wall_time_sec),
             "modulelist_dispatch_calls": int(self.modulelist_dispatch_calls),
             "modulelist_active_expert_blocks": int(self.modulelist_active_expert_blocks),
             "modulelist_resident_expert_blocks": int(self.modulelist_resident_expert_blocks),
@@ -563,6 +607,11 @@ class RuntimeProfile:
             "modulelist_expert_compute_wall_time_sec": float(self.modulelist_expert_compute_wall_time_sec),
             "modulelist_resident_compute_wall_time_sec": float(self.modulelist_resident_compute_wall_time_sec),
             "modulelist_demand_compute_wall_time_sec": float(self.modulelist_demand_compute_wall_time_sec),
+            "modulelist_assignment_build_wall_time_sec": float(self.modulelist_assignment_build_wall_time_sec),
+            "modulelist_resident_gather_wall_time_sec": float(self.modulelist_resident_gather_wall_time_sec),
+            "modulelist_demand_gather_wall_time_sec": float(self.modulelist_demand_gather_wall_time_sec),
+            "modulelist_resident_merge_wall_time_sec": float(self.modulelist_resident_merge_wall_time_sec),
+            "modulelist_demand_merge_wall_time_sec": float(self.modulelist_demand_merge_wall_time_sec),
             "resident_lane_expert_blocks": int(self.resident_lane_expert_blocks),
             "resident_lane_token_assignments": int(self.resident_lane_token_assignments),
             "resident_lane_compute_wall_time_sec": float(self.resident_lane_compute_wall_time_sec),
@@ -1138,11 +1187,16 @@ class OffloadEngine(object):
     def _attach_module_service_metadata(self, module):
         if getattr(module, "_archer_service_metadata_ready", False):
             return
+        t0 = time.perf_counter()
         module._archer_service_modules = tuple(module.modules())
         module._archer_service_params = tuple(module.parameters(recurse=True))
         module._archer_service_buffers = tuple(module.buffers(recurse=True))
         module._archer_manual_service_active = False
         module._archer_service_metadata_ready = True
+        self.runtime_profile.record_tail_group_plan(
+            metadata_prepare_calls=1,
+            metadata_prepare_wall_time_sec=time.perf_counter() - t0,
+        )
 
     def _set_manual_service_active(self, module, enabled: bool):
         self._attach_module_service_metadata(module)
@@ -1174,8 +1228,10 @@ class OffloadEngine(object):
         plan_key = tuple(id(module) for module in unique_modules)
         service_plan = self._module_group_service_plans.get(plan_key)
         if service_plan is not None:
+            self.runtime_profile.record_tail_group_plan(cache_hit=True)
             return service_plan
 
+        t0 = time.perf_counter()
         flat_tensors = []
         tensor_groups = []
         for module in unique_modules:
@@ -1192,6 +1248,11 @@ class OffloadEngine(object):
             "flat_tensors": tuple(flat_tensors),
         }
         self._module_group_service_plans[plan_key] = service_plan
+        self.runtime_profile.record_tail_group_plan(
+            cache_miss=True,
+            build_calls=1,
+            build_wall_time_sec=time.perf_counter() - t0,
+        )
         return service_plan
 
     def _tensor_in_offload_set(self, tensor):

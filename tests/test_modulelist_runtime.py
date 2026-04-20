@@ -1,6 +1,7 @@
 import unittest
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import torch
 
@@ -259,6 +260,66 @@ class ModulelistRuntimeTest(unittest.TestCase):
         self.assertEqual(fake_engine.group_calls, [(experts[0], experts[1])])
         self.assertEqual(fake_engine.group_begins, [((experts[0], experts[1]), 2, 4)])
         self.assertEqual(fake_engine.group_ends, [(experts[0], experts[1])])
+
+    def test_dispatch_records_assignment_gather_and_merge_breakdown(self):
+        hidden_states = torch.tensor(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+            ],
+            dtype=torch.float32,
+        )
+        selected_experts = torch.tensor(
+            [
+                [0, 1],
+                [1, 2],
+                [2, 0],
+            ],
+            dtype=torch.long,
+        )
+        routing_weights = torch.tensor(
+            [
+                [0.7, 0.3],
+                [0.6, 0.4],
+                [0.8, 0.2],
+            ],
+            dtype=torch.float32,
+        )
+        experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=0.0),
+                _AffineExpert(scale=1.0, bias=1.0),
+                _AffineExpert(scale=-1.0, bias=0.5),
+            ]
+        )
+        fake_engine = _FakeOffloadEngine()
+        for expert in experts:
+            expert.offload_engine = fake_engine
+
+        calls = []
+        runtime_profile = SimpleNamespace(
+            record_modulelist_dispatch=lambda **kwargs: calls.append(kwargs)
+        )
+
+        dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=experts,
+            resident_expert_ids={2},
+            runtime_profile=runtime_profile,
+        )
+
+        self.assertEqual(len(calls), 1)
+        payload = calls[0]
+        self.assertGreaterEqual(payload["assignment_build_wall_time_sec"], 0.0)
+        self.assertGreaterEqual(payload["resident_gather_wall_time_sec"], 0.0)
+        self.assertGreaterEqual(payload["demand_gather_wall_time_sec"], 0.0)
+        self.assertGreaterEqual(payload["resident_merge_wall_time_sec"], 0.0)
+        self.assertGreaterEqual(payload["demand_merge_wall_time_sec"], 0.0)
+        self.assertEqual(payload["resident_expert_blocks"], 1)
+        self.assertEqual(payload["demand_expert_blocks"], 2)
 
 
 if __name__ == "__main__":
