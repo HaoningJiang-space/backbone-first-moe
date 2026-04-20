@@ -48,6 +48,27 @@
   - what the realistic zero-loading / oracle ceiling looks like
   - whether current weak gains come from a bad method or a low memory-optimization ceiling
 
+## Strategic Read
+
+- `Qwen` still supports a real structural backbone story, but the strongest current evidence is no longer a pure memory story.
+- Warm steady-state throughput gains remain small enough that another round of cache-policy tuning is unlikely to become the headline result.
+- The strongest new evidence is:
+  - backbone concentrates routed compute mass
+  - backbone materially sparsifies the residual tail
+  - exact assignment-shape reuse is weak
+- Therefore backbone should now be interpreted primarily as:
+  - a `compute-mass concentrator`
+  - a `tail sparsifier`
+  - not as a strong `exact plan-cache key`
+
+Implication:
+- same-resource throughput can still improve
+- but the improvement must come from `execution efficiency`, not from reduced mathematical compute
+- without quantization, reduced top-k, pruning, or other semantic changes, `huge` gains are unlikely
+- the realistic systems target is therefore:
+  - medium gains from more regular grouped execution
+  - not giant gains from cache heuristics alone
+
 ## Three-Layer Diagnosis
 
 Use the following order when judging weak throughput results:
@@ -231,6 +252,16 @@ Immediate next step:
 - run a trace-driven observation pass first on `Qwen @ 0.10` with the current fair resident plan
 - only promote this into a systems implementation track if the observation numbers are strong enough
 
+Current observation read:
+- `Qwen fair` clears the go/no-go bar because:
+  - assignment mass on backbone is high
+  - residual active-expert count drops materially
+  - backbone groups are much larger than tail groups
+- `Mixtral adaptive` shows a weaker but still non-trivial version of the same pattern
+- `DeepSeek zero-resident` behaves as the expected negative control
+- this is enough to justify a compute-regularity implementation track
+- it is **not** enough to justify exact plan-cache work as the first implementation step
+
 ### 2. Runtime-Calibrated Service Envelope
 
 Goal:
@@ -279,6 +310,28 @@ Why:
 Immediate implementation note:
 - for `Qwen/modulelist`, the next concrete step is to replace per-expert subtree demand service with grouped demand-lane service so one lane activation can cover multiple demand experts in the same layer-step
 - for `DeepSeek/packed`, the next concrete step is to reduce grouped tail wait/sync boundaries and reuse dispatch metadata more aggressively
+
+### 4A. Backbone-Guided Compute Regularization
+
+Goal:
+- convert backbone structure into faster same-resource execution without changing model semantics
+
+Concrete work:
+- keep the mathematical compute unchanged
+- improve how backbone compute is executed:
+  - coarse grouped metadata reuse for backbone lane
+  - reusable backbone-specific buffers
+  - static workspace / stream binding
+  - grouped backbone lane separated from sparse dynamic tail service
+- explicitly avoid overfitting to exact assignment patterns
+
+Why:
+- this is the highest-confidence path supported by current observations
+- it uses the part of backbone regularity that is actually strong:
+  - mass concentration
+  - larger grouped compute
+  - residual tail sparsification
+- it does not rely on a reuse signal that is currently weak
 
 ### 5. Resident Fast Path
 
@@ -338,6 +391,8 @@ Why:
 - No speculative prefetch as the main serving path.
 - No controller-heavy mode switching as the paper centerpiece.
 - No claiming gains from points that degenerate to `resident = 0`.
+- No betting the main implementation path on exact assignment-shape plan caches.
+- No promising giant throughput gains under exact semantics without evidence of real compute reduction.
 
 ## Method Statement
 
@@ -368,8 +423,27 @@ Implication:
   - asymmetric resource allocation by `saved stall`
   - serviceability-constrained resident capacity
   - bifurcated runtime realization
+  - backbone-guided compute regularization under the same resource budget
+
+Limits:
+
+- if semantics are held fixed:
+  - same model
+  - same top-k
+  - no quantization
+  - no pruning / skipping
+- then backbone can make execution more efficient, but cannot create giant gains by itself
+- giant gains would require one of:
+  - real compute reduction
+  - more aggressive router-aware batching / scheduling
+  - a changed serving objective that trades latency fairness for throughput
+- those are possible future directions, but are not the default claim of the current plan
 
 Immediate next implementation step:
 
-- finish moving `Qwen/modulelist` from per-expert subtree demand service toward grouped exact tail service
-- then attack `DeepSeek/packed` dispatch/wait with the same bifurcated-runtime lens
+- for `Qwen/modulelist`, start with a minimal Phase 2 prototype:
+  - reusable backbone buffers
+  - coarse grouped metadata reuse
+  - static workspace binding
+- do not start with exact plan-cache reuse
+- after that, revisit `DeepSeek/packed` only if the same compute-regularity lens produces a plausible grouped service prototype
