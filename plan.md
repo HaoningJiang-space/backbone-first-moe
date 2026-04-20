@@ -174,6 +174,54 @@ Why:
 - This is the right EuroSys move now.
 - It prevents us from over-optimizing a method whose ceiling may already be low.
 
+### 1A. Backbone Compute Regularity Observation
+
+Goal:
+- Test whether the extracted backbone is valuable as a `compute regularity` object, not only as a memory object.
+
+Phase 1:
+- analysis only; do not change kernels or model math yet
+- compute the following from routed traces plus a fixed resident plan:
+  - `backbone_access_coverage`
+  - `backbone_token_coverage`
+  - `backbone_flop_coverage`
+  - `backbone_expert_block_coverage`
+  - `active_expert_count_before_after_backbone`
+  - `group_size_before_after_backbone`
+  - `assignment_shape_reuse_rate`
+- keep the interpretation disciplined:
+  - for homogeneous-expert models such as current `Qwen`, `backbone_flop_coverage` is an approximate proxy derived from routed assignments rather than a direct hardware FLOP counter
+  - dispatch-overhead breakdown remains a separate runtime-profiling question, not a trace-only claim
+
+Success criteria for moving forward:
+- at least two of the following should hold on the analyzed fair workload:
+  - `backbone_flop_coverage > 0.40`
+  - mean `active_expert_count` reduction after removing backbone assignments `> 0.30`
+  - `assignment_shape_reuse_rate > 0.50`
+
+Why:
+- if these signals are weak, backbone remains primarily a memory story
+- if these signals are strong, backbone becomes a plausible `compute regularity` object and justifies execution-plan work
+
+Phase 2:
+- execution-plan reuse, still without quantization or model changes
+- target items:
+  - prebuilt dispatch metadata for backbone lane
+  - backbone-specific reusable buffers
+  - static stream / workspace binding
+  - grouped plan cache for `modulelist` and `packed`
+
+Phase 3:
+- persistent backbone lane
+- only after Phase 1 and Phase 2 justify it
+- target items:
+  - backbone-specialized dispatch / merge path
+  - persistent backbone execution lane
+
+Immediate next step:
+- run a trace-driven observation pass first on `Qwen @ 0.10` with the current fair resident plan
+- only promote this into a systems implementation track if the observation numbers are strong enough
+
 ### 2. Runtime-Calibrated Service Envelope
 
 Goal:
