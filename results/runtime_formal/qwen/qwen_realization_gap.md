@@ -165,3 +165,60 @@ The next engineering priority is:
 1. reduce `Qwen` demand-lane begin/end overhead further
 2. continue reducing `DeepSeek` packed `dispatch_wait`
 3. use simulator ceilings only as idealized headroom references, always paired with real-machine attribution
+
+## 7. Preliminary A/B/C Attribution
+
+The clean decomposition we wanted is:
+
+- `A`: unified baseline, no resident
+- `B`: same fair resident set and same budget as `C`, but `disable_backbone_lane_split=true`
+- `C`: backbone-first two-lane runtime with the same resident set and budget
+
+The first completed `Qwen @ 0.10` `A/B/C` pair is:
+
+| Mode | Gen tok/s |
+|---|---:|
+| `A` | `13.0264` |
+| `B` | `13.2989` |
+| `C` | `13.3310` |
+
+Derived gains:
+
+- `A -> B = +2.09%`
+- `B -> C = +0.24%`
+- `A -> C = +2.34%`
+
+Current interpretation:
+
+- the clean `B` mode now exists and is runnable
+- the first pair suggests that the dominant effect currently comes from `backbone resident/materialization`
+- the incremental value of the present `two-lane` realization looks small
+
+This should be read carefully:
+
+- this is only the first completed pair, not the final repeated `n`-pair result
+- therefore it should guide attribution and implementation work, but it should not replace the primary warm steady-state claim yet
+
+Matched `B/C` short-run breakdown gives the same directional signal:
+
+| Metric | `B` | `C` | Delta |
+|---|---:|---:|---:|
+| Gen tok/s | `5.7355` | `5.6999` | `-0.62%` |
+| `tail_group_begin_wall_time_sec` | `26.763s` | `26.732s` | `-0.031s` |
+| `modulelist_demand_compute_wall_time_sec` | `28.400s` | `28.164s` | `-0.236s` |
+| `modulelist_resident_compute_wall_time_sec` | `0.000s` | `0.277s` | `+0.277s` |
+| `modulelist_resident_gather_wall_time_sec` | `0.000s` | `0.024s` | `+0.024s` |
+| `modulelist_resident_merge_wall_time_sec` | `0.000s` | `0.051s` | `+0.051s` |
+
+Interpretation:
+
+- `C` currently saves only a small amount on the tail side relative to `B`
+- while adding a measurable resident-lane realization cost
+- so the present `B -> C` gap is not a strong realized win yet
+
+Paper-facing implication:
+
+- backbone still looks valuable
+- but the safest current statement is:
+  - `backbone resident/materialization` is the strongest demonstrated source of gain
+  - `two-lane specialization` remains a plausible but not yet strongly realized extension

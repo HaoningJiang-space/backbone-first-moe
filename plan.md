@@ -104,6 +104,71 @@ Practical rule:
 - if a change disproportionately improves `C` relative to `A`, it is evidence for `backbone-first realization`
 - if a change only makes sense after splitting `backbone` from `tail`, it is a candidate `backbone-specific systems contribution`
 
+## Current A/B/C Decomposition
+
+The most important missing experiment was a clean `B`:
+
+- `A`: unified baseline, no resident
+- `B`: same fair resident set and same budget as `C`, but with `disable_backbone_lane_split=true`
+- `C`: backbone-first two-lane runtime with the same resident set and budget
+
+The first completed `A/B/C` pair on `Qwen @ 0.10` is:
+
+- `A = 13.0264 tok/s`
+- `B = 13.2989 tok/s`
+- `C = 13.3310 tok/s`
+
+Current pair-1 decomposition:
+
+- `A -> B = +2.09%`
+- `B -> C = +0.24%`
+- `A -> C = +2.34%`
+
+Interpretation:
+
+- the clean `B` mode is now implemented and runnable
+- the first pair suggests that the current value comes primarily from `backbone resident/materialization`
+- the incremental value of the current two-lane realization is small in this first pair
+- therefore the paper should not currently claim a strong `two-lane` win by default
+
+Important scope limit:
+
+- this is still a `preliminary decomposition`, not the final `n`-pair result
+- do not overwrite the primary warm steady-state claim with this single pair
+- use it to guide implementation and attribution priorities:
+  - `A -> B` currently looks like the stronger effect
+  - `B -> C` still needs the full repeated run before it can be treated as stable
+
+Supporting `B/C` breakdown on a matched short observation run:
+
+- `B = 5.7355 tok/s`
+- `C = 5.6999 tok/s`
+- `B -> C = -0.62%`
+
+Field-level comparison:
+
+- `tail_group_begin_wall_time_sec`
+  - `B = 26.763s`
+  - `C = 26.732s`
+  - almost unchanged
+- `modulelist_demand_compute_wall_time_sec`
+  - `B = 28.400s`
+  - `C = 28.164s`
+  - only `-0.236s`
+- `C` adds resident-lane cost:
+  - `resident_compute = 0.277s`
+  - `resident_gather = 0.024s`
+  - `resident_merge = 0.051s`
+
+Current best read:
+
+- the present `B -> C` gap is not a large hidden tail-side win waiting to be unlocked
+- under the current implementation, `C` only saves a small amount on the tail side relative to `B`
+- and that small saving can be canceled by the resident-lane realization cost itself
+- therefore `two-lane specialization` should currently be treated as:
+  - an implementation hypothesis that still needs work
+  - not as the already-proven main source of gain
+
 ## Three-Layer Diagnosis
 
 Use the following order when judging weak throughput results:
