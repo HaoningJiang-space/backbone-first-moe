@@ -211,17 +211,67 @@ void ArcherPrefetchHandle::ReleaseTensor(std::uint64_t& request_id, torch::Tenso
 void ArcherPrefetchHandle::AcquireTensorGroup(std::uint64_t& request_id,
                                               std::vector<torch::Tensor> buffers)
 {
-    std::vector<torch::Tensor> acquired;
-    acquired.reserve(buffers.size());
+    struct TensorAcquireEntry {
+        std::uint32_t tensor_id;
+        void* old_ptr;
+        torch::Tensor* buffer;
+        NodePtr node;
+    };
+
+    std::vector<TensorAcquireEntry> entries;
+    entries.reserve(buffers.size());
+
+    std::unordered_map<std::size_t, std::size_t> node_to_entry_index;
+    std::vector<NodePtr> nodes_to_wait;
+    nodes_to_wait.reserve(buffers.size());
+
     try {
         for (auto& buffer : buffers) {
-            AcquireTensor(request_id, buffer);
-            acquired.push_back(buffer);
+            auto tensor_id = kArcherTensorHandle->GetTensorId((void*)buffer.data_ptr());
+            auto node = kTopologyHandle->GetNodeFromTensorID(tensor_id);
+            entries.push_back({tensor_id, (void*)buffer.data_ptr(), &buffer, node});
+
+            if (node_to_entry_index.find(node->id) != node_to_entry_index.end()) { continue; }
+            node_to_entry_index.emplace(node->id, entries.size() - 1);
+
+            node->state = 1;
+            if (node_id_to_tensor_ids_.find(node->id) != node_id_to_tensor_ids_.end() &&
+                node_id_to_tensor_ids_[node->id].size() != 0) {
+                continue;
+            }
+
+            node_id_to_tensor_ids_[node->id] = std::unordered_set<std::uint32_t>();
+            for (auto& node_tensor_id : node->tensor_ids) {
+                node_id_to_tensor_ids_[node->id].insert(node_tensor_id);
+            }
+
+            auto node_body = kTopologyHandle->GetNodeBodyFromCorrID(node->corr_id);
+            if (node->device.is_cuda()) { node_body->gpu_hit_cnt++; }
+
+            node->mutex.lock();
+            if (node->is_sparse) {
+                bool success = kTaskPool->RemoveCachedSparseNode(node);
+                if (!success) { node->is_overflow = true; }
+            } else {
+                kTaskPool->RemoveCachedDenseNode(node);
+            }
+            kTaskPool->StartExec(request_id, node);
+            nodes_to_wait.push_back(node);
+        }
+
+        for (auto& node : nodes_to_wait) {
+            std::unique_lock<std::mutex> lock(node->mutex, std::adopt_lock);
+            node->cv.wait(lock, [node] { return node->state == 0; });
+        }
+
+        for (auto& entry : entries) {
+            kArcherTensorHandle->SetTensor(entry.tensor_id, *entry.buffer);
+            kArcherTensorHandle->UpdateTensorMap(entry.old_ptr, (void*)entry.buffer->data_ptr());
         }
     } catch (...) {
-        for (auto it = acquired.rbegin(); it != acquired.rend(); ++it) {
+        for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
             try {
-                ReleaseTensor(request_id, *it);
+                ReleaseTensor(request_id, *it->buffer);
             } catch (...) {
             }
         }
