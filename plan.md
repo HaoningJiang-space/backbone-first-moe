@@ -70,6 +70,40 @@ Implication:
   - medium gains from more regular grouped execution
   - not giant gains from cache heuristics alone
 
+## Backbone-Centric Reading
+
+The core contribution must stay centered on `backbone`, not on generic runtime hygiene.
+
+What counts as the main story:
+
+- `backbone discovery`
+  - stable routed backbone exists on real workloads
+  - the selector is runtime-calibrated rather than static / hand-tuned
+- `two-lane architecture`
+  - backbone lane and tail lane should not share one unified generic service path
+- `backbone-first > unified`
+  - under the same fair budget and the same resident set, separating backbone from tail is better than treating every expert access uniformly
+
+What does **not** count as the main story:
+
+- generic `begin_group` speedups
+- generic `demand compute` micro-optimizations
+- generic metadata caching that helps both `A` and `C` roughly equally
+
+These optimizations are still useful, but only as:
+
+- supporting attribution
+- implementation hygiene
+- evidence that the current runtime can realize the backbone signal more cheaply
+
+They should not be promoted into the paper thesis by themselves.
+
+Practical rule:
+
+- if a change speeds up both `A` and `C` similarly, it is `runtime hygiene`
+- if a change disproportionately improves `C` relative to `A`, it is evidence for `backbone-first realization`
+- if a change only makes sense after splitting `backbone` from `tail`, it is a candidate `backbone-specific systems contribution`
+
 ## Three-Layer Diagnosis
 
 Use the following order when judging weak throughput results:
@@ -352,6 +386,12 @@ Why:
   - residual tail sparsification
 - it does not rely on a reuse signal that is currently weak
 
+Contribution boundary:
+
+- this track is valid only if it remains clearly `backbone-guided`
+- generic speedups that are equally available to unified serving do not strengthen the core claim
+- therefore every implementation step on this track should be evaluated with an explicit `A/B/C(/D)` ladder rather than only as a raw throughput increase
+
 ### 5. Resident Fast Path
 
 Goal:
@@ -382,6 +422,34 @@ Why:
 - This is necessary for a defensible fairness claim.
 
 ## Experiment Queue
+
+### Backbone Value Ladder
+
+The paper-facing ablation stack should be read as:
+
+- `A`
+  - unified baseline, no resident backbone
+- `B`
+  - unified / generic runtime with the same discovered backbone resident set
+  - this isolates the value of `backbone discovery + resident materialization`
+- `C`
+  - backbone-first two-lane runtime with the same resident set
+  - this isolates the value of `backbone-aware realization`
+- `D` (optional)
+  - backbone-guided compute regularization on top of `C`
+  - this isolates the value of treating backbone as a compute-regularity object
+
+Interpretation discipline:
+
+- `A -> B` answers whether backbone itself has usable systems value
+- `B -> C` answers whether two-lane architecture realizes that value better than a unified runtime
+- `C -> D` answers whether backbone also supports same-resource compute-path gains
+
+Current evidence status:
+
+- `A -> C` is positive on `Qwen`
+- `A -> C` alone is not enough to cleanly attribute where the gain comes from
+- therefore future evaluation should explicitly move toward `A/B/C(/D)` rather than treating all runtime work as one monolithic delta
 
 ### Running Now
 
@@ -465,4 +533,8 @@ Immediate next implementation step:
   - coarse grouped metadata reuse
   - static workspace binding
 - do not start with exact plan-cache reuse
+- treat any generic `A` and `C` co-speedup as supporting evidence only
+- only promote work into the main story if it:
+  - enlarges the `B -> C` gap
+  - or enables a credible `C -> D` backbone-compute result
 - after that, revisit `DeepSeek/packed` only if the same compute-regularity lens produces a plausible grouped service prototype
