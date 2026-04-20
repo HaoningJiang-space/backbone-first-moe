@@ -56,6 +56,7 @@
   - backbone concentrates routed compute mass
   - backbone materially sparsifies the residual tail
   - exact assignment-shape reuse is weak
+  - coarse backbone active-set reuse is very strong on `Qwen fair`
 - Therefore backbone should now be interpreted primarily as:
   - a `compute-mass concentrator`
   - a `tail sparsifier`
@@ -238,8 +239,16 @@ Phase 2:
 - interpretation:
   - backbone clearly concentrates compute mass and sparsifies the residual tail
   - exact assignment-shape reuse is weak
-  - therefore Phase 2 should prioritize `coarse grouped reuse + reusable buffers + static workspace binding`
-  - do **not** treat exact plan-cache reuse as the default implementation path
+- therefore Phase 2 should prioritize `coarse grouped reuse + reusable buffers + static workspace binding`
+- do **not** treat exact plan-cache reuse as the default implementation path
+- updated `Qwen fair` read with coarse grouped reuse:
+  - weighted exact assignment-shape reuse `~= 0.011`
+  - weighted backbone active-set reuse `~= 0.966`
+  - weighted backbone active-count reuse `~= 0.966`
+  - weighted tail active-set reuse `~= 0.329`
+- interpretation:
+  - the backbone is not a good `exact plan-cache key`
+  - it **is** a strong key for `coarse grouped metadata reuse`, `reusable buffer sizing`, and `static workspace binding`
 
 Phase 3:
 - persistent backbone lane
@@ -251,13 +260,23 @@ Phase 3:
 Immediate next step:
 - run a trace-driven observation pass first on `Qwen @ 0.10` with the current fair resident plan
 - only promote this into a systems implementation track if the observation numbers are strong enough
+- before writing the first Phase 2 prototype, add one runtime-side observation pass on `Qwen/modulelist` to separate:
+  - dispatch metadata build
+  - buffer / workspace preparation
+  - gather / scatter / merge
+  from pure expert compute
+- this is the missing bridge between `trace regularity` and `execution-plan reuse`
 
 Current observation read:
 - `Qwen fair` clears the go/no-go bar because:
   - assignment mass on backbone is high
   - residual active-expert count drops materially
   - backbone groups are much larger than tail groups
+  - backbone active-set and active-count reuse are both very high
 - `Mixtral adaptive` shows a weaker but still non-trivial version of the same pattern
+  - backbone active-set reuse is also high there
+  - but tail active-set reuse stays similarly high
+  - so it does **not** support as clean a backbone-vs-tail split as `Qwen fair`
 - `DeepSeek zero-resident` behaves as the expected negative control
 - this is enough to justify a compute-regularity implementation track
 - it is **not** enough to justify exact plan-cache work as the first implementation step

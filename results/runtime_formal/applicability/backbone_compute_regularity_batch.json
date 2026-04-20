@@ -10,7 +10,11 @@
     "chunk_active_reduction_min": 0.6191917150956338,
     "backbone_group_mean": 31.958280529953914,
     "tail_group_mean": 3.6469286041650193,
-    "shape_reuse_weighted_mean": 0.010752688172043015
+    "shape_reuse_weighted_mean": 0.010752688172043015,
+    "backbone_active_set_reuse_weighted_mean": 0.9663978494623656,
+    "backbone_active_count_reuse_weighted_mean": 0.9663978494623656,
+    "tail_active_set_reuse_weighted_mean": 0.3293010752688172,
+    "tail_active_count_reuse_weighted_mean": 0.6586021505376344
   },
   "auxiliary_cases": {
     "qwen_current": {
@@ -22,7 +26,11 @@
       "chunk_active_reduction_min": 0.25034465434014497,
       "backbone_group_mean": 9.647015237941831,
       "tail_group_mean": 9.457558311966519,
-      "shape_reuse_weighted_mean": 0.0
+      "shape_reuse_weighted_mean": 0.0,
+      "backbone_active_set_reuse_weighted_mean": 0.7903225806451613,
+      "backbone_active_count_reuse_weighted_mean": 0.8669354838709677,
+      "tail_active_set_reuse_weighted_mean": 0.4576612903225806,
+      "tail_active_count_reuse_weighted_mean": 0.7903225806451613
     },
     "mixtral_adaptive": {
       "resident_plan_type": "adaptive_nonfair",
@@ -33,7 +41,11 @@
       "chunk_active_reduction_min": 0.35452068932411673,
       "backbone_group_mean": 18.587903225806453,
       "tail_group_mean": 16.141671466973886,
-      "shape_reuse_weighted_mean": 0.0
+      "shape_reuse_weighted_mean": 0.0,
+      "backbone_active_set_reuse_weighted_mean": 0.9304435483870968,
+      "backbone_active_count_reuse_weighted_mean": 0.9344758064516129,
+      "tail_active_set_reuse_weighted_mean": 0.9163306451612904,
+      "tail_active_count_reuse_weighted_mean": 0.9203629032258065
     },
     "olmoe_adaptive": {
       "resident_plan_type": "adaptive_nonfair_large_resident",
@@ -44,7 +56,11 @@
       "chunk_active_reduction_min": 0.9997472739757617,
       "backbone_group_mean": 9.566984040366291,
       "tail_group_mean": 0.034274193548387094,
-      "shape_reuse_weighted_mean": 0.0
+      "shape_reuse_weighted_mean": 0.0,
+      "backbone_active_set_reuse_weighted_mean": 0.35080645161290325,
+      "backbone_active_count_reuse_weighted_mean": 0.7600806451612904,
+      "tail_active_set_reuse_weighted_mean": 0.9657258064516129,
+      "tail_active_count_reuse_weighted_mean": 0.9657258064516129
     },
     "deepseek_zero": {
       "resident_plan_type": "fair_zero_resident_negative_control",
@@ -55,7 +71,11 @@
       "chunk_active_reduction_min": 0.0,
       "backbone_group_mean": 0.0,
       "tail_group_mean": 0.0,
-      "shape_reuse_weighted_mean": 0.0
+      "shape_reuse_weighted_mean": 0.0,
+      "backbone_active_set_reuse_weighted_mean": 0.0,
+      "backbone_active_count_reuse_weighted_mean": 0.0,
+      "tail_active_set_reuse_weighted_mean": 0.0,
+      "tail_active_count_reuse_weighted_mean": 0.0
     }
   }
 }

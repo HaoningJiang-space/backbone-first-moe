@@ -26,6 +26,10 @@
   - `tail = 3.65`
   - `backbone = 31.96`
 - weighted `assignment_shape_reuse_rate = 0.0108`
+- weighted `backbone_active_set_reuse_rate = 0.9664`
+- weighted `backbone_active_count_reuse_rate = 0.9664`
+- weighted `tail_active_set_reuse_rate = 0.3293`
+- weighted `tail_active_count_reuse_rate = 0.6586`
 
 ## Reading
 
@@ -38,6 +42,10 @@ This supports a `compute regularity` story, but not an `exact plan cache` story.
 - Removing backbone assignments makes the residual tail materially sparser.
 - Backbone groups are much larger than tail groups.
 - Exact assignment-shape reuse is weak.
+- Coarse backbone reuse is very strong:
+  - the active resident expert set repeats almost exactly at the `(iter, layer)` step granularity
+  - the active resident expert count is likewise highly stable
+- Tail behavior stays much less regular than backbone behavior.
 
 Layer highlights:
 
@@ -65,3 +73,11 @@ Therefore the next implementation step should prioritize:
 - static workspace / stream binding
 
 It should **not** prioritize exact assignment-shape plan caching as the default path.
+
+More concretely:
+
+- backbone is a strong candidate for:
+  - prebuilt coarse grouped metadata
+  - reusable buffer sizing keyed by backbone active count
+  - static workspace / stream binding for the backbone lane
+- tail is **not** a strong candidate for exact plan caching, and should remain dynamically serviced.

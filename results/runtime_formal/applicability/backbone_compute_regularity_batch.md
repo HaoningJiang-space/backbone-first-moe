@@ -18,12 +18,22 @@ The other rows are auxiliary existence checks or negative controls and use older
 - `backbone_group_mean = 31.96`
 - `tail_group_mean = 3.65`
 - `shape_reuse_weighted_mean = 0.0108`
+- `backbone_active_set_reuse_weighted_mean = 0.9664`
+- `backbone_active_count_reuse_weighted_mean = 0.9664`
+- `tail_active_set_reuse_weighted_mean = 0.3293`
+- `tail_active_count_reuse_weighted_mean = 0.6586`
 
 Reading:
 
 - strong compute-mass concentration
 - strong tail sparsification
 - weak exact shape reuse
+- very strong coarse backbone reuse
+- materially weaker tail active-set reuse than backbone reuse
+- this now directly supports:
+  - coarse grouped metadata reuse
+  - reusable buffer sizing keyed by backbone activity
+  - static workspace / stream binding for backbone lane
 
 ## Auxiliary Cases
 
@@ -33,12 +43,15 @@ Reading:
 - low coverage and weak tail sparsification on the fair trace
 - chunk minima stay low as well
 - this indicates resident quality matters; backbone regularity is not automatic
+- coarse reuse remains non-zero, but the backbone/tail separation is much weaker than `qwen_fair`
 
 `mixtral_adaptive`
 
 - adaptive non-fair resident plan
 - moderate assignment coverage and moderate active-expert reduction
 - still no evidence for exact shape reuse
+- both backbone and tail active-set reuse are high, so the split is less clean than `qwen_fair`
+- this suggests `Mixtral` may support reusable grouped plans, but not necessarily a strong backbone-vs-tail specialization story
 
 `olmoe_adaptive`
 
@@ -59,3 +72,4 @@ The batch observation reinforces the same engineering conclusion:
 - treat backbone as a compute-mass concentrator and tail sparsifier
 - do not prioritize exact assignment-shape plan caching
 - prioritize coarse grouped reuse, reusable buffers, and static workspace binding
+- keep `Qwen/modulelist` as the Phase 2 target because it shows the cleanest `high-backbone-reuse + lower-tail-reuse` split
