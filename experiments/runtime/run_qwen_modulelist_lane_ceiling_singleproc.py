@@ -52,7 +52,8 @@ def log_stage(output_root: Path, stage: str):
 
 
 def make_cfg(args, output_path: Path, *, resident_file: str = "", budget_override: int = 0,
-             no_control_mode: bool = False, tag: str = "runtime_eval") -> RuntimeEvalConfig:
+             no_control_mode: bool = False, no_tail_wait_mode: bool = False,
+             tag: str = "runtime_eval") -> RuntimeEvalConfig:
     return RuntimeEvalConfig(
         model_path=args.model_path,
         prompt_file=args.prompt_file,
@@ -74,6 +75,7 @@ def make_cfg(args, output_path: Path, *, resident_file: str = "", budget_overrid
         store_capacity=args.store_capacity,
         batch_prefetch=False,
         no_control_mode=no_control_mode,
+        no_tail_wait_mode=no_tail_wait_mode,
         tag=tag,
     )
 
@@ -82,6 +84,16 @@ def run_eval(cfg: RuntimeEvalConfig, prompts, tokenizer):
     model = build_model(cfg)
     try:
         return evaluate_runtime_with_components(cfg, model, tokenizer, prompts)
+    finally:
+        cleanup_model(model)
+
+
+def run_eval_pair_with_reused_model(warmup_cfg: RuntimeEvalConfig, pair_cfg: RuntimeEvalConfig, prompts, tokenizer):
+    model = build_model(warmup_cfg)
+    try:
+        warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, prompts)
+        pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, prompts)
+        return warmup, pair
     finally:
         cleanup_model(model)
 
@@ -116,7 +128,7 @@ def select_resident(args, budget_bytes: int, output_dir: Path) -> Path:
 
 
 def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, resident_json: Path, *,
-             mode_name: str, no_control_mode: bool):
+             mode_name: str, no_control_mode: bool, no_tail_wait_mode: bool = False):
     mode_root = output_root / mode_name
     warmup_dir = mode_root / "warmup"
     pair_dir = mode_root / "pair1"
@@ -128,6 +140,7 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         warmup_dir / "qwen_A_warmup.json",
         budget_override=budget_bytes,
         no_control_mode=no_control_mode,
+        no_tail_wait_mode=no_tail_wait_mode,
         tag=f"{mode_name}_warmup_A",
     )
     c_warmup_cfg = make_cfg(
@@ -136,6 +149,7 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         resident_file=str(resident_json),
         budget_override=budget_bytes,
         no_control_mode=no_control_mode,
+        no_tail_wait_mode=no_tail_wait_mode,
         tag=f"{mode_name}_warmup_C",
     )
     a_pair_cfg = make_cfg(
@@ -143,6 +157,7 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         pair_dir / "qwen_A_mem0p10_lane_long.json",
         budget_override=budget_bytes,
         no_control_mode=no_control_mode,
+        no_tail_wait_mode=no_tail_wait_mode,
         tag=f"{mode_name}_pair1_A",
     )
     c_pair_cfg = make_cfg(
@@ -151,24 +166,38 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         resident_file=str(resident_json),
         budget_override=budget_bytes,
         no_control_mode=no_control_mode,
+        no_tail_wait_mode=no_tail_wait_mode,
         tag=f"{mode_name}_pair1_C",
     )
 
-    log_stage(output_root, f"{mode_name}:warmup_a:start")
-    a_warmup = run_eval(a_warmup_cfg, prompts, tokenizer)
-    log_stage(output_root, f"{mode_name}:warmup_a:done")
+    if no_tail_wait_mode:
+        log_stage(output_root, f"{mode_name}:warmup_a:start")
+        log_stage(output_root, f"{mode_name}:pair1_a:start")
+        a_warmup, a_pair = run_eval_pair_with_reused_model(a_warmup_cfg, a_pair_cfg, prompts, tokenizer)
+        log_stage(output_root, f"{mode_name}:warmup_a:done")
+        log_stage(output_root, f"{mode_name}:pair1_a:done")
 
-    log_stage(output_root, f"{mode_name}:warmup_c:start")
-    c_warmup = run_eval(c_warmup_cfg, prompts, tokenizer)
-    log_stage(output_root, f"{mode_name}:warmup_c:done")
+        log_stage(output_root, f"{mode_name}:warmup_c:start")
+        log_stage(output_root, f"{mode_name}:pair1_c:start")
+        c_warmup, c_pair = run_eval_pair_with_reused_model(c_warmup_cfg, c_pair_cfg, prompts, tokenizer)
+        log_stage(output_root, f"{mode_name}:warmup_c:done")
+        log_stage(output_root, f"{mode_name}:pair1_c:done")
+    else:
+        log_stage(output_root, f"{mode_name}:warmup_a:start")
+        a_warmup = run_eval(a_warmup_cfg, prompts, tokenizer)
+        log_stage(output_root, f"{mode_name}:warmup_a:done")
 
-    log_stage(output_root, f"{mode_name}:pair1_a:start")
-    a_pair = run_eval(a_pair_cfg, prompts, tokenizer)
-    log_stage(output_root, f"{mode_name}:pair1_a:done")
+        log_stage(output_root, f"{mode_name}:warmup_c:start")
+        c_warmup = run_eval(c_warmup_cfg, prompts, tokenizer)
+        log_stage(output_root, f"{mode_name}:warmup_c:done")
 
-    log_stage(output_root, f"{mode_name}:pair1_c:start")
-    c_pair = run_eval(c_pair_cfg, prompts, tokenizer)
-    log_stage(output_root, f"{mode_name}:pair1_c:done")
+        log_stage(output_root, f"{mode_name}:pair1_a:start")
+        a_pair = run_eval(a_pair_cfg, prompts, tokenizer)
+        log_stage(output_root, f"{mode_name}:pair1_a:done")
+
+        log_stage(output_root, f"{mode_name}:pair1_c:start")
+        c_pair = run_eval(c_pair_cfg, prompts, tokenizer)
+        log_stage(output_root, f"{mode_name}:pair1_c:done")
 
     gain = 0.0
     if a_pair["generated_tokens_per_sec"] > 0:
@@ -179,6 +208,7 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
     summary = {
         "mode": mode_name,
         "no_control_mode": bool(no_control_mode),
+        "no_tail_wait_mode": bool(no_tail_wait_mode),
         "sparse_budget_bytes": int(budget_bytes),
         "resident_expert_ids_file": str(resident_json),
         "warmup": {"A": a_warmup, "C": c_warmup},
@@ -235,12 +265,24 @@ def main():
         mode_name="no_control",
         no_control_mode=True,
     )
+    no_tail_wait_summary = run_mode(
+        args,
+        output_root,
+        prompts,
+        tokenizer,
+        budget_bytes,
+        resident_json,
+        mode_name="no_tail_wait",
+        no_control_mode=False,
+        no_tail_wait_mode=True,
+    )
 
     summary = {
         "budget_bytes": budget_bytes,
         "resident_expert_ids_file": str(resident_json),
         "control": control_summary,
         "no_control": no_control_summary,
+        "no_tail_wait": no_tail_wait_summary,
     }
     (output_root / "summary.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))

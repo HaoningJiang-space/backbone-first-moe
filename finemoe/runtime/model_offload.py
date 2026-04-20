@@ -585,6 +585,7 @@ class ModuleServiceGroupContext:
     expert_blocks: int = 0
     token_assignments: int = 0
     no_control: bool = False
+    no_tail_wait: bool = False
     begun_tensors: tuple = ()
 
 
@@ -642,6 +643,8 @@ class OffloadEngine(object):
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
         self.no_control_mode = False
+        self.no_tail_wait_mode = False
+        self._no_tail_wait_ready_tensor_ids = set()
         self._module_group_service_plans = {}
         self._reset_resident_registry()
         self.runtime_profile = RuntimeProfile()
@@ -805,6 +808,7 @@ class OffloadEngine(object):
         self._runtime_budget_override_source = ""
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
+        self._no_tail_wait_ready_tensor_ids = set()
 
     def _record_requested_residents(
         self,
@@ -1323,13 +1327,41 @@ class OffloadEngine(object):
                 expert_blocks=int(expert_blocks),
                 token_assignments=int(token_assignments),
                 no_control=bool(self.no_control_mode),
+                no_tail_wait=bool(self.no_tail_wait_mode),
                 begun_tensors=(),
             )
 
         group_begin_t0 = time.perf_counter()
         self._set_manual_service_active_group(module_list, True)
         try:
-            if self.no_control_mode:
+            if self.no_tail_wait_mode:
+                begun_by_module = []
+                begun_tensors = []
+                ready_tensor_ids = self._no_tail_wait_ready_tensor_ids
+                for module, module_tensors in zip(
+                    service_plan["unique_modules"], service_plan["tensor_groups"]
+                ):
+                    module_begun_tensors = []
+                    for tensor in module_tensors:
+                        tensor_id = id(tensor)
+                        if tensor_id in ready_tensor_ids:
+                            self._move_tensor_to_service_device(tensor)
+                            continue
+                        if self._tensor_in_offload_set(tensor):
+                            module_begun_tensors.append(tensor)
+                        else:
+                            self._move_tensor_to_service_device(tensor)
+                            ready_tensor_ids.add(tensor_id)
+                    module_begun_tensors = tuple(module_begun_tensors)
+                    begun_tensors.extend(module_begun_tensors)
+                    begun_by_module.append((module, module_begun_tensors))
+                begun_tensors = tuple(begun_tensors)
+                if begun_tensors:
+                    self._begin_manual_service_tensors_group(begun_tensors)
+                    for tensor in begun_tensors:
+                        ready_tensor_ids.add(id(tensor))
+                begun_by_module = tuple(begun_by_module)
+            elif self.no_control_mode:
                 begun_by_module = []
                 begun_tensors = []
                 for module, module_tensors in zip(
@@ -1367,6 +1399,7 @@ class OffloadEngine(object):
             expert_blocks=int(expert_blocks),
             token_assignments=int(token_assignments),
             no_control=bool(self.no_control_mode),
+            no_tail_wait=bool(self.no_tail_wait_mode),
             begun_tensors=begun_tensors,
         )
 
@@ -1389,9 +1422,7 @@ class OffloadEngine(object):
             return
         t0 = time.perf_counter()
         try:
-            if service_ctx.no_control:
-                self._end_module_subtrees_group(service_ctx.begun_by_module)
-            else:
+            if not service_ctx.no_tail_wait:
                 self._end_module_subtrees_group(service_ctx.begun_by_module)
         finally:
             self._set_manual_service_active_group(service_ctx.modules, False)
@@ -1596,6 +1627,7 @@ class OffloadEngine(object):
 
         self.archer_config = _archer_config
         self.no_control_mode = bool(getattr(_archer_config, "no_control_mode", False))
+        self.no_tail_wait_mode = bool(getattr(_archer_config, "no_tail_wait_mode", False))
         if getattr(_archer_config, "sparse_budget_bytes_override", 0):
             self._runtime_budget_override_bytes = int(_archer_config.sparse_budget_bytes_override)
             self._runtime_budget_override_source = "runtime_sparse_budget_override"

@@ -32,6 +32,10 @@ class ArcherConfig:
         default=False,
         metadata={"help": "Approximate machine-side control ceiling by minimizing Python-side module service orchestration"},
     )
+    no_tail_wait_mode: bool = field(
+        default=False,
+        metadata={"help": "Approximate machine-side tail-service ceiling by keeping touched tail tensors ready within a reused model instance"},
+    )
     # master_addr: str = field(
     #     default="127.0.0.1",
     #     metadata={"help": "Hosts for running archer"},

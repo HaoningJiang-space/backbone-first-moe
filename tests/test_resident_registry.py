@@ -32,6 +32,7 @@ class ResidentRegistryTest(unittest.TestCase):
         engine.resident_expert_ids = []
         engine.resident_expert_ids_set = set()
         engine.no_control_mode = False
+        engine.no_tail_wait_mode = False
         engine._module_group_service_plans = {}
         OffloadEngine._reset_resident_registry(engine)
         return engine
@@ -363,6 +364,45 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(
             engine.archer_engine.end_group_tensors,
             expected_end_order,
+        )
+
+    def test_run_module_demand_lane_group_no_tail_wait_reuses_ready_tensors(self):
+        engine = self._build_engine_stub()
+        engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
+        engine.device = "cpu"
+        engine.request_id = 12
+        engine.no_tail_wait_mode = True
+
+        class _GroupedArcherEngine:
+            def __init__(self):
+                self.begin_group_calls = 0
+                self.end_group_calls = 0
+
+            def begin_group(self, request_id, tensors):
+                self.begin_group_calls += 1
+
+            def end_group(self, request_id, tensors):
+                self.end_group_calls += 1
+
+        engine.archer_engine = _GroupedArcherEngine()
+        modules = [nn.Linear(4, 4), nn.Linear(4, 4)]
+        engine.offload_set = {
+            param.data_ptr()
+            for module in modules
+            for param in module.parameters()
+        }
+        inputs = [torch.zeros(1, 4), torch.zeros(1, 4)]
+
+        outputs1 = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+        outputs2 = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+
+        self.assertEqual(len(outputs1), 2)
+        self.assertEqual(len(outputs2), 2)
+        self.assertEqual(engine.archer_engine.begin_group_calls, 1)
+        self.assertEqual(engine.archer_engine.end_group_calls, 0)
+        self.assertEqual(
+            len(engine._no_tail_wait_ready_tensor_ids),
+            sum(1 for module in modules for _ in module.parameters()),
         )
 
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
