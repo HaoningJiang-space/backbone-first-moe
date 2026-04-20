@@ -1,0 +1,42 @@
+{
+  "analysis": "qwen_backbone_compute_regularity",
+  "model": "Qwen1.5-MoE-A2.7B-Chat",
+  "workload": "lmsys-chat-1m",
+  "trace_length": 64,
+  "resident_plan": {
+    "resident_set_size": 165,
+    "selection_budget_bytes": 4735686246,
+    "source_path": "/data/ziheng/backbone-first-moe_fresh_e2e/results/fair_long_qwen_lane_rerun_seq/residents/qwen_lane_mem0p10.json"
+  },
+  "trace_source_path": "/data/ziheng/FineMoE-EuroSys26/demo/states/Qwen1.5-MoE-A2.7B-Chat~lmsys-chat-1m~64.pkl",
+  "remote_artifact_path": "/data/ziheng/backbone-first-moe_fresh_e2e/results/qwen_backbone_compute_regularity/qwen_mem0p10_compute_regularity.json",
+  "coverage": {
+    "backbone_access_coverage": 0.8359007476478495,
+    "backbone_token_coverage": 1.0,
+    "backbone_layer_token_coverage": 0.9957577284946236,
+    "backbone_expert_block_coverage": 0.38738533848836326,
+    "backbone_flop_coverage": 0.8359007476478495,
+    "backbone_flop_coverage_assumption": "homogeneous_expert_ffn_cost"
+  },
+  "active_expert_count_before_after_backbone": {
+    "all_mean": 17.72983870967742,
+    "tail_only_mean": 10.861559139784946,
+    "reduction_fraction_mean": 0.44263264497278504,
+    "reduction_fraction_p50": 0.4117647058823529,
+    "reduction_fraction_p95": 0.7777777777777778
+  },
+  "group_size_before_after_backbone": {
+    "per_step_mean_all": 16.972933271974988,
+    "per_step_mean_tail_only": 3.6469286041650193,
+    "per_step_mean_backbone_only": 31.958280529953914
+  },
+  "assignment_shape_reuse_rate": {
+    "weighted_mean": 0.010752688172043015
+  },
+  "go_no_go": {
+    "backbone_flop_coverage_gt_0p40": true,
+    "active_expert_reduction_gt_0p30": true,
+    "assignment_shape_reuse_rate_gt_0p50": false,
+    "decision": "proceed_to_phase2_but_prioritize_coarse_grouped_reuse_over_exact_plan_cache"
+  }
+}

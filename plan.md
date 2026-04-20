@@ -210,6 +210,15 @@ Phase 2:
   - backbone-specific reusable buffers
   - static stream / workspace binding
   - grouped plan cache for `modulelist` and `packed`
+- first `Qwen @ 0.10` observation result:
+  - `backbone_flop_coverage ~= 0.836` under the homogeneous-expert proxy
+  - mean active-expert reduction after removing backbone assignments `~= 0.443`
+  - weighted `assignment_shape_reuse_rate ~= 0.011`
+- interpretation:
+  - backbone clearly concentrates compute mass and sparsifies the residual tail
+  - exact assignment-shape reuse is weak
+  - therefore Phase 2 should prioritize `coarse grouped reuse + reusable buffers + static workspace binding`
+  - do **not** treat exact plan-cache reuse as the default implementation path
 
 Phase 3:
 - persistent backbone lane
