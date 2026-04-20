@@ -169,6 +169,226 @@ Current best read:
   - an implementation hypothesis that still needs work
   - not as the already-proven main source of gain
 
+## Conservative Backbone Roadmap
+
+This is the evidence-aligned roadmap for the next phase.
+
+The main thesis stays:
+
+- `backbone` is the core insight
+- `backbone` is not only a memory object
+- `backbone` is also a `compute regularity` object
+
+But the roadmap must distinguish clearly between:
+
+- what is already proven
+- what has been tried and found weak
+- what is still only a plausible next step
+
+### What Is Already Proven
+
+#### Level 1: Backbone Discovery
+
+What is proven:
+
+- stable backbone exists on real routed workloads
+- backbone concentrates routed compute mass
+- backbone materially sparsifies the residual tail
+
+Current strongest evidence:
+
+- `assignment_fraction_per_token_mean = 0.8359`
+- `active_reduction_mean = 0.4426`
+- `backbone_group_mean = 31.96`
+- `tail_group_mean = 3.65`
+- `weighted_backbone_active_set_reuse_rate = 0.9664`
+- `shape_reuse_weighted_mean = 0.0108`
+
+Interpretation:
+
+- backbone is a strong `compute-mass concentrator`
+- backbone is a strong `tail sparsifier`
+- backbone is **not** currently a strong `exact assignment-shape cache key`
+
+#### Level 2: Backbone Resident / Materialization
+
+What is proven:
+
+- under the same fair resident set and budget, resident backbone materialization already gives measurable value
+
+Current cleanest evidence:
+
+- first `A/B/C` pair:
+  - `A -> B = +2.09%`
+  - `B -> C = +0.24%`
+  - `A -> C = +2.34%`
+
+Interpretation:
+
+- the strongest currently demonstrated gain comes from `backbone resident/materialization`
+- the paper can safely claim that backbone is valuable as a resident serving object
+
+### What Has Already Been Tried And Looks Weak
+
+The following should **not** be treated as the next headline optimization path:
+
+- exact assignment-shape plan cache
+- metadata-cache-first story
+- output-buffer-cache-first story
+
+Why:
+
+- exact shape reuse is weak:
+  - `shape_reuse_weighted_mean = 0.0108`
+- metadata reuse was implemented and helped only slightly
+- output-buffer reuse was implemented and helped only slightly
+- both are useful as hygiene, but neither currently looks like the main missing realization win
+
+Practical implication:
+
+- do not frame the next phase as:
+  - `cache more metadata`
+  - `cache more buffers`
+  - `exact plan reuse`
+
+These are secondary optimizations, not the current strategic lever.
+
+### What The Current B/C Evidence Says
+
+Matched short-run `B/C` breakdown:
+
+- `B = 5.7355 tok/s`
+- `C = 5.6999 tok/s`
+- `B -> C = -0.62%`
+
+Key fields:
+
+- `tail_group_begin_wall_time_sec`
+  - `B = 26.763s`
+  - `C = 26.732s`
+  - almost unchanged
+- `modulelist_demand_compute_wall_time_sec`
+  - `B = 28.400s`
+  - `C = 28.164s`
+  - only `-0.236s`
+- `C` adds resident-lane cost:
+  - `resident_compute = 0.277s`
+  - `resident_gather = 0.024s`
+  - `resident_merge = 0.051s`
+
+Interpretation:
+
+- the current `B -> C` gap is **not** a large hidden win that is already visible in tail-side counters
+- current `C` saves only a small amount relative to `B`
+- that small saving can be canceled by the realization cost of the resident lane itself
+
+This means:
+
+- `two-lane specialization` is still a plausible systems direction
+- but it is **not yet** a strong demonstrated gain
+- therefore it should be treated as a redesign target, not as an already-proven headline result
+
+### The Next Real Engineering Target
+
+The next target should be:
+
+- `backbone-aware grouped realization redesign`
+
+Not:
+
+- more generic runtime hygiene
+- more metadata caching
+- more exact plan caching
+
+The concrete goal is:
+
+- keep the proven value of `backbone resident/materialization`
+- reduce the extra realization cost introduced by the current backbone lane
+- do so without requiring aggressive semantic changes
+
+The current systems problem is therefore:
+
+> how to realize a resident backbone through a grouped, low-overhead path
+> that is meaningfully cheaper than the current unified resident-serving path
+
+### Progressive, Evidence-Aligned Levels
+
+#### Level 3: Backbone-Aware Grouped Realization
+
+This is the next recommended implementation target.
+
+Desired properties:
+
+- grouped backbone-serving path
+- reduced resident gather / merge / coordination overhead
+- reusable backbone workspace and stable execution state
+- no dependence on exact assignment-shape reuse
+
+This level should be evaluated by:
+
+- clean `B -> C` repeated runs
+- `B/C` matched short-run breakdowns
+- explicit resident-lane cost attribution
+
+Success criterion:
+
+- `B -> C` becomes a stable positive gain, not just a single-pair fluctuation
+
+#### Level 4: Optional Backbone-Specialized Fused / Static Execution
+
+This remains a possible heavy endpoint, not the current default path.
+
+It becomes worth pursuing only if:
+
+- Level 3 succeeds
+- the remaining resident-lane overhead is still significant
+- grouped backbone execution clearly dominates the remaining realization gap
+
+This level includes ideas such as:
+
+- more aggressive grouped backbone dispatch
+- static workspace / stream specialization
+- backbone-specialized fused execution
+
+Important rule:
+
+- do not claim fused-kernel gains before they are implemented and measured
+- treat them as `future heavy endpoints` until real data exists
+
+### What The Paper Should Say Today
+
+The strongest current version is:
+
+1. `backbone discovery` is real
+2. `backbone resident/materialization` is already valuable
+3. `backbone` also exhibits strong compute-regularity structure
+4. current `two-lane` realization is not yet strong enough to be the main demonstrated source of gain
+5. the next systems challenge is to build a cheaper `backbone-aware grouped realization`
+
+In other words:
+
+- the current main result is not:
+  - `two-lane already wins big`
+- the current main result is:
+  - `backbone exists`
+  - `backbone resident already helps`
+  - `backbone exposes a new realization problem that current runtimes do not yet solve well`
+
+### Immediate Next Step
+
+Do next:
+
+- keep running clean `A/B/C` repeated experiments
+- treat `A -> B` as the current strongest proven gain
+- use `B/C` breakdown to guide a resident-lane redesign
+- only after that, decide whether a heavier fused/static backbone path is justified
+
+Do not do next:
+
+- present metadata reuse as the next major win
+- present buffer reuse as the next major win
+- present fused kernels as already-validated backbone value
+
 ## Three-Layer Diagnosis
 
 Use the following order when judging weak throughput results:
