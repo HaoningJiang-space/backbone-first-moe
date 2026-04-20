@@ -187,44 +187,45 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         tag=f"{mode_name}_pair1_C",
     )
 
+    log_stage(output_root, f"{mode_name}:build_a:start")
     a_model = build_model(a_warmup_cfg)
-    c_model = build_model(c_warmup_cfg)
+    log_stage(output_root, f"{mode_name}:build_a:done")
     try:
+        log_stage(output_root, f"{mode_name}:warmup_a:start")
+        log_stage(output_root, f"{mode_name}:pair1_a:start")
         if no_tail_wait_mode:
-            log_stage(output_root, f"{mode_name}:warmup_a:start")
-            log_stage(output_root, f"{mode_name}:pair1_a:start")
             a_warmup, a_pair = run_no_tail_wait_persistent_pair(
                 a_model, a_warmup_cfg, a_pair_cfg, prompts, tokenizer
             )
-            log_stage(output_root, f"{mode_name}:warmup_a:done")
-            log_stage(output_root, f"{mode_name}:pair1_a:done")
-
-            log_stage(output_root, f"{mode_name}:warmup_c:start")
-            log_stage(output_root, f"{mode_name}:pair1_c:start")
-            c_warmup, c_pair = run_no_tail_wait_persistent_pair(
-                c_model, c_warmup_cfg, c_pair_cfg, prompts, tokenizer
-            )
-            log_stage(output_root, f"{mode_name}:warmup_c:done")
-            log_stage(output_root, f"{mode_name}:pair1_c:done")
         else:
-            log_stage(output_root, f"{mode_name}:warmup_a:start")
-            log_stage(output_root, f"{mode_name}:pair1_a:start")
             a_warmup, a_pair = run_persistent_model_pair(
                 a_model, a_warmup_cfg, a_pair_cfg, prompts, tokenizer
             )
-            log_stage(output_root, f"{mode_name}:warmup_a:done")
-            log_stage(output_root, f"{mode_name}:pair1_a:done")
+        log_stage(output_root, f"{mode_name}:warmup_a:done")
+        log_stage(output_root, f"{mode_name}:pair1_a:done")
+    finally:
+        cleanup_model(a_model)
+        log_stage(output_root, f"{mode_name}:cleanup_a:done")
 
-            log_stage(output_root, f"{mode_name}:warmup_c:start")
-            log_stage(output_root, f"{mode_name}:pair1_c:start")
+    log_stage(output_root, f"{mode_name}:build_c:start")
+    c_model = build_model(c_warmup_cfg)
+    log_stage(output_root, f"{mode_name}:build_c:done")
+    try:
+        log_stage(output_root, f"{mode_name}:warmup_c:start")
+        log_stage(output_root, f"{mode_name}:pair1_c:start")
+        if no_tail_wait_mode:
+            c_warmup, c_pair = run_no_tail_wait_persistent_pair(
+                c_model, c_warmup_cfg, c_pair_cfg, prompts, tokenizer
+            )
+        else:
             c_warmup, c_pair = run_persistent_model_pair(
                 c_model, c_warmup_cfg, c_pair_cfg, prompts, tokenizer
             )
-            log_stage(output_root, f"{mode_name}:warmup_c:done")
-            log_stage(output_root, f"{mode_name}:pair1_c:done")
+        log_stage(output_root, f"{mode_name}:warmup_c:done")
+        log_stage(output_root, f"{mode_name}:pair1_c:done")
     finally:
-        cleanup_model(a_model)
         cleanup_model(c_model)
+        log_stage(output_root, f"{mode_name}:cleanup_c:done")
 
     gain = 0.0
     if a_pair["generated_tokens_per_sec"] > 0:
