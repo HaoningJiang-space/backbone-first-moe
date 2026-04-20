@@ -932,6 +932,14 @@ class OffloadEngine(object):
             return int(self._resident_budget_override_bytes)
         return budget_bytes
 
+    def _get_runtime_observed_sparse_budget_bytes(self):
+        if not hasattr(self, "archer_engine") or self.archer_engine is None:
+            return 0
+        getter = getattr(self.archer_engine, "get_sparse_cache_limit", None)
+        if getter is None:
+            return 0
+        return int(getter(torch.device(self.device)))
+
     def _get_sparse_budget_source(self):
         runtime_source = "free_device_memory_ratio"
         if (
@@ -951,10 +959,77 @@ class OffloadEngine(object):
             return f"min({runtime_source},resident_selection_budget_bytes)"
         return runtime_source
 
+    def _get_runtime_observed_sparse_budget_source(self):
+        if not hasattr(self, "archer_engine") or self.archer_engine is None:
+            return ""
+        getter = getattr(self.archer_engine, "get_sparse_cache_limit", None)
+        if getter is None:
+            return ""
+        return "free_device_memory_ratio"
+
+    @staticmethod
+    def _combine_budget_sources(*sources):
+        active_sources = [source for source in sources if source]
+        if not active_sources:
+            return ""
+        source = active_sources[0]
+        for next_source in active_sources[1:]:
+            source = f"min({source},{next_source})"
+        return source
+
+    def _get_protocol_sparse_budget_bytes(self):
+        budget_bytes = None
+        if (
+            self._runtime_budget_override_bytes is not None
+            and self._runtime_budget_override_bytes > 0
+        ):
+            budget_bytes = int(self._runtime_budget_override_bytes)
+        if (
+            self._resident_budget_override_bytes is not None
+            and self._resident_budget_override_bytes > 0
+        ):
+            resident_budget_bytes = int(self._resident_budget_override_bytes)
+            if budget_bytes is None:
+                budget_bytes = resident_budget_bytes
+            else:
+                budget_bytes = min(budget_bytes, resident_budget_bytes)
+        if budget_bytes is None:
+            return int(self._get_sparse_budget_bytes())
+        return int(budget_bytes)
+
+    def _get_protocol_sparse_budget_source(self):
+        runtime_override_source = ""
+        resident_override_source = ""
+        if (
+            self._runtime_budget_override_bytes is not None
+            and self._runtime_budget_override_bytes > 0
+        ):
+            runtime_override_source = (
+                self._runtime_budget_override_source or "runtime_sparse_budget_override"
+            )
+        if (
+            self._resident_budget_override_bytes is not None
+            and self._resident_budget_override_bytes > 0
+        ):
+            resident_override_source = (
+                self._resident_budget_override_source or "resident_selection_budget_bytes"
+            )
+        protocol_source = self._combine_budget_sources(
+            runtime_override_source,
+            resident_override_source,
+        )
+        if protocol_source:
+            return protocol_source
+        return self._get_sparse_budget_source()
+
     def get_sparse_budget_info(self):
         return {
-            "budget_bytes": int(self._get_sparse_budget_bytes()),
-            "budget_source": self._get_sparse_budget_source(),
+            "budget_bytes": int(self._get_protocol_sparse_budget_bytes()),
+            "budget_source": self._get_protocol_sparse_budget_source(),
+            "runtime_observed_budget_bytes": int(self._get_runtime_observed_sparse_budget_bytes()),
+            "runtime_observed_budget_source": self._get_runtime_observed_sparse_budget_source(),
+            "runtime_effective_budget_bytes": int(self._get_sparse_budget_bytes()),
+            "runtime_effective_budget_source": self._get_sparse_budget_source(),
         }
 
     def _clip_resident_prefix_to_sparse_budget(self, resident_expert_ids, expert_tensor_ids):

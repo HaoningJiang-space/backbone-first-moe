@@ -189,6 +189,18 @@ def evaluate_runtime_with_components(runtime_cfg, model, tokenizer, prompts):
         "peak_memory_mb": peak_memory_mb,
         "sparse_budget_bytes": int(sparse_budget_info.get("budget_bytes", 0)),
         "sparse_budget_source": sparse_budget_info.get("budget_source", ""),
+        "runtime_observed_sparse_budget_bytes": int(
+            sparse_budget_info.get("runtime_observed_budget_bytes", 0)
+        ),
+        "runtime_observed_sparse_budget_source": sparse_budget_info.get(
+            "runtime_observed_budget_source", ""
+        ),
+        "runtime_effective_sparse_budget_bytes": int(
+            sparse_budget_info.get("runtime_effective_budget_bytes", 0)
+        ),
+        "runtime_effective_sparse_budget_source": sparse_budget_info.get(
+            "runtime_effective_budget_source", ""
+        ),
         "resident_count": (
             resident_registry["admitted_count"]
             if resident_registry is not None

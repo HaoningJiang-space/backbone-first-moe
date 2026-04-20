@@ -460,6 +460,10 @@ class ResidentRegistryTest(unittest.TestCase):
 
         self.assertEqual(budget["budget_bytes"], 4096)
         self.assertEqual(budget["budget_source"], "free_device_memory_ratio")
+        self.assertEqual(budget["runtime_observed_budget_bytes"], 4096)
+        self.assertEqual(budget["runtime_observed_budget_source"], "free_device_memory_ratio")
+        self.assertEqual(budget["runtime_effective_budget_bytes"], 4096)
+        self.assertEqual(budget["runtime_effective_budget_source"], "free_device_memory_ratio")
 
     def test_sparse_budget_info_respects_resident_budget_override(self):
         engine = self._build_engine_stub()
@@ -471,8 +475,12 @@ class ResidentRegistryTest(unittest.TestCase):
         budget = OffloadEngine.get_sparse_budget_info(engine)
 
         self.assertEqual(budget["budget_bytes"], 1024)
+        self.assertEqual(budget["budget_source"], "runtime_sparse_budget_bytes")
+        self.assertEqual(budget["runtime_observed_budget_bytes"], 4096)
+        self.assertEqual(budget["runtime_observed_budget_source"], "free_device_memory_ratio")
+        self.assertEqual(budget["runtime_effective_budget_bytes"], 1024)
         self.assertEqual(
-            budget["budget_source"],
+            budget["runtime_effective_budget_source"],
             "min(free_device_memory_ratio,runtime_sparse_budget_bytes)",
         )
 
@@ -490,6 +498,13 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(budget["budget_bytes"], 1024)
         self.assertEqual(
             budget["budget_source"],
+            "min(runtime_sparse_budget_override,runtime_sparse_budget_bytes)",
+        )
+        self.assertEqual(budget["runtime_observed_budget_bytes"], 4096)
+        self.assertEqual(budget["runtime_observed_budget_source"], "free_device_memory_ratio")
+        self.assertEqual(budget["runtime_effective_budget_bytes"], 1024)
+        self.assertEqual(
+            budget["runtime_effective_budget_source"],
             "min(min(free_device_memory_ratio,runtime_sparse_budget_override),runtime_sparse_budget_bytes)",
         )
 
