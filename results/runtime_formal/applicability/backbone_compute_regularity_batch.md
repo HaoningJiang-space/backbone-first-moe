@@ -11,9 +11,10 @@ The other rows are auxiliary existence checks or negative controls and use older
 
 - resident plan type: `fair_runtime_aligned`
 - resident set size: `165`
-- `backbone_access_coverage = 0.8359`
 - assignment fraction per token mean `= 0.8359`
+- chunk assignment fraction min `= 0.7934`
 - active-expert reduction mean `= 0.4426`
+- chunk active-reduction min `= 0.6192`
 - `backbone_group_mean = 31.96`
 - `tail_group_mean = 3.65`
 - `shape_reuse_weighted_mean = 0.0108`
@@ -30,6 +31,7 @@ Reading:
 
 - historical non-fair resident plan
 - low coverage and weak tail sparsification on the fair trace
+- chunk minima stay low as well
 - this indicates resident quality matters; backbone regularity is not automatic
 
 `mixtral_adaptive`

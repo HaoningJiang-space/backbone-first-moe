@@ -17,6 +17,9 @@
   - per token mean `= 0.8359`
   - per token p50 `= 0.8542`
   - per token p95 `= 0.9271`
+- chunk stability with `8`-sequence chunks:
+  - assignment fraction per token mean: overall chunk mean `= 0.8359`, chunk min `= 0.7934`
+  - active-reduction mean: overall chunk mean `= 0.6720`, chunk min `= 0.6192`
 - mean `active_expert_count` reduction after removing backbone assignments `= 0.4426`
 - per-step mean expert group size:
   - `all = 16.97`
@@ -31,9 +34,21 @@ This supports a `compute regularity` story, but not an `exact plan cache` story.
 - The backbone covers most routed compute mass.
 - Almost every token iteration touches backbone at least once, but that field should be read as an `any-hit` indicator rather than a mass-coverage metric.
 - The stronger metric is assignment fraction per token, which is also high.
+- The same concentration pattern remains visible across `8`-sequence workload chunks, so this is not only a full-batch aggregate artifact.
 - Removing backbone assignments makes the residual tail materially sparser.
 - Backbone groups are much larger than tail groups.
 - Exact assignment-shape reuse is weak.
+
+Layer highlights:
+
+- strongest concentration:
+  - layer `14`: assignment coverage `0.9878`, active-reduction mean `0.8337`
+  - layer `15`: assignment coverage `0.9592`, active-reduction mean `0.6408`
+  - layer `9`: assignment coverage `0.9459`, active-reduction mean `0.6246`
+- weakest concentration:
+  - layer `1`: assignment coverage `0.5994`, active-reduction mean `0.2015`
+  - layer `0`: assignment coverage `0.6343`, active-reduction mean `0.2611`
+  - layer `17`: assignment coverage `0.6678`, active-reduction mean `0.3458`
 
 ## Decision
 

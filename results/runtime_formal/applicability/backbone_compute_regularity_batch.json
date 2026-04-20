@@ -4,11 +4,10 @@
     "name": "qwen_fair",
     "resident_plan_type": "fair_runtime_aligned",
     "resident_set_size": 165,
-    "backbone_access_coverage": 0.8359007476478495,
-    "backbone_any_hit_token_coverage": 1.0,
-    "backbone_expert_block_coverage": 0.38738533848836326,
     "assignment_fraction_per_token_mean": 0.8359007476478494,
+    "chunk_assignment_fraction_min": 0.7934307795698925,
     "active_reduction_mean": 0.44263264497278504,
+    "chunk_active_reduction_min": 0.6191917150956338,
     "backbone_group_mean": 31.958280529953914,
     "tail_group_mean": 3.6469286041650193,
     "shape_reuse_weighted_mean": 0.010752688172043015
@@ -17,11 +16,10 @@
     "qwen_current": {
       "resident_plan_type": "historical_nonfair_current",
       "resident_set_size": 396,
-      "backbone_access_coverage": 0.25984438004032256,
-      "backbone_any_hit_token_coverage": 1.0,
-      "backbone_expert_block_coverage": 0.252183442367084,
       "assignment_fraction_per_token_mean": 0.25984438004032256,
+      "chunk_assignment_fraction_min": 0.2552608366935484,
       "active_reduction_mean": 0.25058594099335113,
+      "chunk_active_reduction_min": 0.25034465434014497,
       "backbone_group_mean": 9.647015237941831,
       "tail_group_mean": 9.457558311966519,
       "shape_reuse_weighted_mean": 0.0
@@ -29,11 +27,10 @@
     "mixtral_adaptive": {
       "resident_plan_type": "adaptive_nonfair",
       "resident_set_size": 87,
-      "backbone_access_coverage": 0.38330078125,
-      "backbone_any_hit_token_coverage": 1.0,
-      "backbone_expert_block_coverage": 0.34103596001557834,
       "assignment_fraction_per_token_mean": 0.38330078125,
+      "chunk_assignment_fraction_min": 0.36567540322580644,
       "active_reduction_mean": 0.3426687307987711,
+      "chunk_active_reduction_min": 0.35452068932411673,
       "backbone_group_mean": 18.587903225806453,
       "tail_group_mean": 16.141671466973886,
       "shape_reuse_weighted_mean": 0.0
@@ -41,11 +38,10 @@
     "olmoe_adaptive": {
       "resident_plan_type": "adaptive_nonfair_large_resident",
       "resident_set_size": 1023,
-      "backbone_access_coverage": 0.9999330582157258,
-      "backbone_any_hit_token_coverage": 1.0,
-      "backbone_expert_block_coverage": 0.9995018762660645,
       "assignment_fraction_per_token_mean": 0.9999330582157258,
+      "chunk_assignment_fraction_min": 0.9998424899193549,
       "active_reduction_mean": 0.9995080064817432,
+      "chunk_active_reduction_min": 0.9997472739757617,
       "backbone_group_mean": 9.566984040366291,
       "tail_group_mean": 0.034274193548387094,
       "shape_reuse_weighted_mean": 0.0
@@ -53,11 +49,10 @@
     "deepseek_zero": {
       "resident_plan_type": "fair_zero_resident_negative_control",
       "resident_set_size": 0,
-      "backbone_access_coverage": 0.0,
-      "backbone_any_hit_token_coverage": 0.0,
-      "backbone_expert_block_coverage": 0.0,
       "assignment_fraction_per_token_mean": 0.0,
+      "chunk_assignment_fraction_min": 0.0,
       "active_reduction_mean": 0.0,
+      "chunk_active_reduction_min": 0.0,
       "backbone_group_mean": 0.0,
       "tail_group_mean": 0.0,
       "shape_reuse_weighted_mean": 0.0

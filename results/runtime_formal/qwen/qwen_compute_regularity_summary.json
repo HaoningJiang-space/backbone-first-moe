@@ -26,6 +26,17 @@
     "per_layer_token_p50": 1.0,
     "per_layer_token_p95": 1.0
   },
+  "chunk_stability": {
+    "chunk_size": 8,
+    "assignment_fraction_per_token_mean": {
+      "mean": 0.8359007476478495,
+      "min": 0.7934307795698925
+    },
+    "active_reduction_mean": {
+      "mean": 0.6720326984935243,
+      "min": 0.6191917150956338
+    }
+  },
   "active_expert_count_before_after_backbone": {
     "all_mean": 17.72983870967742,
     "tail_only_mean": 10.861559139784946,
@@ -40,6 +51,42 @@
   },
   "assignment_shape_reuse_rate": {
     "weighted_mean": 0.010752688172043015
+  },
+  "per_layer_highlights": {
+    "highest_assignment_coverage_layers": [
+      {
+        "layer": 14,
+        "assignment_coverage": 0.9877772177419355,
+        "active_reduction_mean": 0.8337348135735233
+      },
+      {
+        "layer": 15,
+        "assignment_coverage": 0.9591733870967742,
+        "active_reduction_mean": 0.640846000820534
+      },
+      {
+        "layer": 9,
+        "assignment_coverage": 0.9459425403225806,
+        "active_reduction_mean": 0.6245825858729084
+      }
+    ],
+    "lowest_assignment_coverage_layers": [
+      {
+        "layer": 1,
+        "assignment_coverage": 0.5994203629032258,
+        "active_reduction_mean": 0.2014827162236074
+      },
+      {
+        "layer": 0,
+        "assignment_coverage": 0.6343245967741935,
+        "active_reduction_mean": 0.261051938108455
+      },
+      {
+        "layer": 17,
+        "assignment_coverage": 0.6678427419354839,
+        "active_reduction_mean": 0.345765773258207
+      }
+    ]
   },
   "go_no_go": {
     "backbone_flop_coverage_gt_0p40": true,
