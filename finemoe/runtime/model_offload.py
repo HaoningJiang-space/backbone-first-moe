@@ -394,6 +394,9 @@ class RuntimeProfile:
     tail_group_begin_wall_time_sec: float = 0.0
     tail_group_end_wall_time_sec: float = 0.0
     tail_group_compute_wall_time_sec: float = 0.0
+    tail_group_flag_activate_wall_time_sec: float = 0.0
+    tail_group_tensor_prepare_wall_time_sec: float = 0.0
+    tail_group_tensor_begin_service_wall_time_sec: float = 0.0
     tail_group_plan_build_calls: int = 0
     tail_group_plan_cache_hits: int = 0
     tail_group_plan_cache_misses: int = 0
@@ -484,6 +487,9 @@ class RuntimeProfile:
         begin_wall_time_sec=0.0,
         end_wall_time_sec=0.0,
         compute_wall_time_sec=0.0,
+        flag_activate_wall_time_sec=0.0,
+        tensor_prepare_wall_time_sec=0.0,
+        tensor_begin_service_wall_time_sec=0.0,
     ):
         self.tail_group_begin_calls += int(begin_calls)
         self.tail_group_end_calls += int(end_calls)
@@ -493,6 +499,9 @@ class RuntimeProfile:
         self.tail_group_begin_wall_time_sec += float(begin_wall_time_sec)
         self.tail_group_end_wall_time_sec += float(end_wall_time_sec)
         self.tail_group_compute_wall_time_sec += float(compute_wall_time_sec)
+        self.tail_group_flag_activate_wall_time_sec += float(flag_activate_wall_time_sec)
+        self.tail_group_tensor_prepare_wall_time_sec += float(tensor_prepare_wall_time_sec)
+        self.tail_group_tensor_begin_service_wall_time_sec += float(tensor_begin_service_wall_time_sec)
 
     def record_tail_group_plan(
         self,
@@ -600,6 +609,9 @@ class RuntimeProfile:
             "tail_group_begin_wall_time_sec": float(self.tail_group_begin_wall_time_sec),
             "tail_group_end_wall_time_sec": float(self.tail_group_end_wall_time_sec),
             "tail_group_compute_wall_time_sec": float(self.tail_group_compute_wall_time_sec),
+            "tail_group_flag_activate_wall_time_sec": float(self.tail_group_flag_activate_wall_time_sec),
+            "tail_group_tensor_prepare_wall_time_sec": float(self.tail_group_tensor_prepare_wall_time_sec),
+            "tail_group_tensor_begin_service_wall_time_sec": float(self.tail_group_tensor_begin_service_wall_time_sec),
             "tail_group_plan_build_calls": int(self.tail_group_plan_build_calls),
             "tail_group_plan_cache_hits": int(self.tail_group_plan_cache_hits),
             "tail_group_plan_cache_misses": int(self.tail_group_plan_cache_misses),
@@ -1442,10 +1454,11 @@ class OffloadEngine(object):
         service_plan = self._get_module_group_service_plan(modules)
         return self._begin_module_subtrees_from_plan(service_plan)
 
-    def _begin_module_subtrees_from_plan(self, service_plan):
+    def _begin_module_subtrees_from_plan(self, service_plan, *, return_timing=False):
         unique_modules = service_plan["unique_modules"]
         begun_by_module = []
         flat_begun_tensors = []
+        prepare_t0 = time.perf_counter()
         for module, module_tensors in zip(unique_modules, service_plan["tensor_groups"]):
             module_begun_tensors = []
             for tensor in module_tensors:
@@ -1456,10 +1469,20 @@ class OffloadEngine(object):
             begun_tensors = tuple(module_begun_tensors)
             flat_begun_tensors.extend(begun_tensors)
             begun_by_module.append((module, begun_tensors))
+        tensor_prepare_wall_time_sec = time.perf_counter() - prepare_t0
+        tensor_begin_service_wall_time_sec = 0.0
         if flat_begun_tensors:
+            begin_t0 = time.perf_counter()
             self._begin_manual_service_tensors_group(tuple(flat_begun_tensors))
+            tensor_begin_service_wall_time_sec = time.perf_counter() - begin_t0
             self._record_no_tail_wait_captured_tensors(flat_begun_tensors)
-        return tuple(begun_by_module)
+        begun_by_module = tuple(begun_by_module)
+        if return_timing:
+            return begun_by_module, {
+                "tensor_prepare_wall_time_sec": float(tensor_prepare_wall_time_sec),
+                "tensor_begin_service_wall_time_sec": float(tensor_begin_service_wall_time_sec),
+            }
+        return begun_by_module
 
     def _end_module_subtree(self, module, begun_tensors=None):
         self._attach_module_service_metadata(module)
@@ -1497,12 +1520,17 @@ class OffloadEngine(object):
             )
 
         group_begin_t0 = time.perf_counter()
+        flag_activate_t0 = time.perf_counter()
         self._set_manual_service_active_plan(service_plan, True)
+        flag_activate_wall_time_sec = time.perf_counter() - flag_activate_t0
+        tensor_prepare_wall_time_sec = 0.0
+        tensor_begin_service_wall_time_sec = 0.0
         try:
             if self.no_tail_wait_mode:
                 begun_by_module = []
                 begun_tensors = []
                 ready_tensor_ids = self._no_tail_wait_ready_tensor_ids
+                prepare_t0 = time.perf_counter()
                 for module, module_tensors in zip(
                     service_plan["unique_modules"], service_plan["tensor_groups"]
                 ):
@@ -1519,13 +1547,17 @@ class OffloadEngine(object):
                     module_begun_tensors = tuple(module_begun_tensors)
                     begun_tensors.extend(module_begun_tensors)
                     begun_by_module.append((module, module_begun_tensors))
+                tensor_prepare_wall_time_sec = time.perf_counter() - prepare_t0
                 begun_tensors = tuple(begun_tensors)
                 if begun_tensors:
+                    begin_t0 = time.perf_counter()
                     self._begin_manual_service_tensors_group(begun_tensors)
+                    tensor_begin_service_wall_time_sec = time.perf_counter() - begin_t0
                 begun_by_module = tuple(begun_by_module)
             elif self.no_control_mode:
                 begun_by_module = []
                 begun_tensors = []
+                prepare_t0 = time.perf_counter()
                 for module, module_tensors in zip(
                     service_plan["unique_modules"], service_plan["tensor_groups"]
                 ):
@@ -1538,13 +1570,21 @@ class OffloadEngine(object):
                     module_begun_tensors = tuple(module_begun_tensors)
                     begun_tensors.extend(module_begun_tensors)
                     begun_by_module.append((module, module_begun_tensors))
+                tensor_prepare_wall_time_sec = time.perf_counter() - prepare_t0
                 begun_tensors = tuple(begun_tensors)
                 if begun_tensors:
+                    begin_t0 = time.perf_counter()
                     self._begin_manual_service_tensors_group(begun_tensors)
+                    tensor_begin_service_wall_time_sec = time.perf_counter() - begin_t0
                 begun_by_module = tuple(begun_by_module)
             else:
                 begun_tensors = ()
-                begun_by_module = self._begin_module_subtrees_group(module_list)
+                begun_by_module, begin_timing = self._begin_module_subtrees_from_plan(
+                    service_plan,
+                    return_timing=True,
+                )
+                tensor_prepare_wall_time_sec = begin_timing["tensor_prepare_wall_time_sec"]
+                tensor_begin_service_wall_time_sec = begin_timing["tensor_begin_service_wall_time_sec"]
         except Exception:
             self._set_manual_service_active_plan(service_plan, False)
             raise
@@ -1554,6 +1594,9 @@ class OffloadEngine(object):
             expert_blocks=int(expert_blocks),
             token_assignments=int(token_assignments),
             begin_wall_time_sec=time.perf_counter() - group_begin_t0,
+            flag_activate_wall_time_sec=flag_activate_wall_time_sec,
+            tensor_prepare_wall_time_sec=tensor_prepare_wall_time_sec,
+            tensor_begin_service_wall_time_sec=tensor_begin_service_wall_time_sec,
         )
         return ModuleServiceGroupContext(
             modules=module_list,

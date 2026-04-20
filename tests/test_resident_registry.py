@@ -218,9 +218,24 @@ class ResidentRegistryTest(unittest.TestCase):
         inputs = [torch.zeros(1, 4), torch.zeros(1, 4)]
         with mock.patch.object(
             OffloadEngine,
-            "_begin_module_subtrees_group",
+            "_get_module_group_service_plan",
             autospec=True,
-            return_value=((modules[0], (object(),)), (modules[1], (object(),))),
+            return_value={
+                "unique_modules": tuple(modules),
+                "service_modules": tuple(modules),
+                "tensor_groups": ((), ()),
+            },
+        ), mock.patch.object(
+            OffloadEngine,
+            "_begin_module_subtrees_from_plan",
+            autospec=True,
+            return_value=(
+                ((modules[0], (object(),)), (modules[1], (object(),))),
+                {
+                    "tensor_prepare_wall_time_sec": 0.0,
+                    "tensor_begin_service_wall_time_sec": 0.0,
+                },
+            ),
         ), mock.patch.object(
             OffloadEngine,
             "_end_module_subtrees_group",
@@ -595,6 +610,13 @@ class ResidentRegistryTest(unittest.TestCase):
             metadata_prepare_calls=2,
             metadata_prepare_wall_time_sec=0.12,
         )
+        engine.runtime_profile.record_tail_group_service(
+            begin_calls=1,
+            begin_wall_time_sec=0.13,
+            flag_activate_wall_time_sec=0.01,
+            tensor_prepare_wall_time_sec=0.02,
+            tensor_begin_service_wall_time_sec=0.03,
+        )
         engine.runtime_profile.record_packed_dispatch(
             resident_expert_blocks=2,
             demand_expert_blocks=5,
@@ -619,6 +641,9 @@ class ResidentRegistryTest(unittest.TestCase):
         self.assertEqual(payload["tail_group_plan_cache_hits"], 1)
         self.assertEqual(payload["tail_group_plan_cache_misses"], 1)
         self.assertEqual(payload["tail_group_metadata_prepare_calls"], 2)
+        self.assertEqual(payload["tail_group_flag_activate_wall_time_sec"], 0.01)
+        self.assertEqual(payload["tail_group_tensor_prepare_wall_time_sec"], 0.02)
+        self.assertEqual(payload["tail_group_tensor_begin_service_wall_time_sec"], 0.03)
         self.assertEqual(payload["packed_demand_expert_blocks"], 5)
         self.assertEqual(payload["packed_dispatch_wait_calls"], 1)
 
