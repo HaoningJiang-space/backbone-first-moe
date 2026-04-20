@@ -1223,6 +1223,10 @@ class OffloadEngine(object):
                 seen_service_modules.add(current_id)
                 current._archer_manual_service_active = enabled
 
+    def _set_manual_service_active_plan(self, service_plan, enabled: bool):
+        for current in service_plan["service_modules"]:
+            current._archer_manual_service_active = enabled
+
     def _get_module_group_service_plan(self, modules):
         unique_modules = tuple(self._iter_unique_modules(modules))
         plan_key = tuple(id(module) for module in unique_modules)
@@ -1242,8 +1246,19 @@ class OffloadEngine(object):
             tensor_groups.append(module_tensors)
             flat_tensors.extend(module_tensors)
 
+        seen_service_modules = set()
+        service_modules = []
+        for module in unique_modules:
+            for current in module._archer_service_modules:
+                current_id = id(current)
+                if current_id in seen_service_modules:
+                    continue
+                seen_service_modules.add(current_id)
+                service_modules.append(current)
+
         service_plan = {
             "unique_modules": unique_modules,
+            "service_modules": tuple(service_modules),
             "tensor_groups": tuple(tensor_groups),
             "flat_tensors": tuple(flat_tensors),
         }
@@ -1412,22 +1427,20 @@ class OffloadEngine(object):
         return tuple(begun_tensors)
 
     def _begin_module_subtrees_group(self, modules):
-        unique_modules = tuple(self._iter_unique_modules(modules))
+        service_plan = self._get_module_group_service_plan(modules)
+        return self._begin_module_subtrees_from_plan(service_plan)
+
+    def _begin_module_subtrees_from_plan(self, service_plan):
+        unique_modules = service_plan["unique_modules"]
         begun_by_module = []
         flat_begun_tensors = []
-        for module in unique_modules:
-            self._attach_module_service_metadata(module)
+        for module, module_tensors in zip(unique_modules, service_plan["tensor_groups"]):
             module_begun_tensors = []
-            for param in module._archer_service_params:
-                if self._tensor_in_offload_set(param):
-                    module_begun_tensors.append(param)
+            for tensor in module_tensors:
+                if self._tensor_in_offload_set(tensor):
+                    module_begun_tensors.append(tensor)
                 else:
-                    self._move_tensor_to_service_device(param)
-            for buf in module._archer_service_buffers:
-                if self._tensor_in_offload_set(buf):
-                    module_begun_tensors.append(buf)
-                else:
-                    self._move_tensor_to_service_device(buf)
+                    self._move_tensor_to_service_device(tensor)
             begun_tensors = tuple(module_begun_tensors)
             flat_begun_tensors.extend(begun_tensors)
             begun_by_module.append((module, begun_tensors))
@@ -1472,7 +1485,7 @@ class OffloadEngine(object):
             )
 
         group_begin_t0 = time.perf_counter()
-        self._set_manual_service_active_group(module_list, True)
+        self._set_manual_service_active_plan(service_plan, True)
         try:
             if self.no_tail_wait_mode:
                 begun_by_module = []
@@ -1521,7 +1534,7 @@ class OffloadEngine(object):
                 begun_tensors = ()
                 begun_by_module = self._begin_module_subtrees_group(module_list)
         except Exception:
-            self._set_manual_service_active_group(module_list, False)
+            self._set_manual_service_active_plan(service_plan, False)
             raise
         self.runtime_profile.record_tail_group_service(
             begin_calls=1,
@@ -1558,6 +1571,7 @@ class OffloadEngine(object):
         if not service_ctx.modules:
             return
         t0 = time.perf_counter()
+        service_plan = self._get_module_group_service_plan(service_ctx.modules)
         try:
             if service_ctx.no_tail_wait:
                 if service_ctx.begun_tensors:
@@ -1565,7 +1579,7 @@ class OffloadEngine(object):
             else:
                 self._end_module_subtrees_group(service_ctx.begun_by_module)
         finally:
-            self._set_manual_service_active_group(service_ctx.modules, False)
+            self._set_manual_service_active_plan(service_plan, False)
             self.runtime_profile.record_tail_group_service(
                 end_calls=1,
                 end_wall_time_sec=time.perf_counter() - t0,
