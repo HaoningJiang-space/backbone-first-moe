@@ -31,6 +31,8 @@ def build_parser():
                         help="Enable batch-aware prefetch (one call per layer instead of per-sequence)")
     parser.add_argument("--no-control-mode", action="store_true",
                         help="Disable module-level service control path for machine-side control ceiling experiments")
+    parser.add_argument("--disable-backbone-lane-split", action="store_true",
+                        help="Keep resident experts pinned but disable backbone-vs-tail specialization for unified-runtime ablations")
     parser.add_argument("--tag", type=str, default="runtime_eval")
     return parser
 
@@ -59,6 +61,7 @@ def main():
         store_capacity=args.store_capacity,
         batch_prefetch=args.batch_prefetch,
         no_control_mode=args.no_control_mode,
+        disable_backbone_lane_split=args.disable_backbone_lane_split,
         tag=args.tag,
     )
     payload = evaluate_runtime(runtime_cfg)

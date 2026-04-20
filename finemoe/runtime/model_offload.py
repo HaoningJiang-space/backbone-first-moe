@@ -717,6 +717,7 @@ class OffloadEngine(object):
         self._resident_budget_override_source = ""
         self.no_control_mode = False
         self.no_tail_wait_mode = False
+        self.disable_backbone_lane_split = False
         self._capture_no_tail_wait_tensors = False
         self._no_tail_wait_ready_tensor_ids = set()
         self._no_tail_wait_captured_tensors = {}
@@ -961,6 +962,7 @@ class OffloadEngine(object):
             layer_id = getattr(module, "layer_id", None)
             if layer_id is None:
                 continue
+            module.enable_backbone_lane_split = not bool(self.disable_backbone_lane_split)
             resident_local_ids = {
                 expert_id
                 for resid_layer_id, expert_id in self.resident_expert_ids_set
@@ -1837,6 +1839,9 @@ class OffloadEngine(object):
         self.archer_config = _archer_config
         self.no_control_mode = bool(getattr(_archer_config, "no_control_mode", False))
         self.no_tail_wait_mode = bool(getattr(_archer_config, "no_tail_wait_mode", False))
+        self.disable_backbone_lane_split = bool(
+            getattr(_archer_config, "disable_backbone_lane_split", False)
+        )
         if getattr(_archer_config, "sparse_budget_bytes_override", 0):
             self._runtime_budget_override_bytes = int(_archer_config.sparse_budget_bytes_override)
             self._runtime_budget_override_source = "runtime_sparse_budget_override"
@@ -2226,6 +2231,7 @@ class OffloadEngine(object):
                         module.prefetch_distance = self.prefetch_distance
                         module.device = self.device
                         module.runtime_profile = self.runtime_profile
+                        module.enable_backbone_lane_split = not bool(self.disable_backbone_lane_split)
 
                         self.expert_layer_modules.append(module)
 

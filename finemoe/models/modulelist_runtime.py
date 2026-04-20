@@ -187,6 +187,7 @@ def dispatch_modulelist_experts(
     routing_weights: torch.Tensor,
     experts,
     resident_expert_ids=None,
+    enable_backbone_lane_split: bool = True,
     runtime_profile=None,
     runtime_cache=None,
 ) -> torch.Tensor:
@@ -213,7 +214,7 @@ def dispatch_modulelist_experts(
     resident_blocks = []
     demand_blocks = []
     for start, end in zip(start_positions, end_positions):
-        if int(sorted_experts[start]) in resident_expert_ids:
+        if enable_backbone_lane_split and int(sorted_experts[start]) in resident_expert_ids:
             resident_blocks.append((start, end))
         else:
             demand_blocks.append((start, end))

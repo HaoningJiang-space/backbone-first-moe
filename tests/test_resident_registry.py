@@ -38,6 +38,7 @@ class ResidentRegistryTest(unittest.TestCase):
         engine.resident_expert_ids_set = set()
         engine.no_control_mode = False
         engine.no_tail_wait_mode = False
+        engine.disable_backbone_lane_split = False
         engine._module_group_service_plans = {}
         OffloadEngine._reset_resident_registry(engine)
         return engine

@@ -36,6 +36,10 @@ class ArcherConfig:
         default=False,
         metadata={"help": "Approximate machine-side tail-service ceiling by keeping touched tail tensors ready within a reused model instance"},
     )
+    disable_backbone_lane_split: bool = field(
+        default=False,
+        metadata={"help": "Keep resident experts materialized but disable backbone-vs-tail dispatch specialization for unified-runtime ablations"},
+    )
     # master_addr: str = field(
     #     default="127.0.0.1",
     #     metadata={"help": "Hosts for running archer"},
