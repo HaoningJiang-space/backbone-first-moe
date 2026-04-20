@@ -1,6 +1,7 @@
 import argparse
 import json
 from collections import defaultdict
+from copy import deepcopy
 from pathlib import Path
 
 import torch
@@ -47,6 +48,10 @@ def load_resident_set(path):
         for item in entries
     }
     return resident_set, payload
+
+
+def subset_state_dict(state_dict, keep_keys):
+    return {key: deepcopy(state_dict[key]) for key in keep_keys}
 
 
 def analyze_trace(state_dict, resident_set):
@@ -118,6 +123,12 @@ def analyze_trace(state_dict, resident_set):
     mean_group_size_backbone = []
     layer_shape_patterns = defaultdict(list)
     layer_exact_patterns = defaultdict(list)
+    per_layer_active_all = defaultdict(list)
+    per_layer_active_tail = defaultdict(list)
+    per_layer_active_reduction = defaultdict(list)
+    per_layer_step_mean_group_all = defaultdict(list)
+    per_layer_step_mean_group_tail = defaultdict(list)
+    per_layer_step_mean_group_backbone = defaultdict(list)
 
     for (iter_idx, layer_idx), counts in sorted(grouped.items()):
         total_blocks += len(counts)
@@ -129,7 +140,11 @@ def analyze_trace(state_dict, resident_set):
         active_tail = len(tail_counts)
         all_active_experts.append(active_all)
         tail_active_experts.append(active_tail)
-        active_reductions.append((active_all - active_tail) / max(1, active_all))
+        reduction = (active_all - active_tail) / max(1, active_all)
+        active_reductions.append(reduction)
+        per_layer_active_all[layer_idx].append(active_all)
+        per_layer_active_tail[layer_idx].append(active_tail)
+        per_layer_active_reduction[layer_idx].append(reduction)
 
         all_values = list(counts.values())
         tail_values = list(tail_counts.values())
@@ -142,6 +157,9 @@ def analyze_trace(state_dict, resident_set):
         mean_group_size_all.append(sum(all_values) / max(1, len(all_values)))
         mean_group_size_tail.append(sum(tail_values) / max(1, len(tail_values)) if tail_values else 0.0)
         mean_group_size_backbone.append(sum(resident_values) / max(1, len(resident_values)) if resident_values else 0.0)
+        per_layer_step_mean_group_all[layer_idx].append(mean_group_size_all[-1])
+        per_layer_step_mean_group_tail[layer_idx].append(mean_group_size_tail[-1])
+        per_layer_step_mean_group_backbone[layer_idx].append(mean_group_size_backbone[-1])
 
         layer_exact_patterns[layer_idx].append(
             tuple(sorted((expert_key[1], int(value)) for expert_key, value in counts.items()))
@@ -181,6 +199,26 @@ def analyze_trace(state_dict, resident_set):
         )
         for layer_idx in sorted(per_layer_assignments.keys())
     }
+    per_layer_summary = {}
+    all_layers = sorted(
+        set(per_layer_assignments.keys())
+        | set(per_layer_active_all.keys())
+        | set(layer_shape_patterns.keys())
+    )
+    for layer_idx in all_layers:
+        per_layer_summary[str(layer_idx)] = {
+            "assignment_coverage": float(
+                per_layer_resident_assignments[layer_idx] / max(1, per_layer_assignments[layer_idx])
+            ),
+            "active_experts_all": summarize_distribution(per_layer_active_all[layer_idx]),
+            "active_experts_tail_only": summarize_distribution(per_layer_active_tail[layer_idx]),
+            "active_reduction_fraction": summarize_distribution(per_layer_active_reduction[layer_idx]),
+            "group_size_per_step_mean_all": summarize_distribution(per_layer_step_mean_group_all[layer_idx]),
+            "group_size_per_step_mean_tail_only": summarize_distribution(per_layer_step_mean_group_tail[layer_idx]),
+            "group_size_per_step_mean_backbone_only": summarize_distribution(per_layer_step_mean_group_backbone[layer_idx]),
+            "shape_reuse_rate": float(reuse_rate(layer_shape_patterns[layer_idx])),
+            "exact_reuse_rate": float(reuse_rate(layer_exact_patterns[layer_idx])),
+        }
 
     return {
         "totals": {
@@ -226,6 +264,66 @@ def analyze_trace(state_dict, resident_set):
             "weighted_mean": float(weighted_shape_reuse),
             "per_layer_shape": per_layer_shape_reuse,
             "per_layer_exact": per_layer_exact_reuse,
+        },
+        "per_layer": per_layer_summary,
+    }
+
+
+def analyze_chunks(state_dict, resident_set, chunk_size):
+    seq_keys = list(state_dict.keys())
+    if chunk_size <= 0 or len(seq_keys) <= chunk_size:
+        return {}
+
+    chunk_rows = []
+    for start in range(0, len(seq_keys), chunk_size):
+        keys = seq_keys[start : start + chunk_size]
+        if not keys:
+            continue
+        subset = subset_state_dict(state_dict, keys)
+        result = analyze_trace(subset, resident_set)
+        chunk_rows.append(
+            {
+                "chunk_index": int(len(chunk_rows)),
+                "num_sequences": int(len(keys)),
+                "sequence_keys": [str(key) for key in keys],
+                "backbone_access_coverage": float(result["coverage"]["backbone_access_coverage"]),
+                "assignment_fraction_per_token_mean": float(result["assignment_fraction"]["per_token"]["mean"]),
+                "active_reduction_mean": float(
+                    result["active_expert_count_before_after_backbone"]["reduction_fraction"]["mean"]
+                ),
+                "backbone_group_mean": float(
+                    result["group_size_before_after_backbone"]["per_step_mean"]["backbone_only"]["mean"]
+                ),
+                "tail_group_mean": float(
+                    result["group_size_before_after_backbone"]["per_step_mean"]["tail_only"]["mean"]
+                ),
+                "shape_reuse_weighted_mean": float(result["assignment_shape_reuse_rate"]["weighted_mean"]),
+            }
+        )
+
+    return {
+        "chunk_size": int(chunk_size),
+        "num_chunks": int(len(chunk_rows)),
+        "rows": chunk_rows,
+        "summary": {
+            "backbone_access_coverage": summarize_distribution(
+                [row["backbone_access_coverage"] for row in chunk_rows]
+            ),
+            "assignment_fraction_per_token_mean": summarize_distribution(
+                [row["assignment_fraction_per_token_mean"] for row in chunk_rows]
+            ),
+            "active_reduction_mean": summarize_distribution(
+                [row["active_reduction_mean"] for row in chunk_rows]
+            ),
+            "backbone_group_mean": summarize_distribution(
+                [row["backbone_group_mean"] for row in chunk_rows]
+            ),
+            "tail_group_mean": summarize_distribution(
+                [row["tail_group_mean"] for row in chunk_rows]
+            ),
+            "shape_reuse_weighted_mean": summarize_distribution(
+                [row["shape_reuse_weighted_mean"] for row in chunk_rows]
+            ),
         },
     }
 
@@ -292,6 +390,26 @@ def build_markdown(summary):
         f"- weighted_mean assignment_shape_reuse_rate: "
         f"`{summary['assignment_shape_reuse_rate']['weighted_mean']:.4f}`"
     )
+    if summary.get("chunk_stability"):
+        chunk = summary["chunk_stability"]
+        lines.append("")
+        lines.append("## Chunk Stability")
+        lines.append("")
+        lines.append(
+            f"- chunk_size: `{chunk['chunk_size']}`"
+        )
+        lines.append(
+            f"- assignment_fraction_per_token_mean across chunks: "
+            f"`mean={chunk['summary']['assignment_fraction_per_token_mean']['mean']:.4f}`, "
+            f"`min={chunk['summary']['assignment_fraction_per_token_mean']['min']:.4f}`, "
+            f"`p95={chunk['summary']['assignment_fraction_per_token_mean']['p95']:.4f}`"
+        )
+        lines.append(
+            f"- active_reduction_mean across chunks: "
+            f"`mean={chunk['summary']['active_reduction_mean']['mean']:.4f}`, "
+            f"`min={chunk['summary']['active_reduction_mean']['min']:.4f}`, "
+            f"`p95={chunk['summary']['active_reduction_mean']['p95']:.4f}`"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -301,6 +419,7 @@ def main():
     parser.add_argument("--resident-file", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--output-prefix", type=str, default="backbone_compute_regularity")
+    parser.add_argument("--chunk-size", type=int, default=0)
     args = parser.parse_args()
 
     state_dict = load_state_dict(args.state_file)
@@ -316,6 +435,7 @@ def main():
         "resident_policy": resident_payload.get("resident_policy"),
         "selection_method": resident_payload.get("selection_method"),
     }
+    summary["chunk_stability"] = analyze_chunks(state_dict, resident_set, args.chunk_size)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     json_path = args.output_dir / f"{args.output_prefix}.json"
