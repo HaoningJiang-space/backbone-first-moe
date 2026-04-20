@@ -644,7 +644,10 @@ class OffloadEngine(object):
         self._resident_budget_override_source = ""
         self.no_control_mode = False
         self.no_tail_wait_mode = False
+        self._capture_no_tail_wait_tensors = False
         self._no_tail_wait_ready_tensor_ids = set()
+        self._no_tail_wait_captured_tensors = {}
+        self._no_tail_wait_active_tensors = ()
         self._module_group_service_plans = {}
         self._reset_resident_registry()
         self.runtime_profile = RuntimeProfile()
@@ -808,7 +811,10 @@ class OffloadEngine(object):
         self._runtime_budget_override_source = ""
         self._resident_budget_override_bytes = None
         self._resident_budget_override_source = ""
+        self._capture_no_tail_wait_tensors = False
         self._no_tail_wait_ready_tensor_ids = set()
+        self._no_tail_wait_captured_tensors = {}
+        self._no_tail_wait_active_tensors = ()
 
     def _record_requested_residents(
         self,
@@ -1169,11 +1175,61 @@ class OffloadEngine(object):
     def _tensor_in_offload_set(self, tensor):
         return tensor.data_ptr() in self.offload_set
 
+    def _iter_unique_tensors(self, tensors):
+        seen = set()
+        for tensor in tensors:
+            tensor_id = id(tensor)
+            if tensor_id in seen:
+                continue
+            seen.add(tensor_id)
+            yield tensor
+
     def _move_tensor_to_service_device(self, tensor):
         tensor_device = tensor.device
         target_device = torch.device(self.device)
         if tensor_device != target_device:
             tensor.data = tensor.data.to(target_device)
+
+    def _record_no_tail_wait_captured_tensors(self, tensors):
+        if not self._capture_no_tail_wait_tensors:
+            return
+        for tensor in self._iter_unique_tensors(tensors):
+            self._no_tail_wait_captured_tensors[id(tensor)] = tensor
+
+    def start_no_tail_wait_capture(self):
+        self._capture_no_tail_wait_tensors = True
+        self._no_tail_wait_captured_tensors = {}
+
+    def stop_no_tail_wait_capture(self):
+        self._capture_no_tail_wait_tensors = False
+
+    def activate_no_tail_wait_mode(self):
+        captured_tensors = tuple(
+            self._iter_unique_tensors(self._no_tail_wait_captured_tensors.values())
+        )
+        self._no_tail_wait_active_tensors = captured_tensors
+        self._no_tail_wait_ready_tensor_ids = {id(tensor) for tensor in captured_tensors}
+        if captured_tensors:
+            tensors_to_begin = []
+            for tensor in captured_tensors:
+                if self._tensor_in_offload_set(tensor):
+                    tensors_to_begin.append(tensor)
+                else:
+                    self._move_tensor_to_service_device(tensor)
+            if tensors_to_begin:
+                self._begin_manual_service_tensors_group(tuple(tensors_to_begin))
+        self.no_tail_wait_mode = True
+
+    def deactivate_no_tail_wait_mode(self):
+        try:
+            if self._no_tail_wait_active_tensors:
+                self._end_manual_service_tensors_group(self._no_tail_wait_active_tensors)
+        finally:
+            self.no_tail_wait_mode = False
+            self._capture_no_tail_wait_tensors = False
+            self._no_tail_wait_ready_tensor_ids = set()
+            self._no_tail_wait_captured_tensors = {}
+            self._no_tail_wait_active_tensors = ()
 
     def _begin_manual_service_tensor(self, tensor):
         if not self._tensor_in_offload_set(tensor):
@@ -1294,6 +1350,7 @@ class OffloadEngine(object):
             begun_by_module.append((module, begun_tensors))
         if flat_begun_tensors:
             self._begin_manual_service_tensors_group(tuple(flat_begun_tensors))
+            self._record_no_tail_wait_captured_tensors(flat_begun_tensors)
         return tuple(begun_by_module)
 
     def _end_module_subtree(self, module, begun_tensors=None):
@@ -1351,15 +1408,12 @@ class OffloadEngine(object):
                             module_begun_tensors.append(tensor)
                         else:
                             self._move_tensor_to_service_device(tensor)
-                            ready_tensor_ids.add(tensor_id)
                     module_begun_tensors = tuple(module_begun_tensors)
                     begun_tensors.extend(module_begun_tensors)
                     begun_by_module.append((module, module_begun_tensors))
                 begun_tensors = tuple(begun_tensors)
                 if begun_tensors:
                     self._begin_manual_service_tensors_group(begun_tensors)
-                    for tensor in begun_tensors:
-                        ready_tensor_ids.add(id(tensor))
                 begun_by_module = tuple(begun_by_module)
             elif self.no_control_mode:
                 begun_by_module = []
@@ -1422,7 +1476,10 @@ class OffloadEngine(object):
             return
         t0 = time.perf_counter()
         try:
-            if not service_ctx.no_tail_wait:
+            if service_ctx.no_tail_wait:
+                if service_ctx.begun_tensors:
+                    self._end_manual_service_tensors_group(service_ctx.begun_tensors)
+            else:
                 self._end_module_subtrees_group(service_ctx.begun_by_module)
         finally:
             self._set_manual_service_active_group(service_ctx.modules, False)

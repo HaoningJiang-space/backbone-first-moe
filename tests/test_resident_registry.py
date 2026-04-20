@@ -366,12 +366,11 @@ class ResidentRegistryTest(unittest.TestCase):
             expected_end_order,
         )
 
-    def test_run_module_demand_lane_group_no_tail_wait_reuses_ready_tensors(self):
+    def test_no_tail_wait_capture_activate_and_release_reuses_ready_tensors(self):
         engine = self._build_engine_stub()
         engine.runtime_profile = MODEL_OFFLOAD.RuntimeProfile()
         engine.device = "cpu"
         engine.request_id = 12
-        engine.no_tail_wait_mode = True
 
         class _GroupedArcherEngine:
             def __init__(self):
@@ -393,17 +392,20 @@ class ResidentRegistryTest(unittest.TestCase):
         }
         inputs = [torch.zeros(1, 4), torch.zeros(1, 4)]
 
+        OffloadEngine.start_no_tail_wait_capture(engine)
         outputs1 = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+        OffloadEngine.stop_no_tail_wait_capture(engine)
+        OffloadEngine.activate_no_tail_wait_mode(engine)
         outputs2 = OffloadEngine.run_module_demand_lane_group(engine, modules, inputs)
+        OffloadEngine.deactivate_no_tail_wait_mode(engine)
 
         self.assertEqual(len(outputs1), 2)
         self.assertEqual(len(outputs2), 2)
-        self.assertEqual(engine.archer_engine.begin_group_calls, 1)
-        self.assertEqual(engine.archer_engine.end_group_calls, 0)
-        self.assertEqual(
-            len(engine._no_tail_wait_ready_tensor_ids),
-            sum(1 for module in modules for _ in module.parameters()),
-        )
+        self.assertEqual(engine.archer_engine.begin_group_calls, 2)
+        self.assertEqual(engine.archer_engine.end_group_calls, 2)
+        self.assertFalse(engine.no_tail_wait_mode)
+        self.assertEqual(len(engine._no_tail_wait_ready_tensor_ids), 0)
+        self.assertEqual(len(engine._no_tail_wait_captured_tensors), 0)
 
     def test_activate_registry_assigns_explicit_packed_fastpath_ids(self):
         engine = self._build_engine_stub()

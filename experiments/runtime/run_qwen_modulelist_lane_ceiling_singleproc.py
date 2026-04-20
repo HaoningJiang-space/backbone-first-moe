@@ -98,6 +98,28 @@ def run_eval_pair_with_reused_model(warmup_cfg: RuntimeEvalConfig, pair_cfg: Run
         cleanup_model(model)
 
 
+def run_no_tail_wait_pair(warmup_cfg: RuntimeEvalConfig, pair_cfg: RuntimeEvalConfig, prompts, tokenizer):
+    model = build_model(warmup_cfg)
+    try:
+        start_capture = getattr(model.engine, "start_no_tail_wait_capture", None)
+        stop_capture = getattr(model.engine, "stop_no_tail_wait_capture", None)
+        activate = getattr(model.engine, "activate_no_tail_wait_mode", None)
+        deactivate = getattr(model.engine, "deactivate_no_tail_wait_mode", None)
+        if start_capture is None or stop_capture is None or activate is None or deactivate is None:
+            raise RuntimeError("Engine does not expose required no-tail-wait controls")
+        start_capture()
+        warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, prompts)
+        stop_capture()
+        activate()
+        try:
+            pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, prompts)
+        finally:
+            deactivate()
+        return warmup, pair
+    finally:
+        cleanup_model(model)
+
+
 def select_resident(args, budget_bytes: int, output_dir: Path) -> Path:
     resident_json = output_dir / "qwen_lane_mem0p10.json"
     cmd = [
@@ -173,13 +195,13 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
     if no_tail_wait_mode:
         log_stage(output_root, f"{mode_name}:warmup_a:start")
         log_stage(output_root, f"{mode_name}:pair1_a:start")
-        a_warmup, a_pair = run_eval_pair_with_reused_model(a_warmup_cfg, a_pair_cfg, prompts, tokenizer)
+        a_warmup, a_pair = run_no_tail_wait_pair(a_warmup_cfg, a_pair_cfg, prompts, tokenizer)
         log_stage(output_root, f"{mode_name}:warmup_a:done")
         log_stage(output_root, f"{mode_name}:pair1_a:done")
 
         log_stage(output_root, f"{mode_name}:warmup_c:start")
         log_stage(output_root, f"{mode_name}:pair1_c:start")
-        c_warmup, c_pair = run_eval_pair_with_reused_model(c_warmup_cfg, c_pair_cfg, prompts, tokenizer)
+        c_warmup, c_pair = run_no_tail_wait_pair(c_warmup_cfg, c_pair_cfg, prompts, tokenizer)
         log_stage(output_root, f"{mode_name}:warmup_c:done")
         log_stage(output_root, f"{mode_name}:pair1_c:done")
     else:
