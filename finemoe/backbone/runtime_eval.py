@@ -3,6 +3,7 @@ import random
 import time
 from dataclasses import dataclass
 from pathlib import Path
+import gc
 
 import torch
 import transformers
@@ -45,6 +46,12 @@ def load_prompts(prompt_file):
         else:
             prompts.append(str(item))
     return prompts
+
+
+def prepare_prompts(runtime_cfg):
+    prompts = load_prompts(runtime_cfg.prompt_file)
+    random.Random(runtime_cfg.seed).shuffle(prompts)
+    return prompts[: runtime_cfg.num_prompts]
 
 
 def batched(items, batch_size):
@@ -93,15 +100,8 @@ def build_tokenizer(runtime_cfg):
     return tokenizer
 
 
-def evaluate_runtime(runtime_cfg):
-    prompts = load_prompts(runtime_cfg.prompt_file)
-    random.Random(runtime_cfg.seed).shuffle(prompts)
-    prompts = prompts[: runtime_cfg.num_prompts]
-
-    model = build_model(runtime_cfg)
-    tokenizer = build_tokenizer(runtime_cfg)
+def evaluate_runtime_with_components(runtime_cfg, model, tokenizer, prompts):
     generate_config = {"pad_token_id": tokenizer.pad_token_id}
-
     per_batch = []
     total_generated_tokens = 0
     total_prompt_tokens = 0
@@ -205,7 +205,23 @@ def evaluate_runtime(runtime_cfg):
     runtime_cfg.output.parent.mkdir(parents=True, exist_ok=True)
     runtime_cfg.output.write_text(json.dumps(payload, indent=2))
 
-    if hasattr(model.engine, "archer_engine"):
-        model.engine.archer_engine.clean_up_resources()
-
     return payload
+
+
+def cleanup_model(model):
+    if hasattr(model, "engine") and hasattr(model.engine, "archer_engine"):
+        model.engine.archer_engine.clean_up_resources()
+    del model
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def evaluate_runtime(runtime_cfg):
+    prompts = prepare_prompts(runtime_cfg)
+    model = build_model(runtime_cfg)
+    tokenizer = build_tokenizer(runtime_cfg)
+    try:
+        return evaluate_runtime_with_components(runtime_cfg, model, tokenizer, prompts)
+    finally:
+        cleanup_model(model)

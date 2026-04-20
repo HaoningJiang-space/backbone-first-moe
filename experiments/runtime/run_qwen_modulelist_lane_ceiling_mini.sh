@@ -4,8 +4,12 @@ set -euo pipefail
 REPO_ROOT="${REPO_ROOT:-/data/ziheng/backbone-first-moe_fresh_e2e}"
 OUT_ROOT="${OUT_ROOT:-${REPO_ROOT}/results/qwen_modulelist_lane_ceiling_mini}"
 
+MODEL_PATH="${MODEL_PATH:-/data/ziheng/models/Qwen1.5-MoE-A2.7B-Chat}"
+OFFLOAD_PATH="${OFFLOAD_PATH:-/data/finemoe_offloads/Qwen1.5-MoE-A2.7B-Chat}"
+PROMPT_FILE="${PROMPT_FILE:-/data/ziheng/FineMoE-EuroSys26/demo/states/lmsys-chat-1m~eval_prompts.json}"
+STATE_FILE="${STATE_FILE:-/data/ziheng/FineMoE-EuroSys26/demo/states/Qwen1.5-MoE-A2.7B-Chat~lmsys-chat-1m~64.pkl}"
+
 NUM_PROMPTS="${NUM_PROMPTS:-8}"
-NUM_MEASURED_PAIRS="${NUM_MEASURED_PAIRS:-1}"
 DEVICE_MEMORY_RATIO="${DEVICE_MEMORY_RATIO:-0.10}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
 MAX_LENGTH="${MAX_LENGTH:-256}"
@@ -15,37 +19,30 @@ STORE_CAPACITY="${STORE_CAPACITY:-1000}"
 SEED="${SEED:-42}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
 
-log_stage() {
-  local stage="$1"
-  printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${stage}"
-}
+cd "${REPO_ROOT}"
+source /home/ziheng/miniconda3/bin/activate mxmoe
 
-run_mode() {
-  local mode_name="$1"
-  local no_control_flag="$2"
-  local mode_out="${OUT_ROOT}/${mode_name}"
-  log_stage "mode=${mode_name}:start out=${mode_out}"
-  (
-    cd "${REPO_ROOT}"
-    env \
-      OUT_ROOT="${mode_out}" \
-      NO_CONTROL_MODE="${no_control_flag}" \
-      NUM_PROMPTS="${NUM_PROMPTS}" \
-      NUM_MEASURED_PAIRS="${NUM_MEASURED_PAIRS}" \
-      DEVICE_MEMORY_RATIO="${DEVICE_MEMORY_RATIO}" \
-      BATCH_SIZE="${BATCH_SIZE}" \
-      MAX_LENGTH="${MAX_LENGTH}" \
-      MAX_NEW_TOKENS="${MAX_NEW_TOKENS}" \
-      MIN_NEW_TOKENS="${MIN_NEW_TOKENS}" \
-      STORE_CAPACITY="${STORE_CAPACITY}" \
-      SEED="${SEED}" \
-      CUDA_DEVICE="${CUDA_DEVICE}" \
-      bash experiments/runtime/run_qwen_modulelist_lane_steady_state.sh
-  )
-  log_stage "mode=${mode_name}:done out=${mode_out}"
-}
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+export TMPDIR="${TMPDIR:-/data/ziheng/tmp}"
+export TMP="${TMP:-${TMPDIR}}"
+export TEMP="${TEMP:-${TMPDIR}}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/data/ziheng/torch_ext_qwen_lane_ceiling_singleproc}"
+export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 
-mkdir -p "${OUT_ROOT}"
+mkdir -p "${TMPDIR}" "${TORCH_EXTENSIONS_DIR}" "${OUT_ROOT}"
 
-run_mode control 0
-run_mode no_control 1
+python experiments/runtime/run_qwen_modulelist_lane_ceiling_singleproc.py \
+  --model-path "${MODEL_PATH}" \
+  --offload-path "${OFFLOAD_PATH}" \
+  --prompt-file "${PROMPT_FILE}" \
+  --state-file "${STATE_FILE}" \
+  --output-root "${OUT_ROOT}" \
+  --device-memory-ratio "${DEVICE_MEMORY_RATIO}" \
+  --device cuda:0 \
+  --batch-size "${BATCH_SIZE}" \
+  --num-prompts "${NUM_PROMPTS}" \
+  --max-length "${MAX_LENGTH}" \
+  --max-new-tokens "${MAX_NEW_TOKENS}" \
+  --min-new-tokens "${MIN_NEW_TOKENS}" \
+  --store-capacity "${STORE_CAPACITY}" \
+  --seed "${SEED}"
