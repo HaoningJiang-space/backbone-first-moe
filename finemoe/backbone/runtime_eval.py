@@ -232,9 +232,12 @@ def cleanup_model(model):
         torch.cuda.empty_cache()
 
 
-def reset_runtime_measurement_state(model):
-    if hasattr(model, "engine") and hasattr(model.engine, "reset_runtime_profile"):
-        model.engine.reset_runtime_profile()
+def reset_runtime_measurement_state(model, clear_dynamic_sparse_state=False):
+    if hasattr(model, "engine"):
+        if clear_dynamic_sparse_state and hasattr(model.engine, "flush_dynamic_sparse_state"):
+            model.engine.flush_dynamic_sparse_state()
+        if hasattr(model.engine, "reset_runtime_profile"):
+            model.engine.reset_runtime_profile()
 
 
 def evaluate_runtime(runtime_cfg):

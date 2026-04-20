@@ -46,6 +46,7 @@ public:
 
     std::size_t GetAllDeviceBusyMemory();
     void ClearCache();
+    void ResetRuntimeState(bool clear_cache = true);
 
     void SetTrace(const torch::Tensor& trace);
     void TraceRequest(const std::uint64_t request_id, const TensorID tensor_id);

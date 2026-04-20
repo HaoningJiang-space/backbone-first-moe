@@ -233,6 +233,7 @@ void ArcherTaskPool::ClearCacheSparseNode(int device_id)
 
     for (auto n : device_nodes) {
         std::lock_guard<std::mutex> lock(this->candidates_mutex_);
+        if (n->is_resident) { continue; }
         if (n->active_service_users.load() > 0) { continue; }
         if (n->mutex.try_lock()) {
             ARCHER_LOG_DEBUG("RemoveCachedSparseNode: {}", n->str());

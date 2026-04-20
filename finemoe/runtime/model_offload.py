@@ -1108,6 +1108,20 @@ class OffloadEngine(object):
             except Exception:
                 pass
 
+    def flush_dynamic_sparse_state(self):
+        reset_runtime_state = getattr(self.archer_engine, "reset_runtime_state", None)
+        if reset_runtime_state is not None:
+            reset_runtime_state(True)
+        else:
+            clear_cache = getattr(self.archer_engine, "clear_cache", None)
+            if clear_cache is not None:
+                clear_cache()
+        self._module_group_service_plans = {}
+        self._capture_no_tail_wait_tensors = False
+        self._no_tail_wait_ready_tensor_ids = set()
+        self._no_tail_wait_captured_tensors = {}
+        self._no_tail_wait_active_tensors = ()
+
     def _mark_module_resident_fastpath(self, module):
         """Mark a resident expert subtree to bypass generic hook bookkeeping."""
         marked = 0

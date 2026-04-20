@@ -373,6 +373,18 @@ void ArcherPrefetchHandle::ClearCache()
     }
 }
 
+void ArcherPrefetchHandle::ResetRuntimeState(bool clear_cache)
+{
+    if (clear_cache) {
+        ClearCache();
+    }
+
+    node_id_to_tensor_ids_.clear();
+    request_id_to_nodes_.clear();
+    last_layer_id_ = 0;
+    last_node_ = nullptr;
+}
+
 void ArcherPrefetchHandle::SetTrace(const torch::Tensor& trace)
 {
     if (trace.dim() != 3 || !trace.is_contiguous() || !trace.is_cpu()) {

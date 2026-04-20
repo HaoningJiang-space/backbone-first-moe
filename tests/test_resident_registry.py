@@ -17,6 +17,11 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(MODEL_OFFLOAD)
 
 OffloadEngine = MODEL_OFFLOAD.OffloadEngine
+RUNTIME_EVAL_PATH = Path(__file__).resolve().parents[1] / "finemoe" / "backbone" / "runtime_eval.py"
+RUNTIME_EVAL_SPEC = importlib.util.spec_from_file_location("test_runtime_eval", RUNTIME_EVAL_PATH)
+RUNTIME_EVAL = importlib.util.module_from_spec(RUNTIME_EVAL_SPEC)
+assert RUNTIME_EVAL_SPEC.loader is not None
+RUNTIME_EVAL_SPEC.loader.exec_module(RUNTIME_EVAL)
 
 
 class ResidentRegistryTest(unittest.TestCase):
@@ -610,6 +615,33 @@ class ResidentRegistryTest(unittest.TestCase):
         payload = OffloadEngine.get_runtime_profile(engine)
         self.assertEqual(payload["module_begin_calls"], 0)
         self.assertIs(fake_layer.runtime_profile, engine.runtime_profile)
+
+    def test_flush_dynamic_sparse_state_clears_cache_state(self):
+        engine = self._build_engine_stub()
+        engine.archer_engine = mock.Mock()
+        engine._module_group_service_plans = {"plan": object()}
+        engine._capture_no_tail_wait_tensors = True
+        engine._no_tail_wait_ready_tensor_ids = {1, 2}
+        engine._no_tail_wait_captured_tensors = {1: object()}
+        engine._no_tail_wait_active_tensors = (object(),)
+
+        OffloadEngine.flush_dynamic_sparse_state(engine)
+
+        engine.archer_engine.reset_runtime_state.assert_called_once_with(True)
+        self.assertEqual(engine._module_group_service_plans, {})
+        self.assertFalse(engine._capture_no_tail_wait_tensors)
+        self.assertEqual(engine._no_tail_wait_ready_tensor_ids, set())
+        self.assertEqual(engine._no_tail_wait_captured_tensors, {})
+        self.assertEqual(engine._no_tail_wait_active_tensors, ())
+
+    def test_reset_runtime_measurement_state_can_flush_dynamic_sparse_state(self):
+        engine = mock.Mock()
+        model = SimpleNamespace(engine=engine)
+
+        RUNTIME_EVAL.reset_runtime_measurement_state(model, clear_dynamic_sparse_state=True)
+
+        engine.flush_dynamic_sparse_state.assert_called_once_with()
+        engine.reset_runtime_profile.assert_called_once_with()
 
 
 if __name__ == "__main__":

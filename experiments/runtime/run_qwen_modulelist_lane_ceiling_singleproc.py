@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import subprocess
 from pathlib import Path
 import sys
@@ -17,7 +18,7 @@ from finemoe.backbone.runtime_eval import (
     build_tokenizer,
     cleanup_model,
     evaluate_runtime_with_components,
-    prepare_prompts,
+    load_prompts,
     reset_runtime_measurement_state,
 )
 
@@ -89,14 +90,40 @@ def run_eval(cfg: RuntimeEvalConfig, prompts, tokenizer):
         cleanup_model(model)
 
 
-def run_persistent_model_pair(model, warmup_cfg: RuntimeEvalConfig, pair_cfg: RuntimeEvalConfig, prompts, tokenizer):
-    warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, prompts)
-    reset_runtime_measurement_state(model)
-    pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, prompts)
+def prepare_prompt_subsets(prompt_file: Path, *, seed: int, num_prompts: int):
+    prompts = load_prompts(prompt_file)
+    random.Random(seed).shuffle(prompts)
+    if len(prompts) < num_prompts * 2:
+        raise RuntimeError(
+            f"Need at least {num_prompts * 2} prompts for warmup/pair split, got {len(prompts)}"
+        )
+    pair_prompts = prompts[:num_prompts]
+    warmup_prompts = prompts[num_prompts:num_prompts * 2]
+    return pair_prompts, warmup_prompts
+
+
+def run_persistent_model_pair(
+    model,
+    warmup_cfg: RuntimeEvalConfig,
+    pair_cfg: RuntimeEvalConfig,
+    warmup_prompts,
+    pair_prompts,
+    tokenizer,
+):
+    warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, warmup_prompts)
+    reset_runtime_measurement_state(model, clear_dynamic_sparse_state=True)
+    pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, pair_prompts)
     return warmup, pair
 
 
-def run_no_tail_wait_persistent_pair(model, warmup_cfg: RuntimeEvalConfig, pair_cfg: RuntimeEvalConfig, prompts, tokenizer):
+def run_no_tail_wait_persistent_pair(
+    model,
+    warmup_cfg: RuntimeEvalConfig,
+    pair_cfg: RuntimeEvalConfig,
+    warmup_prompts,
+    pair_prompts,
+    tokenizer,
+):
     start_capture = getattr(model.engine, "start_no_tail_wait_capture", None)
     stop_capture = getattr(model.engine, "stop_no_tail_wait_capture", None)
     activate = getattr(model.engine, "activate_no_tail_wait_mode", None)
@@ -104,12 +131,13 @@ def run_no_tail_wait_persistent_pair(model, warmup_cfg: RuntimeEvalConfig, pair_
     if start_capture is None or stop_capture is None or activate is None or deactivate is None:
         raise RuntimeError("Engine does not expose required no-tail-wait controls")
     start_capture()
-    warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, prompts)
+    warmup = evaluate_runtime_with_components(warmup_cfg, model, tokenizer, warmup_prompts)
     stop_capture()
+    reset_runtime_measurement_state(model, clear_dynamic_sparse_state=True)
     activate()
     try:
         reset_runtime_measurement_state(model)
-        pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, prompts)
+        pair = evaluate_runtime_with_components(pair_cfg, model, tokenizer, pair_prompts)
     finally:
         deactivate()
     return warmup, pair
@@ -144,7 +172,7 @@ def select_resident(args, budget_bytes: int, output_dir: Path) -> Path:
     return resident_json
 
 
-def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, resident_json: Path, *,
+def run_mode(args, output_root: Path, warmup_prompts, pair_prompts, tokenizer, budget_bytes: int, resident_json: Path, *,
              mode_name: str, no_control_mode: bool, no_tail_wait_mode: bool = False):
     mode_root = output_root / mode_name
     warmup_dir = mode_root / "warmup"
@@ -195,11 +223,11 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         log_stage(output_root, f"{mode_name}:pair1_a:start")
         if no_tail_wait_mode:
             a_warmup, a_pair = run_no_tail_wait_persistent_pair(
-                a_model, a_warmup_cfg, a_pair_cfg, prompts, tokenizer
+                a_model, a_warmup_cfg, a_pair_cfg, warmup_prompts, pair_prompts, tokenizer
             )
         else:
             a_warmup, a_pair = run_persistent_model_pair(
-                a_model, a_warmup_cfg, a_pair_cfg, prompts, tokenizer
+                a_model, a_warmup_cfg, a_pair_cfg, warmup_prompts, pair_prompts, tokenizer
             )
         log_stage(output_root, f"{mode_name}:warmup_a:done")
         log_stage(output_root, f"{mode_name}:pair1_a:done")
@@ -215,11 +243,11 @@ def run_mode(args, output_root: Path, prompts, tokenizer, budget_bytes: int, res
         log_stage(output_root, f"{mode_name}:pair1_c:start")
         if no_tail_wait_mode:
             c_warmup, c_pair = run_no_tail_wait_persistent_pair(
-                c_model, c_warmup_cfg, c_pair_cfg, prompts, tokenizer
+                c_model, c_warmup_cfg, c_pair_cfg, warmup_prompts, pair_prompts, tokenizer
             )
         else:
             c_warmup, c_pair = run_persistent_model_pair(
-                c_model, c_warmup_cfg, c_pair_cfg, prompts, tokenizer
+                c_model, c_warmup_cfg, c_pair_cfg, warmup_prompts, pair_prompts, tokenizer
             )
         log_stage(output_root, f"{mode_name}:warmup_c:done")
         log_stage(output_root, f"{mode_name}:pair1_c:done")
@@ -261,11 +289,15 @@ def main():
         tag="plan_A",
     )
 
-    prompts = prepare_prompts(plan_cfg)
+    pair_prompts, warmup_prompts = prepare_prompt_subsets(
+        args.prompt_file,
+        seed=args.seed,
+        num_prompts=args.num_prompts,
+    )
     tokenizer = build_tokenizer(plan_cfg)
 
     log_stage(output_root, "plan_a:start")
-    plan_payload = run_eval(plan_cfg, prompts, tokenizer)
+    plan_payload = run_eval(plan_cfg, pair_prompts, tokenizer)
     log_stage(output_root, "plan_a:done")
 
     budget_bytes = int(plan_payload["sparse_budget_bytes"])
@@ -276,7 +308,8 @@ def main():
     control_summary = run_mode(
         args,
         output_root,
-        prompts,
+        warmup_prompts,
+        pair_prompts,
         tokenizer,
         budget_bytes,
         resident_json,
@@ -286,7 +319,8 @@ def main():
     no_control_summary = run_mode(
         args,
         output_root,
-        prompts,
+        warmup_prompts,
+        pair_prompts,
         tokenizer,
         budget_bytes,
         resident_json,
@@ -296,7 +330,8 @@ def main():
     no_tail_wait_summary = run_mode(
         args,
         output_root,
-        prompts,
+        warmup_prompts,
+        pair_prompts,
         tokenizer,
         budget_bytes,
         resident_json,

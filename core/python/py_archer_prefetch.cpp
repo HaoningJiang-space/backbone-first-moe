@@ -56,6 +56,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
              (std::size_t(ArcherPrefetchHandle::*)()) & ArcherPrefetchHandle::GetAllDeviceBusyMemory)
         .def("clear_cache",
              (void(ArcherPrefetchHandle::*)()) & ArcherPrefetchHandle::ClearCache)
+        .def("reset_runtime_state",
+             &ArcherPrefetchHandle::ResetRuntimeState,
+             py::arg("clear_cache") = true)
         .def("set_trace",
              (void(ArcherPrefetchHandle::*)(const torch::Tensor&)) & ArcherPrefetchHandle::SetTrace)
         //    .def("trace_request",
