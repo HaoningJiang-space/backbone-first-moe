@@ -69,33 +69,56 @@ def _run_modulelist_resident_lane(
     experts,
     blocks,
 ):
+    if not blocks:
+        return 0, 0.0, 0.0, 0.0
+
+    def _concat_slices(tensor: torch.Tensor):
+        slices = [tensor[start:end] for start, end in blocks]
+        if len(slices) == 1:
+            return slices[0]
+        return torch.cat(slices, dim=0)
+
+    gather_t0 = time.perf_counter()
+    resident_token_idx = _concat_slices(sorted_tokens)
+    resident_weights = _concat_slices(sorted_weights)
+    resident_states = hidden_states[resident_token_idx]
+    gather_wall_time_sec = time.perf_counter() - gather_t0
+
     compute_wall_time_sec = 0.0
-    gather_wall_time_sec = 0.0
     merge_wall_time_sec = 0.0
-    token_assignments = 0
+    token_assignments = int(resident_token_idx.numel())
+    resident_outputs = []
+    offset = 0
     for start, end in blocks:
         expert_idx = int(sorted_experts[start])
-        token_idx = sorted_tokens[start:end]
         block_tokens = int(end - start)
-        token_assignments += block_tokens
-        t0 = time.perf_counter()
-        current_state = hidden_states[token_idx]
-        gather_wall_time_sec += time.perf_counter() - t0
+        current_state = resident_states[offset: offset + block_tokens]
         expert_module = experts[expert_idx]
         t0 = time.perf_counter()
         current_hidden_states = expert_module(current_state)
         compute_wall_time_sec += time.perf_counter() - t0
-        t0 = time.perf_counter()
-        current_hidden_states = current_hidden_states.to(
+        resident_outputs.append(current_hidden_states)
+        offset += block_tokens
+
+    merge_t0 = time.perf_counter()
+    if len(resident_outputs) == 1:
+        merged_hidden_states = resident_outputs[0]
+    else:
+        merged_hidden_states = torch.cat(resident_outputs, dim=0)
+    if (
+        merged_hidden_states.device != final_hidden_states.device
+        or merged_hidden_states.dtype != final_hidden_states.dtype
+    ):
+        merged_hidden_states = merged_hidden_states.to(
             device=final_hidden_states.device,
             dtype=final_hidden_states.dtype,
         )
-        current_hidden_states = current_hidden_states * sorted_weights[start:end].to(
-            device=final_hidden_states.device,
-            dtype=final_hidden_states.dtype,
-        ).unsqueeze(-1)
-        final_hidden_states.index_add_(0, token_idx, current_hidden_states)
-        merge_wall_time_sec += time.perf_counter() - t0
+    merged_hidden_states = merged_hidden_states * resident_weights.to(
+        device=final_hidden_states.device,
+        dtype=final_hidden_states.dtype,
+    ).unsqueeze(-1)
+    final_hidden_states.index_add_(0, resident_token_idx, merged_hidden_states)
+    merge_wall_time_sec += time.perf_counter() - merge_t0
     return token_assignments, compute_wall_time_sec, gather_wall_time_sec, merge_wall_time_sec
 
 
