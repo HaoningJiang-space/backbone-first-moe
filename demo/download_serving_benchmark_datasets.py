@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import random
 from pathlib import Path
 
@@ -258,6 +259,7 @@ def main():
 
     summary = {
         "requested_datasets": requested,
+        "hf_endpoint": os.environ.get("HF_ENDPOINT"),
         "outputs": manifest,
         "errors": errors,
     }

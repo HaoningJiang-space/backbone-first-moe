@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="${REPO_ROOT:-/data/ziheng/backbone-first-moe_fresh_e2e}"
 OUT_ROOT="${OUT_ROOT:-${REPO_ROOT}/demo/states/benchmarks}"
 HF_CACHE_DIR="${HF_CACHE_DIR:-/data/ziheng/hf_datasets}"
+HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 DATASETS="${DATASETS:-gsm8k,mmlu,bbh,longbench}"
 SAMPLE_SIZE="${SAMPLE_SIZE:-128}"
 MIXED_PER_SOURCE="${MIXED_PER_SOURCE:-32}"
@@ -15,6 +16,8 @@ source /home/ziheng/miniconda3/bin/activate mxmoe
 export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 export HF_HOME="${HF_HOME:-/data/ziheng/hf_home}"
 export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_CACHE_DIR}}"
+export HF_ENDPOINT
+export HF_HUB_DISABLE_TELEMETRY="${HF_HUB_DISABLE_TELEMETRY:-1}"
 
 mkdir -p "${OUT_ROOT}" "${HF_CACHE_DIR}" "${HF_HOME}"
 
