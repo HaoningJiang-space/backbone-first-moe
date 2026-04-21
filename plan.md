@@ -169,6 +169,97 @@ Current best read:
   - an implementation hypothesis that still needs work
   - not as the already-proven main source of gain
 
+## Fresh Real-Machine Backbone Validation
+
+This question is now answered with **fresh real-machine evidence**, not only with previously collected traces.
+
+Protocol:
+
+- regenerate `4` non-overlapping routed trace shards on the real machine
+- each shard uses fresh prompts and real model execution
+- each shard selects its own resident backbone independently
+- then test both:
+  - cross-shard trace-level transfer
+  - held-out runtime transfer
+
+### Real-Machine Shard-Level Existence
+
+On `Qwen`, with `4 x 16` fresh-prompt shards at `mem=0.10`:
+
+- per-shard resident counts:
+  - `405, 413, 447, 425`
+- native assignment-fraction-per-token means:
+  - `0.4219, 0.3998, 0.4141, 0.3916`
+- native active-reduction means:
+  - `0.3533, 0.3506, 0.3710, 0.3470`
+
+Interpretation:
+
+- each fresh shard yields a large, non-degenerate resident backbone
+- each shard shows substantial native routed-assignment coverage
+- therefore `backbone exists` is now supported by fresh real-machine routed traces
+
+### Real-Machine Cross-Shard Stability
+
+Across all train-shard to test-shard transfers:
+
+- resident-set Jaccard:
+  - mean `0.3054`
+  - min `0.2547`
+  - max `0.3432`
+- held-out retained assignment fraction:
+  - mean `0.9220`
+  - min `0.8740`
+  - max `0.9916`
+- held-out retained active-reduction fraction:
+  - mean `0.9513`
+  - min `0.8887`
+  - max `1.0028`
+
+Interpretation:
+
+- exact resident identity overlap is only moderate
+- but the **functional backbone** transfers strongly across fresh shards
+- what is stable is not a fixed exact expert-id set
+- what is stable is a backbone that preserves most of the useful routed coverage and tail sparsification on held-out prompts
+
+### Held-Out Real-Machine Runtime Transfer
+
+Trace-level transfer is now also backed by a real runtime check.
+
+Held-out runtime protocol:
+
+- prompts: shard `1`
+- `A`: no resident backbone
+- `B_native`: resident set selected from shard `1`
+- `B_transfer`: resident set selected from shard `0`
+- both resident files are trimmed to the same runtime-feasible `top165` regime
+
+Measured throughput:
+
+- `A = 5.1729 tok/s`
+- `B_native = 5.3580 tok/s`
+- `B_transfer = 5.3392 tok/s`
+
+Transfer retention:
+
+- `A -> B_native = +3.58%`
+- `A -> B_transfer = +3.22%`
+- retained gain fraction = `0.8984`
+
+Interpretation:
+
+- a backbone learned on shard `0` preserves about `90%` of the native runtime gain on held-out shard `1`
+- therefore `backbone is stable` is no longer just a trace-side claim
+- it now has **held-out real-machine runtime transfer** support
+
+Most important conclusion:
+
+- `backbone exists and is stable` should now be treated as a proven statement for `Qwen`
+- this conclusion is stronger than the current `two-lane` realization claim
+- the current uncertainty is no longer whether backbone is real
+- the current uncertainty is how to realize backbone cheaply enough at runtime
+
 ## Conservative Backbone Roadmap
 
 This is the evidence-aligned roadmap for the next phase.
@@ -192,6 +283,8 @@ But the roadmap must distinguish clearly between:
 What is proven:
 
 - stable backbone exists on real routed workloads
+- stable backbone also transfers across fresh real-machine prompt shards
+- held-out runtime gain transfer is strong in the runtime-feasible resident regime
 - backbone concentrates routed compute mass
 - backbone materially sparsifies the residual tail
 
@@ -208,6 +301,7 @@ Interpretation:
 
 - backbone is a strong `compute-mass concentrator`
 - backbone is a strong `tail sparsifier`
+- backbone is stable in a functional sense even when exact resident-set overlap is only moderate
 - backbone is **not** currently a strong `exact assignment-shape cache key`
 
 #### Level 2: Backbone Resident / Materialization
