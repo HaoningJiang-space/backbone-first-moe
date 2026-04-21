@@ -35,6 +35,8 @@ def build_parser():
                         help="Keep already-ready tail tensors resident across grouped service windows for no-tail-wait experiments")
     parser.add_argument("--disable-backbone-lane-split", action="store_true",
                         help="Keep resident experts pinned but disable backbone-vs-tail specialization for unified-runtime ablations")
+    parser.add_argument("--backbone-grouped-resident-mode", action="store_true",
+                        help="Use a dedicated grouped resident workspace path for backbone assignments on top of unified runtime")
     parser.add_argument("--tag", type=str, default="runtime_eval")
     return parser
 
@@ -65,6 +67,7 @@ def main():
         no_control_mode=args.no_control_mode,
         no_tail_wait_mode=args.no_tail_wait_mode,
         disable_backbone_lane_split=args.disable_backbone_lane_split,
+        backbone_grouped_resident_mode=args.backbone_grouped_resident_mode,
         tag=args.tag,
     )
     payload = evaluate_runtime(runtime_cfg)

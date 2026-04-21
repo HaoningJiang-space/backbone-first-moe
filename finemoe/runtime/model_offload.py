@@ -422,6 +422,9 @@ class RuntimeProfile:
     modulelist_output_buffer_cache_hits: int = 0
     modulelist_output_buffer_cache_misses: int = 0
     modulelist_output_buffer_prepare_wall_time_sec: float = 0.0
+    modulelist_resident_workspace_cache_hits: int = 0
+    modulelist_resident_workspace_cache_misses: int = 0
+    modulelist_resident_workspace_prepare_wall_time_sec: float = 0.0
     resident_lane_expert_blocks: int = 0
     resident_lane_token_assignments: int = 0
     resident_lane_compute_wall_time_sec: float = 0.0
@@ -540,6 +543,9 @@ class RuntimeProfile:
         output_buffer_cache_hit=False,
         output_buffer_cache_miss=False,
         output_buffer_prepare_wall_time_sec=0.0,
+        resident_workspace_cache_hit=False,
+        resident_workspace_cache_miss=False,
+        resident_workspace_prepare_wall_time_sec=0.0,
     ):
         self.modulelist_dispatch_calls += 1
         self.modulelist_active_expert_blocks += int(active_expert_blocks)
@@ -559,6 +565,11 @@ class RuntimeProfile:
         self.modulelist_output_buffer_cache_hits += int(bool(output_buffer_cache_hit))
         self.modulelist_output_buffer_cache_misses += int(bool(output_buffer_cache_miss))
         self.modulelist_output_buffer_prepare_wall_time_sec += float(output_buffer_prepare_wall_time_sec)
+        self.modulelist_resident_workspace_cache_hits += int(bool(resident_workspace_cache_hit))
+        self.modulelist_resident_workspace_cache_misses += int(bool(resident_workspace_cache_miss))
+        self.modulelist_resident_workspace_prepare_wall_time_sec += float(
+            resident_workspace_prepare_wall_time_sec
+        )
         self.resident_lane_expert_blocks += int(resident_expert_blocks)
         self.resident_lane_token_assignments += int(resident_token_assignments)
         self.resident_lane_compute_wall_time_sec += float(resident_compute_wall_time_sec)
@@ -636,6 +647,11 @@ class RuntimeProfile:
             "modulelist_output_buffer_cache_hits": int(self.modulelist_output_buffer_cache_hits),
             "modulelist_output_buffer_cache_misses": int(self.modulelist_output_buffer_cache_misses),
             "modulelist_output_buffer_prepare_wall_time_sec": float(self.modulelist_output_buffer_prepare_wall_time_sec),
+            "modulelist_resident_workspace_cache_hits": int(self.modulelist_resident_workspace_cache_hits),
+            "modulelist_resident_workspace_cache_misses": int(self.modulelist_resident_workspace_cache_misses),
+            "modulelist_resident_workspace_prepare_wall_time_sec": float(
+                self.modulelist_resident_workspace_prepare_wall_time_sec
+            ),
             "resident_lane_expert_blocks": int(self.resident_lane_expert_blocks),
             "resident_lane_token_assignments": int(self.resident_lane_token_assignments),
             "resident_lane_compute_wall_time_sec": float(self.resident_lane_compute_wall_time_sec),
@@ -1842,6 +1858,9 @@ class OffloadEngine(object):
         self.disable_backbone_lane_split = bool(
             getattr(_archer_config, "disable_backbone_lane_split", False)
         )
+        self.backbone_grouped_resident_mode = bool(
+            getattr(_archer_config, "backbone_grouped_resident_mode", False)
+        )
         if getattr(_archer_config, "sparse_budget_bytes_override", 0):
             self._runtime_budget_override_bytes = int(_archer_config.sparse_budget_bytes_override)
             self._runtime_budget_override_source = "runtime_sparse_budget_override"
@@ -2232,6 +2251,7 @@ class OffloadEngine(object):
                         module.device = self.device
                         module.runtime_profile = self.runtime_profile
                         module.enable_backbone_lane_split = not bool(self.disable_backbone_lane_split)
+                        module.backbone_grouped_resident_mode = bool(self.backbone_grouped_resident_mode)
 
                         self.expert_layer_modules.append(module)
 

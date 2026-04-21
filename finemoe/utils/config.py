@@ -40,6 +40,10 @@ class ArcherConfig:
         default=False,
         metadata={"help": "Keep resident experts materialized but disable backbone-vs-tail dispatch specialization for unified-runtime ablations"},
     )
+    backbone_grouped_resident_mode: bool = field(
+        default=False,
+        metadata={"help": "On top of unified runtime, route resident backbone assignments through a dedicated grouped resident workspace path"},
+    )
     # master_addr: str = field(
     #     default="127.0.0.1",
     #     metadata={"help": "Hosts for running archer"},

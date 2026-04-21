@@ -508,6 +508,94 @@ class ModulelistRuntimeTest(unittest.TestCase):
         self.assertGreaterEqual(calls[0]["output_buffer_prepare_wall_time_sec"], 0.0)
         self.assertGreaterEqual(calls[1]["output_buffer_prepare_wall_time_sec"], 0.0)
 
+    def test_dispatch_backbone_grouped_resident_mode_reuses_workspace(self):
+        hidden_states = torch.tensor(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+            ],
+            dtype=torch.float32,
+        )
+        selected_experts = torch.tensor(
+            [
+                [0, 1],
+                [1, 2],
+                [2, 0],
+            ],
+            dtype=torch.long,
+        )
+        routing_weights = torch.tensor(
+            [
+                [0.7, 0.3],
+                [0.6, 0.4],
+                [0.8, 0.2],
+            ],
+            dtype=torch.float32,
+        )
+        experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=0.0),
+                _AffineExpert(scale=1.0, bias=1.0),
+                _AffineExpert(scale=-1.0, bias=0.5),
+            ]
+        )
+        reference_experts = torch.nn.ModuleList(
+            [
+                _AffineExpert(scale=2.0, bias=0.0),
+                _AffineExpert(scale=1.0, bias=1.0),
+                _AffineExpert(scale=-1.0, bias=0.5),
+            ]
+        )
+        fake_engine = _FakeOffloadEngine()
+        for expert in experts:
+            expert.offload_engine = fake_engine
+
+        runtime_cache = {}
+        calls = []
+        runtime_profile = SimpleNamespace(
+            record_modulelist_dispatch=lambda **kwargs: calls.append(kwargs)
+        )
+
+        first = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=experts,
+            resident_expert_ids={1, 2},
+            enable_backbone_lane_split=False,
+            backbone_grouped_resident_mode=True,
+            runtime_profile=runtime_profile,
+            runtime_cache=runtime_cache,
+        )
+        second = dispatch_modulelist_experts(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=experts,
+            resident_expert_ids={1, 2},
+            enable_backbone_lane_split=False,
+            backbone_grouped_resident_mode=True,
+            runtime_profile=runtime_profile,
+            runtime_cache=runtime_cache,
+        )
+        expected = _reference_dispatch(
+            hidden_states=hidden_states,
+            selected_experts=selected_experts,
+            routing_weights=routing_weights,
+            experts=reference_experts,
+        )
+
+        self.assertTrue(torch.allclose(first, expected, atol=1e-6))
+        self.assertTrue(torch.allclose(second, expected, atol=1e-6))
+        self.assertEqual(fake_engine.group_calls, [(experts[0],), (experts[0],)])
+        self.assertEqual(calls[0]["resident_workspace_cache_hit"], 0)
+        self.assertEqual(calls[0]["resident_workspace_cache_miss"], 1)
+        self.assertEqual(calls[1]["resident_workspace_cache_hit"], 1)
+        self.assertEqual(calls[1]["resident_workspace_cache_miss"], 0)
+        self.assertGreaterEqual(calls[0]["resident_workspace_prepare_wall_time_sec"], 0.0)
+        self.assertGreaterEqual(calls[1]["resident_workspace_prepare_wall_time_sec"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

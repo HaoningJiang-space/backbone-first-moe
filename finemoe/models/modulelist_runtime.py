@@ -59,6 +59,69 @@ def _acquire_output_buffer(hidden_states: torch.Tensor, runtime_cache=None):
     return final_hidden_states, cache_hit, prepare_wall_time_sec
 
 
+def _acquire_resident_workspace(hidden_states: torch.Tensor, token_assignments: int, runtime_cache=None):
+    hidden_dim = hidden_states.shape[-1]
+    prepare_t0 = time.perf_counter()
+    cache_hit = False
+    token_idx_buffer = None
+    weight_buffer = None
+    state_buffer = None
+    output_buffer = None
+
+    if runtime_cache is not None:
+        cached = runtime_cache.get("resident_backbone_workspace")
+        if cached is not None:
+            capacity = int(cached.get("capacity", 0))
+            token_idx_tensor = cached.get("token_idx")
+            weight_tensor = cached.get("weights")
+            state_tensor = cached.get("states")
+            output_tensor = cached.get("outputs")
+            if (
+                capacity >= token_assignments
+                and token_idx_tensor is not None
+                and weight_tensor is not None
+                and state_tensor is not None
+                and output_tensor is not None
+                and tuple(state_tensor.shape[1:]) == (hidden_dim,)
+                and tuple(output_tensor.shape[1:]) == (hidden_dim,)
+                and token_idx_tensor.device == hidden_states.device
+                and weight_tensor.device == hidden_states.device
+                and state_tensor.device == hidden_states.device
+                and output_tensor.device == hidden_states.device
+                and weight_tensor.dtype == hidden_states.dtype
+                and state_tensor.dtype == hidden_states.dtype
+                and output_tensor.dtype == hidden_states.dtype
+            ):
+                token_idx_buffer = token_idx_tensor
+                weight_buffer = weight_tensor
+                state_buffer = state_tensor
+                output_buffer = output_tensor
+                cache_hit = True
+
+    if token_idx_buffer is None:
+        capacity = max(1, int(token_assignments))
+        token_idx_buffer = torch.empty((capacity,), dtype=torch.long, device=hidden_states.device)
+        weight_buffer = torch.empty((capacity,), dtype=hidden_states.dtype, device=hidden_states.device)
+        state_buffer = torch.empty((capacity, hidden_dim), dtype=hidden_states.dtype, device=hidden_states.device)
+        output_buffer = torch.empty((capacity, hidden_dim), dtype=hidden_states.dtype, device=hidden_states.device)
+        if runtime_cache is not None:
+            runtime_cache["resident_backbone_workspace"] = {
+                "capacity": capacity,
+                "token_idx": token_idx_buffer,
+                "weights": weight_buffer,
+                "states": state_buffer,
+                "outputs": output_buffer,
+            }
+
+    prepare_wall_time_sec = time.perf_counter() - prepare_t0
+    return {
+        "token_idx": token_idx_buffer[:token_assignments],
+        "weights": weight_buffer[:token_assignments],
+        "states": state_buffer[:token_assignments],
+        "outputs": output_buffer[:token_assignments],
+    }, cache_hit, prepare_wall_time_sec
+
+
 def _run_modulelist_resident_lane(
     *,
     hidden_states: torch.Tensor,
@@ -70,7 +133,7 @@ def _run_modulelist_resident_lane(
     blocks,
 ):
     if not blocks:
-        return 0, 0.0, 0.0, 0.0
+        return 0, 0.0, 0.0, 0.0, False, False, 0.0
 
     def _concat_slices(tensor: torch.Tensor):
         slices = [tensor[start:end] for start, end in blocks]
@@ -119,7 +182,78 @@ def _run_modulelist_resident_lane(
     ).unsqueeze(-1)
     final_hidden_states.index_add_(0, resident_token_idx, merged_hidden_states)
     merge_wall_time_sec += time.perf_counter() - merge_t0
-    return token_assignments, compute_wall_time_sec, gather_wall_time_sec, merge_wall_time_sec
+    return token_assignments, compute_wall_time_sec, gather_wall_time_sec, merge_wall_time_sec, False, False, 0.0
+
+
+def _run_modulelist_resident_lane_workspace(
+    *,
+    hidden_states: torch.Tensor,
+    final_hidden_states: torch.Tensor,
+    sorted_experts: torch.Tensor,
+    sorted_tokens: torch.Tensor,
+    sorted_weights: torch.Tensor,
+    experts,
+    blocks,
+    runtime_cache=None,
+):
+    if not blocks:
+        return 0, 0.0, 0.0, 0.0, False, False, 0.0
+
+    token_assignments = int(sum(int(end - start) for start, end in blocks))
+    workspace, workspace_cache_hit, workspace_prepare_wall_time_sec = _acquire_resident_workspace(
+        hidden_states,
+        token_assignments,
+        runtime_cache=runtime_cache,
+    )
+    resident_token_idx = workspace["token_idx"]
+    resident_weights = workspace["weights"]
+    resident_states = workspace["states"]
+    resident_outputs = workspace["outputs"]
+
+    gather_t0 = time.perf_counter()
+    offset = 0
+    for start, end in blocks:
+        block_tokens = int(end - start)
+        resident_token_idx[offset: offset + block_tokens].copy_(sorted_tokens[start:end])
+        resident_weights[offset: offset + block_tokens].copy_(sorted_weights[start:end])
+        offset += block_tokens
+    torch.index_select(hidden_states, 0, resident_token_idx, out=resident_states)
+    gather_wall_time_sec = time.perf_counter() - gather_t0
+
+    compute_wall_time_sec = 0.0
+    offset = 0
+    for start, end in blocks:
+        expert_idx = int(sorted_experts[start])
+        block_tokens = int(end - start)
+        current_state = resident_states[offset: offset + block_tokens]
+        expert_module = experts[expert_idx]
+        t0 = time.perf_counter()
+        current_hidden_states = expert_module(current_state)
+        compute_wall_time_sec += time.perf_counter() - t0
+        if (
+            current_hidden_states.device != resident_outputs.device
+            or current_hidden_states.dtype != resident_outputs.dtype
+        ):
+            current_hidden_states = current_hidden_states.to(
+                device=resident_outputs.device,
+                dtype=resident_outputs.dtype,
+            )
+        resident_outputs[offset: offset + block_tokens].copy_(current_hidden_states)
+        offset += block_tokens
+
+    merge_t0 = time.perf_counter()
+    resident_outputs.mul_(resident_weights.unsqueeze(-1))
+    final_hidden_states.index_add_(0, resident_token_idx, resident_outputs)
+    merge_wall_time_sec = time.perf_counter() - merge_t0
+    return (
+        token_assignments,
+        compute_wall_time_sec,
+        gather_wall_time_sec,
+        merge_wall_time_sec,
+        workspace_cache_hit,
+        not workspace_cache_hit,
+        workspace_prepare_wall_time_sec,
+    )
 
 
 def _run_modulelist_demand_lane(
@@ -211,6 +345,7 @@ def dispatch_modulelist_experts(
     experts,
     resident_expert_ids=None,
     enable_backbone_lane_split: bool = True,
+    backbone_grouped_resident_mode: bool = False,
     runtime_profile=None,
     runtime_cache=None,
 ) -> torch.Tensor:
@@ -234,28 +369,54 @@ def dispatch_modulelist_experts(
     assignment_build_wall_time_sec = time.perf_counter() - assignment_t0
 
     resident_expert_ids = set(resident_expert_ids or ())
+    use_resident_backbone_path = bool(resident_expert_ids) and (
+        enable_backbone_lane_split or backbone_grouped_resident_mode
+    )
     resident_blocks = []
     demand_blocks = []
     for start, end in zip(start_positions, end_positions):
-        if enable_backbone_lane_split and int(sorted_experts[start]) in resident_expert_ids:
+        if use_resident_backbone_path and int(sorted_experts[start]) in resident_expert_ids:
             resident_blocks.append((start, end))
         else:
             demand_blocks.append((start, end))
 
-    (
-        resident_token_assignments,
-        resident_compute_wall_time_sec,
-        resident_gather_wall_time_sec,
-        resident_merge_wall_time_sec,
-    ) = _run_modulelist_resident_lane(
-        hidden_states=hidden_states,
-        final_hidden_states=final_hidden_states,
-        sorted_experts=sorted_experts,
-        sorted_tokens=sorted_tokens,
-        sorted_weights=sorted_weights,
-        experts=experts,
-        blocks=resident_blocks,
-    )
+    if backbone_grouped_resident_mode:
+        (
+            resident_token_assignments,
+            resident_compute_wall_time_sec,
+            resident_gather_wall_time_sec,
+            resident_merge_wall_time_sec,
+            resident_workspace_cache_hit,
+            resident_workspace_cache_miss,
+            resident_workspace_prepare_wall_time_sec,
+        ) = _run_modulelist_resident_lane_workspace(
+            hidden_states=hidden_states,
+            final_hidden_states=final_hidden_states,
+            sorted_experts=sorted_experts,
+            sorted_tokens=sorted_tokens,
+            sorted_weights=sorted_weights,
+            experts=experts,
+            blocks=resident_blocks,
+            runtime_cache=runtime_cache,
+        )
+    else:
+        (
+            resident_token_assignments,
+            resident_compute_wall_time_sec,
+            resident_gather_wall_time_sec,
+            resident_merge_wall_time_sec,
+            resident_workspace_cache_hit,
+            resident_workspace_cache_miss,
+            resident_workspace_prepare_wall_time_sec,
+        ) = _run_modulelist_resident_lane(
+            hidden_states=hidden_states,
+            final_hidden_states=final_hidden_states,
+            sorted_experts=sorted_experts,
+            sorted_tokens=sorted_tokens,
+            sorted_weights=sorted_weights,
+            experts=experts,
+            blocks=resident_blocks,
+        )
     (
         demand_token_assignments,
         demand_compute_wall_time_sec,
@@ -295,6 +456,9 @@ def dispatch_modulelist_experts(
             output_buffer_cache_hit=output_buffer_cache_hit,
             output_buffer_cache_miss=not output_buffer_cache_hit,
             output_buffer_prepare_wall_time_sec=output_buffer_prepare_wall_time_sec,
+            resident_workspace_cache_hit=resident_workspace_cache_hit,
+            resident_workspace_cache_miss=resident_workspace_cache_miss,
+            resident_workspace_prepare_wall_time_sec=resident_workspace_prepare_wall_time_sec,
         )
 
     return final_hidden_states

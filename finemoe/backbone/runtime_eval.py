@@ -35,6 +35,7 @@ class RuntimeEvalConfig:
     no_control_mode: bool = False
     no_tail_wait_mode: bool = False
     disable_backbone_lane_split: bool = False
+    backbone_grouped_resident_mode: bool = False
     tag: str = "runtime_eval"
 
 
@@ -72,6 +73,7 @@ def build_model(runtime_cfg):
             "no_control_mode": runtime_cfg.no_control_mode,
             "no_tail_wait_mode": runtime_cfg.no_tail_wait_mode,
             "disable_backbone_lane_split": runtime_cfg.disable_backbone_lane_split,
+            "backbone_grouped_resident_mode": runtime_cfg.backbone_grouped_resident_mode,
             "prefetch_distance": runtime_cfg.prefetch_distance,
             "store_capacity": runtime_cfg.store_capacity,
             "device": runtime_cfg.device,
@@ -182,6 +184,7 @@ def evaluate_runtime_with_components(runtime_cfg, model, tokenizer, prompts):
         "no_control_mode": bool(runtime_cfg.no_control_mode),
         "no_tail_wait_mode": bool(runtime_cfg.no_tail_wait_mode),
         "disable_backbone_lane_split": bool(runtime_cfg.disable_backbone_lane_split),
+        "backbone_grouped_resident_mode": bool(runtime_cfg.backbone_grouped_resident_mode),
         "device_memory_ratio": float(runtime_cfg.device_memory_ratio),
         "prefetch_distance": int(runtime_cfg.prefetch_distance),
         "num_prompts": len(prompts),

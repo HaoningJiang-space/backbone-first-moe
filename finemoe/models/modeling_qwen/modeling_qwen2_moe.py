@@ -807,6 +807,7 @@ class Qwen2MoeSparseMoeBlock(nn.Module):
             experts=self.experts,
             resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
             enable_backbone_lane_split=getattr(self, "enable_backbone_lane_split", True),
+            backbone_grouped_resident_mode=getattr(self, "backbone_grouped_resident_mode", False),
             runtime_profile=getattr(self, "runtime_profile", None),
             runtime_cache=self._modulelist_runtime_cache,
         )
@@ -923,6 +924,7 @@ class SyncQwen2MoeSparseMoeBlock(nn.Module):
             experts=self.experts,
             resident_expert_ids=getattr(self, "resident_local_expert_ids", ()),
             enable_backbone_lane_split=getattr(self, "enable_backbone_lane_split", True),
+            backbone_grouped_resident_mode=getattr(self, "backbone_grouped_resident_mode", False),
             runtime_profile=getattr(self, "runtime_profile", None),
             runtime_cache=self._modulelist_runtime_cache,
         )
