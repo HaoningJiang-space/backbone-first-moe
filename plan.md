@@ -142,13 +142,13 @@ Important scope limit:
 Held-out short `A/B/C` is now complete under the runtime-feasible `top165` regime on shard-`1` prompts:
 
 - pair means:
-  - `A = 5.2144 tok/s`
-  - `B = 5.3792 tok/s`
-  - `C = 5.3577 tok/s`
+  - `A = 5.1898 tok/s`
+  - `B = 5.3824 tok/s`
+  - `C = 5.3704 tok/s`
 - mean gains:
-  - `A -> B = +3.16%`
-  - `B -> C = -0.40%`
-  - `A -> C = +2.75%`
+  - `A -> B = +3.71%`
+  - `B -> C = -0.22%`
+  - `A -> C = +3.48%`
 
 Interpretation:
 
@@ -158,6 +158,11 @@ Interpretation:
 - therefore the paper should presently treat:
   - `A -> B` as the main quantitative systems result
   - `B -> C` as the current realization-gap evidence
+- the latest grouped resident-lane change improved `B -> C` only from `-0.40%` to `-0.22%`
+- so the current decision should be:
+  - keep `A -> B` as the paper-facing systems result
+  - treat `B -> C` as a current no-go for mainline claiming
+  - do not spend the main implementation budget on further generic two-lane tuning unless a new design can directly target backbone-specific grouped realization
 
 Supporting `B/C` breakdown on a matched short observation run:
 
@@ -566,16 +571,18 @@ In other words:
 
 Do next:
 
-- keep running clean `A/B/C` repeated experiments
-- treat `A -> B` as the current strongest proven gain
-- use `B/C` breakdown to guide a resident-lane redesign
-- only after that, decide whether a heavier fused/static backbone path is justified
+- keep `A -> B` as the strongest current proven gain
+- close the current `B -> C` loop as `realization gap`, not as the main quantitative result
+- tighten selector fairness where needed with runtime-budget-calibrated resident selection
+- only revisit `B -> C` if the next design is explicitly backbone-specific and materially different from the current resident-lane realization
+- if revisiting compute-path work, require it to be measured as a clean `C -> D` extension rather than more generic `B/C` hygiene
 
 Do not do next:
 
 - present metadata reuse as the next major win
 - present buffer reuse as the next major win
 - present fused kernels as already-validated backbone value
+- keep iterating on small two-lane implementation tweaks as if they are likely to change the main paper result
 
 ## Three-Layer Diagnosis
 

@@ -166,7 +166,7 @@ The next engineering priority is:
 2. continue reducing `DeepSeek` packed `dispatch_wait`
 3. use simulator ceilings only as idealized headroom references, always paired with real-machine attribution
 
-## 7. Preliminary A/B/C Attribution
+## 7. A/B/C Attribution
 
 The clean decomposition we wanted is:
 
@@ -174,7 +174,7 @@ The clean decomposition we wanted is:
 - `B`: same fair resident set and same budget as `C`, but `disable_backbone_lane_split=true`
 - `C`: backbone-first two-lane runtime with the same resident set and budget
 
-The first completed `Qwen @ 0.10` `A/B/C` pair is:
+The first completed `Qwen @ 0.10` `A/B/C` pair was:
 
 | Mode | Gen tok/s |
 |---|---:|
@@ -199,6 +199,27 @@ This should be read carefully:
 - this is only the first completed pair, not the final repeated `n`-pair result
 - therefore it should guide attribution and implementation work, but it should not replace the primary warm steady-state claim yet
 
+The current held-out repeated authority is the short runtime-feasible `top165` run on shard-`1` prompts:
+
+| Mode | Mean Gen tok/s |
+|---|---:|
+| `A` | `5.1898` |
+| `B` | `5.3824` |
+| `C` | `5.3704` |
+
+Derived mean gains:
+
+- `A -> B = +3.71%`
+- `B -> C = -0.22%`
+- `A -> C = +3.48%`
+
+Interpretation:
+
+- this is currently the cleanest repeated held-out runtime decomposition
+- `backbone resident/materialization` remains a stable positive gain
+- the latest resident grouped-realization change only narrows `B -> C` slightly, from roughly `-0.40%` to `-0.22%`
+- therefore current `two-lane specialization` is still not a stable positive add-on over `B`
+
 Matched `B/C` short-run breakdown gives the same directional signal:
 
 | Metric | `B` | `C` | Delta |
@@ -222,3 +243,4 @@ Paper-facing implication:
 - but the safest current statement is:
   - `backbone resident/materialization` is the strongest demonstrated source of gain
   - `two-lane specialization` remains a plausible but not yet strongly realized extension
+  - current `B -> C` should be treated as realization-gap evidence rather than as a main quantitative claim
