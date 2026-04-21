@@ -12,7 +12,8 @@ fi
 MODEL_PATH="${MODEL_PATH:-/data/ziheng/models/Qwen1.5-MoE-A2.7B-Chat}"
 OFFLOAD_PATH="${OFFLOAD_PATH:-/data/finemoe_offloads/Qwen1.5-MoE-A2.7B-Chat}"
 PROMPT_FILE="${PROMPT_FILE:-/data/ziheng/backbone-first-moe_fresh_e2e/results/qwen_real_machine_backbone_validation_v1/shard_1/prompts.json}"
-RESIDENT_FILE="${RESIDENT_FILE:-/data/ziheng/backbone-first-moe_fresh_e2e/results/qwen_real_machine_backbone_validation_v1/shard_1/resident/resident_mem0p10_top165.json}"
+STATE_FILE="${STATE_FILE:-}"
+RESIDENT_FILE="${RESIDENT_FILE:-}"
 
 DEVICE_MEMORY_RATIO="${DEVICE_MEMORY_RATIO:-0.10}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
@@ -36,10 +37,11 @@ export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 export TMPDIR="${TMPDIR:-/data/ziheng/tmp}"
 export TMP="${TMP:-${TMPDIR}}"
 export TEMP="${TEMP:-${TMPDIR}}"
-export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/data/ziheng/torch_ext_qwen_real_machine_abd}"
 if [ -z "${CUDA_VISIBLE_DEVICES:-}" ]; then
   export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 fi
+cuda_tag="$(printf '%s' "${CUDA_VISIBLE_DEVICES}" | tr -c '[:alnum:]' '_')"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/data/ziheng/torch_ext_qwen_real_machine_abd_${cuda_tag}}"
 
 mkdir -p "${TMPDIR}" "${TORCH_EXTENSIONS_DIR}" "${OUT_ROOT}"
 
@@ -90,6 +92,76 @@ with open(sys.argv[1], "r") as fh:
 PY
 }
 
+resolve_state_file() {
+  python - "${PROMPT_FILE}" "${STATE_FILE}" <<'PY'
+from pathlib import Path
+import sys
+
+prompt_file = Path(sys.argv[1]).resolve()
+explicit = sys.argv[2].strip()
+if explicit:
+    path = Path(explicit).resolve()
+    if not path.exists():
+        raise SystemExit(f"STATE_FILE does not exist: {path}")
+    print(path)
+    raise SystemExit(0)
+
+candidates = []
+states_dir = prompt_file.parent / "states"
+if states_dir.is_dir():
+    candidates.extend(sorted(states_dir.glob("*.pkl")))
+
+if prompt_file.name == "prompts.json":
+    shard_dir = prompt_file.parent
+    sibling_states = shard_dir / "states"
+    if sibling_states.is_dir():
+        candidates.extend(sorted(sibling_states.glob("*.pkl")))
+
+dedup = []
+seen = set()
+for candidate in candidates:
+    key = str(candidate.resolve())
+    if key in seen:
+        continue
+    seen.add(key)
+    dedup.append(candidate.resolve())
+
+if len(dedup) != 1:
+    pretty = ", ".join(str(p) for p in dedup) if dedup else "<none>"
+    raise SystemExit(
+        "Unable to resolve unique STATE_FILE from PROMPT_FILE. "
+        f"Candidates: {pretty}. Set STATE_FILE explicitly."
+    )
+print(dedup[0])
+PY
+}
+
+resolve_selected_resident_file() {
+  python - "${plan_dir}" "${DEVICE_MEMORY_RATIO}" <<'PY'
+from pathlib import Path
+import sys
+
+plan_dir = Path(sys.argv[1])
+mem_ratio = float(sys.argv[2])
+text = f"{mem_ratio:.6f}"
+whole, frac = text.split(".")
+frac = frac.rstrip("0")
+if len(frac) < 2:
+    frac = frac.ljust(2, "0")
+path = plan_dir / f"resident_mem{whole}p{frac}.json"
+print(path)
+PY
+}
+
+read_selected_resident_capacity() {
+  python - "${1}" <<'PY'
+import json, sys
+with open(sys.argv[1], "r") as fh:
+    payload = json.load(fh)
+print(int(payload.get("selected_resident_capacity", payload.get("resident_capacity", 0))))
+PY
+}
+
 pair_order() {
   local pair_idx="$1"
   case $(((pair_idx - 1) % 3)) in
@@ -110,17 +182,46 @@ run_eval "${plan_a_json}" "" 0 "A"
 log_stage "plan_a:done output=${plan_a_json}"
 fixed_budget_bytes="$(read_budget "${plan_a_json}")"
 
+resident_source="explicit_file"
+resident_json="${RESIDENT_FILE}"
+if [ -z "${resident_json}" ]; then
+  resident_source="runtime_budget_reselected"
+  state_file="$(resolve_state_file)"
+  resident_json="$(resolve_selected_resident_file)"
+  rm -f "${resident_json}"
+  log_stage "resident_select:start state_file=${state_file} budget_bytes=${fixed_budget_bytes}"
+  python -m experiments.simulation.select_adaptive_resident_set \
+    --state-file "${state_file}" \
+    --model-path "${MODEL_PATH}" \
+    --output-dir "${plan_dir}" \
+    --output-prefix resident \
+    --memory-ratios "${DEVICE_MEMORY_RATIO}" \
+    --selection-method frontier_prefix \
+    --profile-fraction 0.2 \
+    --prefetch-windows 0 \
+    --sparse-budget-bytes "${fixed_budget_bytes}"
+  log_stage "resident_select:done output=${resident_json}"
+fi
+
+resident_capacity="$(read_selected_resident_capacity "${resident_json}")"
+
 log_stage "warmup_a:start"
 run_eval "${warm_dir}/qwen_A_warmup.json" "" "${fixed_budget_bytes}" "A"
 log_stage "warmup_a:done"
 
-log_stage "warmup_b:start"
-run_eval "${warm_dir}/qwen_B_warmup.json" "${RESIDENT_FILE}" "${fixed_budget_bytes}" "B"
-log_stage "warmup_b:done"
+if [ "${resident_capacity}" -eq 0 ]; then
+  cp "${warm_dir}/qwen_A_warmup.json" "${warm_dir}/qwen_B_warmup.json"
+  cp "${warm_dir}/qwen_A_warmup.json" "${warm_dir}/qwen_D_warmup.json"
+  log_stage "warmup_b_d:skipped resident_capacity=0"
+else
+  log_stage "warmup_b:start"
+  run_eval "${warm_dir}/qwen_B_warmup.json" "${resident_json}" "${fixed_budget_bytes}" "B"
+  log_stage "warmup_b:done"
 
-log_stage "warmup_d:start"
-run_eval "${warm_dir}/qwen_D_warmup.json" "${RESIDENT_FILE}" "${fixed_budget_bytes}" "D"
-log_stage "warmup_d:done"
+  log_stage "warmup_d:start"
+  run_eval "${warm_dir}/qwen_D_warmup.json" "${resident_json}" "${fixed_budget_bytes}" "D"
+  log_stage "warmup_d:done"
+fi
 
 for pair_idx in $(seq 1 "${NUM_MEASURED_PAIRS}"); do
   pair_dir="${OUT_ROOT}/pair${pair_idx}"
@@ -130,10 +231,10 @@ for pair_idx in $(seq 1 "${NUM_MEASURED_PAIRS}"); do
     output_json="${pair_dir}/qwen_${mode}_heldout.json"
     rm -f "${output_json}"
     log_stage "pair${pair_idx}:${mode}:start output=${output_json}"
-    if [ "${mode}" = "A" ]; then
+    if [ "${mode}" = "A" ] || [ "${resident_capacity}" -eq 0 ]; then
       run_eval "${output_json}" "" "${fixed_budget_bytes}" "${mode}"
     else
-      run_eval "${output_json}" "${RESIDENT_FILE}" "${fixed_budget_bytes}" "${mode}"
+      run_eval "${output_json}" "${resident_json}" "${fixed_budget_bytes}" "${mode}"
     fi
     log_stage "pair${pair_idx}:${mode}:done output=${output_json}"
   done
@@ -159,7 +260,7 @@ print(
 PY
 done
 
-python - "${OUT_ROOT}" "${NUM_MEASURED_PAIRS}" "${RESIDENT_FILE}" <<'PY'
+python - "${OUT_ROOT}" "${NUM_MEASURED_PAIRS}" "${resident_json}" "${resident_source}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -167,8 +268,28 @@ from pathlib import Path
 out_root = Path(sys.argv[1])
 num_pairs = int(sys.argv[2])
 resident_file = sys.argv[3]
+resident_source = sys.argv[4]
+
+with open(resident_file) as fr:
+    resident_payload = json.load(fr)
 
 rows = []
+def profile_subset(payload):
+    rp = payload.get("runtime_profile", {})
+    return {
+        "resident_expert_blocks": int(rp.get("modulelist_resident_expert_blocks", 0)),
+        "demand_expert_blocks": int(rp.get("modulelist_demand_expert_blocks", 0)),
+        "resident_token_assignments": int(rp.get("modulelist_resident_token_assignments", 0)),
+        "demand_token_assignments": int(rp.get("modulelist_demand_token_assignments", 0)),
+        "resident_compute_wall_time_sec": float(rp.get("modulelist_resident_compute_wall_time_sec", 0.0)),
+        "demand_compute_wall_time_sec": float(rp.get("modulelist_demand_compute_wall_time_sec", 0.0)),
+        "resident_gather_wall_time_sec": float(rp.get("modulelist_resident_gather_wall_time_sec", 0.0)),
+        "resident_merge_wall_time_sec": float(rp.get("modulelist_resident_merge_wall_time_sec", 0.0)),
+        "resident_workspace_cache_hits": int(rp.get("modulelist_resident_workspace_cache_hits", 0)),
+        "resident_workspace_cache_misses": int(rp.get("modulelist_resident_workspace_cache_misses", 0)),
+        "tail_group_begin_wall_time_sec": float(rp.get("tail_group_begin_wall_time_sec", 0.0)),
+    }
+
 for pair_idx in range(1, num_pairs + 1):
     pair_dir = out_root / f"pair{pair_idx}"
     with open(pair_dir / "qwen_A_heldout.json") as fa, \
@@ -182,6 +303,9 @@ for pair_idx in range(1, num_pairs + 1):
         "A_tps": a["generated_tokens_per_sec"],
         "B_tps": b["generated_tokens_per_sec"],
         "D_tps": d["generated_tokens_per_sec"],
+        "A_profile": profile_subset(a),
+        "B_profile": profile_subset(b),
+        "D_profile": profile_subset(d),
     })
 
 def summarize(src, dst):
@@ -195,6 +319,10 @@ def summarize(src, dst):
 summary = {
     "num_pairs": num_pairs,
     "resident_file": resident_file,
+    "resident_source": resident_source,
+    "resident_selection_budget_bytes": resident_payload.get("selection_budget_bytes"),
+    "resident_selection_budget_source": resident_payload.get("selection_budget_source"),
+    "resident_capacity": int(resident_payload.get("selected_resident_capacity", resident_payload.get("resident_capacity", 0))),
     "pairs": rows,
     "A_to_B": summarize("A_tps", "B_tps"),
     "B_to_D": summarize("B_tps", "D_tps"),
