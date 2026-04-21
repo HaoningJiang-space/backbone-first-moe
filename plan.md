@@ -194,6 +194,48 @@ Current best read:
   - an implementation hypothesis that still needs work
   - not as the already-proven main source of gain
 
+## Why Current C Does Not Work
+
+Current evidence says the present `C` design is the wrong place to keep investing.
+
+What `C` is supposed to do:
+
+- keep the same discovered resident backbone as `B`
+- realize additional value by explicitly splitting `backbone lane` from `tail lane`
+
+What actually happens today:
+
+- `A -> B` is stable and positive
+- `B -> C` remains slightly negative even after a resident-lane grouped realization pass
+- the latest pass only moved `B -> C` from roughly `-0.40%` to `-0.22%`
+
+Why this is happening:
+
+1. the current explicit lane split does **not** unlock a large hidden tail-side saving
+   - `tail_group_begin` barely changes between `B` and `C`
+   - `modulelist_demand_compute` improves only slightly
+2. `C` introduces its own resident-lane realization cost
+   - resident compute
+   - resident gather
+   - resident merge
+3. small implementation improvements mostly reduce the size of the loss
+   - they have not turned `C` into a stable positive add-on
+
+Implication:
+
+- current `C` should be treated as a useful failed prototype
+- it demonstrates a real `realization gap`
+- it should **not** be treated as the main path for further generic tuning
+
+Decision:
+
+- `C` is now a `no-go` as the primary optimization target
+- keep it as:
+  - a control point
+  - a negative lesson
+  - a realization-gap baseline
+- move the main implementation budget to a new `D`
+
 ## Backbone-Specific Filter
 
 Use the following filter before promoting any optimization into the main story.
@@ -498,9 +540,15 @@ The current systems problem is therefore:
 
 ### Progressive, Evidence-Aligned Levels
 
-#### Level 3: Backbone-Aware Grouped Realization
+#### Level 3: Backbone-Specific `D` Prototype
 
 This is the next recommended implementation target.
+
+The design rule is:
+
+- build `D` on top of `B`, not on top of the current `C`
+- keep `B`'s proven resident/materialization benefit
+- replace only the resident-backbone execution path with a more backbone-specific grouped path
 
 Desired properties:
 
@@ -509,16 +557,18 @@ Desired properties:
 - reusable backbone workspace and stable execution state
 - no dependence on exact assignment-shape reuse
 - explicit use of backbone stability / group structure, not just frequent-expert caching
+- demand / tail side remains as close as possible to `B`
 
 This level should be evaluated by:
 
-- clean `B -> C` repeated runs
-- `B/C` matched short-run breakdowns
-- explicit resident-lane cost attribution
+- clean `B -> D` repeated runs
+- `B/D` matched short-run breakdowns
+- explicit resident-path cost attribution
 
 Success criterion:
 
-- `B -> C` becomes a stable positive gain, not just a single-pair fluctuation
+- `B -> D` becomes a stable positive gain, not just a single-pair fluctuation
+- the gain should come from a backbone-specific path, not from generic hygiene that also lifts `A`
 
 #### Level 4: Optional Backbone-Specialized Fused / Static Execution
 
@@ -556,7 +606,7 @@ The strongest current version is:
 2. `backbone resident/materialization` is already valuable
 3. `backbone` also exhibits strong compute-regularity structure
 4. current `two-lane` realization is not yet strong enough to be the main demonstrated source of gain
-5. the next systems challenge is to build a cheaper `backbone-aware grouped realization`
+5. the next systems challenge is to build a new `D` that realizes backbone-specific grouped execution on top of `B`
 
 In other words:
 
@@ -574,8 +624,9 @@ Do next:
 - keep `A -> B` as the strongest current proven gain
 - close the current `B -> C` loop as `realization gap`, not as the main quantitative result
 - tighten selector fairness where needed with runtime-budget-calibrated resident selection
-- only revisit `B -> C` if the next design is explicitly backbone-specific and materially different from the current resident-lane realization
-- if revisiting compute-path work, require it to be measured as a clean `C -> D` extension rather than more generic `B/C` hygiene
+- move the next implementation to `D = B + backbone-specific grouped realization`
+- if revisiting compute-path work, require it to be measured as a clean `B -> D` gain first
+- only after `B -> D` is stable and positive, consider a heavier `D -> E` fused/static backbone path
 
 Do not do next:
 
@@ -925,22 +976,26 @@ The paper-facing ablation stack should be read as:
   - this isolates the value of `backbone discovery + resident materialization`
 - `C`
   - backbone-first two-lane runtime with the same resident set
-  - this isolates the value of `backbone-aware realization`
+  - this isolates the value of the current explicit split design
+  - today it is best treated as a realization-gap control rather than the next target
 - `D` (optional)
-  - backbone-guided compute regularization on top of `C`
-  - this isolates the value of treating backbone as a compute-regularity object
+  - backbone-guided compute regularization on top of `B`
+  - this isolates the value of treating backbone as a compute-regularity object without inheriting the current `C` design
 
 Interpretation discipline:
 
 - `A -> B` answers whether backbone itself has usable systems value
-- `B -> C` answers whether two-lane architecture realizes that value better than a unified runtime
-- `C -> D` answers whether backbone also supports same-resource compute-path gains
+- `B -> C` answers whether the current two-lane split realizes that value better than a unified runtime
+- `B -> D` answers whether a new backbone-specific grouped path realizes additional value
+- only after that should a heavier `D -> E` backbone-compute endpoint be considered
 
 Current evidence status:
 
 - `A -> C` is positive on `Qwen`
 - `A -> C` alone is not enough to cleanly attribute where the gain comes from
-- therefore future evaluation should explicitly move toward `A/B/C(/D)` rather than treating all runtime work as one monolithic delta
+- `A -> B` is now the strongest stable result
+- `B -> C` is currently a negative or near-zero result
+- therefore future evaluation should move toward `A/B/C/D`, with `D` replacing `C` as the main systems upside candidate
 
 ### Running Now
 
@@ -1023,11 +1078,12 @@ Immediate next implementation step:
 - instead, the next implementation must satisfy the `backbone-specific filter` above
 - preferred order:
   - first, keep the clean repeated `A/B/C` authority current
-  - second, attempt a resident-aware grouped backbone realization that is measured as `B -> C`
-  - third, only if that succeeds, attempt a true `C -> D` grouped-backbone compute prototype
+  - second, freeze current `C` as realization-gap evidence
+  - third, attempt `D = B + backbone-specific grouped realization`
+  - fourth, only if that succeeds, attempt a heavier backbone-compute endpoint beyond `D`
 - do not start with exact plan-cache reuse
 - treat any generic `A` and `C` co-speedup as supporting evidence only
 - only promote work into the main story if it:
-  - enlarges the `B -> C` gap
-  - or enables a credible `C -> D` backbone-compute result
+  - produces a stable positive `B -> D`
+  - or later enables a credible backbone-compute result beyond `D`
 - after that, revisit `DeepSeek/packed` only if the same compute-regularity lens produces a plausible grouped service prototype
