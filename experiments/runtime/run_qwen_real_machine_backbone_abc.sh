@@ -5,6 +5,10 @@ REPO_ROOT="${REPO_ROOT:-/data/ziheng/backbone-first-moe_fresh_e2e}"
 OUT_ROOT="${OUT_ROOT:-${REPO_ROOT}/results/qwen_real_machine_backbone_abc}"
 NUM_MEASURED_PAIRS="${NUM_MEASURED_PAIRS:-3}"
 
+if [ "${1:-}" != "" ]; then
+  OUT_ROOT="$1"
+fi
+
 MODEL_PATH="${MODEL_PATH:-/data/ziheng/models/Qwen1.5-MoE-A2.7B-Chat}"
 OFFLOAD_PATH="${OFFLOAD_PATH:-/data/finemoe_offloads/Qwen1.5-MoE-A2.7B-Chat}"
 PROMPT_FILE="${PROMPT_FILE:-/data/ziheng/backbone-first-moe_fresh_e2e/results/qwen_real_machine_backbone_validation_v1/shard_1/prompts.json}"
