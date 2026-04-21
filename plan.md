@@ -139,6 +139,26 @@ Important scope limit:
   - `A -> B` currently looks like the stronger effect
   - `B -> C` still needs the full repeated run before it can be treated as stable
 
+Held-out short `A/B/C` is now complete under the runtime-feasible `top165` regime on shard-`1` prompts:
+
+- pair means:
+  - `A = 5.2144 tok/s`
+  - `B = 5.3792 tok/s`
+  - `C = 5.3577 tok/s`
+- mean gains:
+  - `A -> B = +3.16%`
+  - `B -> C = -0.40%`
+  - `A -> C = +2.75%`
+
+Interpretation:
+
+- this is currently the cleanest repeated held-out runtime decomposition
+- `backbone resident/materialization` is now a stable demonstrated gain
+- current `two-lane` realization does **not** add a stable extra win on top of `B`
+- therefore the paper should presently treat:
+  - `A -> B` as the main quantitative systems result
+  - `B -> C` as the current realization-gap evidence
+
 Supporting `B/C` breakdown on a matched short observation run:
 
 - `B = 5.7355 tok/s`
@@ -168,6 +188,72 @@ Current best read:
 - therefore `two-lane specialization` should currently be treated as:
   - an implementation hypothesis that still needs work
   - not as the already-proven main source of gain
+
+## Backbone-Specific Filter
+
+Use the following filter before promoting any optimization into the main story.
+
+An optimization should count as `backbone-specific` only if it satisfies most of these:
+
+1. it uses backbone's distinct structural signals:
+   - high coarse active-set reuse
+   - large backbone group size
+   - strong compute-mass concentration
+2. it depends on backbone discovery:
+   - without the discovered backbone set, the optimization is not well-defined
+3. it treats backbone and tail differently:
+   - stable backbone path
+   - dynamic tail path
+4. it exploits `stability` rather than only `frequency`:
+   - reuse / repeated active sets / reusable grouped execution state
+   - not merely "these experts are often accessed"
+
+Practical consequence:
+
+- `generic runtime hygiene` is not backbone-specific even if it helps `C`
+- `backbone-guided heuristics` are weaker than true backbone-specific mechanisms
+- only optimizations that genuinely rely on backbone stability / group structure should be promoted into the main thesis
+
+### What Currently Qualifies
+
+Strong candidates:
+
+- `backbone resident/materialization`
+  - requires the discovered resident backbone set
+- `backbone-aware grouped realization`
+  - grouped backbone-serving path
+  - explicit separation from dynamic tail service
+- `grouped backbone dispatch / grouped backbone GEMM`
+  - if it actually relies on backbone group-size and active-set stability
+- `backbone-specialized fused or static execution`
+  - only if it is keyed by repeated backbone structure and evaluated as `C -> D`
+
+### What Does Not Currently Qualify As Main Story
+
+Do not promote these as the next headline result:
+
+- generic metadata caching
+- generic output-buffer reuse
+- generic `begin_group` or `demand compute` micro-optimizations
+- quantization by itself
+- pruning by itself
+
+Reason:
+
+- these can be useful engineering tools
+- but by themselves they do not yet demonstrate a backbone-specific systems insight
+- and several of them have already shown only weak gains in our current runtime
+
+### Interpretation Rule
+
+Use this ladder when evaluating any new implementation:
+
+- if it helps `A`, `B`, and `C` similarly:
+  - runtime hygiene
+- if it improves `B -> C` under the same resident set:
+  - backbone-aware realization evidence
+- if it additionally enables a clean `C -> D` gain:
+  - backbone-specific compute-regularity evidence
 
 ## Fresh Real-Machine Backbone Validation
 
@@ -417,6 +503,7 @@ Desired properties:
 - reduced resident gather / merge / coordination overhead
 - reusable backbone workspace and stable execution state
 - no dependence on exact assignment-shape reuse
+- explicit use of backbone stability / group structure, not just frequent-expert caching
 
 This level should be evaluated by:
 
@@ -441,8 +528,15 @@ It becomes worth pursuing only if:
 This level includes ideas such as:
 
 - more aggressive grouped backbone dispatch
+- grouped backbone GEMM if it is actually keyed by backbone grouping
 - static workspace / stream specialization
 - backbone-specialized fused execution
+
+Important scope boundary:
+
+- grouped GEMM / fusion only belong in the main paper path if they are implemented as `backbone-specific`
+- they do **not** qualify merely because they speed up MoE generically
+- do not attach speculative gain numbers to them before measuring `C -> D`
 
 Important rule:
 
@@ -765,6 +859,17 @@ Why:
   - residual tail sparsification
 - it does not rely on a reuse signal that is currently weak
 
+Current implementation read:
+
+- `metadata reuse` and `output-buffer reuse` were both implemented and measured
+- both produced only small gains
+- therefore they should be treated as:
+  - useful subcomponents
+  - not the next headline optimization track
+- the next serious attempt on this line should be:
+  - a resident-aware grouped backbone realization
+  - or a true `C -> D` grouped-backbone compute prototype
+
 Contribution boundary:
 
 - this track is valid only if it remains clearly `backbone-guided`
@@ -907,10 +1012,12 @@ Limits:
 
 Immediate next implementation step:
 
-- for `Qwen/modulelist`, start with a minimal Phase 2 prototype:
-  - reusable backbone buffers
-  - coarse grouped metadata reuse
-  - static workspace binding
+- for `Qwen/modulelist`, do **not** keep iterating on metadata-cache-first or buffer-cache-first ideas as the main path
+- instead, the next implementation must satisfy the `backbone-specific filter` above
+- preferred order:
+  - first, keep the clean repeated `A/B/C` authority current
+  - second, attempt a resident-aware grouped backbone realization that is measured as `B -> C`
+  - third, only if that succeeds, attempt a true `C -> D` grouped-backbone compute prototype
 - do not start with exact plan-cache reuse
 - treat any generic `A` and `C` co-speedup as supporting evidence only
 - only promote work into the main story if it:
