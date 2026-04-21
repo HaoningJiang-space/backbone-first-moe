@@ -1,5 +1,6 @@
 import argparse
 import json
+import random
 import shutil
 import subprocess
 import sys
@@ -64,7 +65,7 @@ def derive_resident_path(output_dir, output_prefix, mem_ratio):
     return output_dir / f"{output_prefix}_mem{whole}p{frac}.json"
 
 
-def build_shard(args, shard_idx, shard_items):
+def build_shard(args, shard_idx, shard_items, source_indices):
     shard_name = f"{args.dataset_prefix}_shard{shard_idx}"
     shard_dir = args.output_dir / f"shard_{shard_idx}"
     prompts_path = shard_dir / "prompts.json"
@@ -142,6 +143,7 @@ def build_shard(args, shard_idx, shard_items):
     return {
         "shard_index": shard_idx,
         "shard_name": shard_name,
+        "source_indices": list(source_indices),
         "prompt_file": str(prompts_path),
         "state_file": str(local_state),
         "resident_file": str(resident_path),
@@ -167,6 +169,9 @@ def build_markdown(summary):
         f"- shards: `{summary['num_shards']}` x `{summary['shard_size']}` prompts"
     )
     lines.append(
+        f"- shard_assignment: `reproducibly shuffled` (seed=`{summary['shuffle_seed']}`)"
+    )
+    lines.append(
         f"- memory_ratio: `{summary['memory_ratio']}`"
     )
     if summary["sparse_budget_bytes"] is not None:
@@ -179,6 +184,7 @@ def build_markdown(summary):
     for shard in summary["shards"]:
         lines.append(
             f"- shard {shard['shard_index']}: resident_count={shard['resident_count']}, "
+            f"selection_budget_bytes={shard['resident_payload'].get('selection_budget_bytes')}, "
             f"assignment_fraction_per_token_mean={shard['assignment_fraction_per_token_mean']:.4f}, "
             f"backbone_any_hit_token_coverage={shard['backbone_any_hit_token_coverage']:.4f}, "
             f"active_reduction_mean={shard['active_reduction_mean']:.4f}"
@@ -227,6 +233,7 @@ def main():
     parser.add_argument("--memory-ratio", type=float, default=0.10)
     parser.add_argument("--profile-fraction", type=float, default=0.2)
     parser.add_argument("--sparse-budget-bytes", type=int, default=None)
+    parser.add_argument("--shuffle-seed", type=int, default=42)
     parser.add_argument("--reuse-existing", action="store_true")
     args = parser.parse_args()
 
@@ -237,12 +244,18 @@ def main():
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    indexed_items = list(enumerate(items))
+    rng = random.Random(args.shuffle_seed)
+    rng.shuffle(indexed_items)
+
     shards = []
     for shard_idx in range(args.num_shards):
         start = shard_idx * args.shard_size
         end = start + args.shard_size
-        shard_items = items[start:end]
-        shards.append(build_shard(args, shard_idx, shard_items))
+        shard_pairs = indexed_items[start:end]
+        shard_items = [item for _, item in shard_pairs]
+        source_indices = [int(idx) for idx, _ in shard_pairs]
+        shards.append(build_shard(args, shard_idx, shard_items, source_indices))
 
     from backbone_moe.workload import load_state_dict  # local import to keep startup light
 
@@ -309,6 +322,7 @@ def main():
         "memory_ratio": args.memory_ratio,
         "profile_fraction": args.profile_fraction,
         "sparse_budget_bytes": args.sparse_budget_bytes,
+        "shuffle_seed": args.shuffle_seed,
         "shards": [],
         "pairwise_transfer": pair_rows,
         "aggregate": {
@@ -324,10 +338,12 @@ def main():
         summary["shards"].append({
             "shard_index": shard["shard_index"],
             "shard_name": shard["shard_name"],
+            "source_indices": shard["source_indices"],
             "prompt_file": shard["prompt_file"],
             "state_file": shard["state_file"],
             "resident_file": shard["resident_file"],
             "resident_count": len(shard["resident_set"]),
+            "resident_payload": shard["resident_payload"],
             "assignment_fraction_per_token_mean": native["assignment_fraction"]["per_token"]["mean"],
             "backbone_any_hit_token_coverage": native["coverage"]["backbone_any_hit_token_coverage"],
             "active_reduction_mean": native["active_expert_count_before_after_backbone"]["reduction_fraction"]["mean"],

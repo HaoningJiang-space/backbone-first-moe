@@ -20,6 +20,11 @@ STORE_CAPACITY="${STORE_CAPACITY:-1000}"
 SEED="${SEED:-42}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
 
+if [ $((NUM_MEASURED_PAIRS % 3)) -ne 0 ]; then
+  echo "NUM_MEASURED_PAIRS must be a multiple of 3 for balanced A/B/C order, got ${NUM_MEASURED_PAIRS}" >&2
+  exit 2
+fi
+
 cd "${REPO_ROOT}"
 source /home/ziheng/miniconda3/bin/activate mxmoe
 
@@ -28,7 +33,9 @@ export TMPDIR="${TMPDIR:-/data/ziheng/tmp}"
 export TMP="${TMP:-${TMPDIR}}"
 export TEMP="${TEMP:-${TMPDIR}}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/data/ziheng/torch_ext_qwen_lane_abc}"
-export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ]; then
+  export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+fi
 
 mkdir -p "${TMPDIR}" "${TORCH_EXTENSIONS_DIR}" "${OUT_ROOT}"
 

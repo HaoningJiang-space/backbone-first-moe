@@ -28,7 +28,9 @@ export TMPDIR="${TMPDIR:-/data/ziheng/tmp}"
 export TMP="${TMP:-${TMPDIR}}"
 export TEMP="${TEMP:-${TMPDIR}}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/data/ziheng/torch_ext_qwen_real_machine_transfer}"
-export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ]; then
+  export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+fi
 
 mkdir -p "${TMPDIR}" "${TORCH_EXTENSIONS_DIR}" "${OUT_ROOT}"
 
@@ -80,6 +82,56 @@ PY
 plan_dir="${OUT_ROOT}/plan"
 warm_dir="${OUT_ROOT}/warmup"
 mkdir -p "${plan_dir}" "${warm_dir}"
+resident_meta_json="${OUT_ROOT}/resident_meta.json"
+
+python - "${NATIVE_RESIDENT_FILE}" "${TRANSFER_RESIDENT_FILE}" "${resident_meta_json}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+
+def load_meta(path_str):
+    path = Path(path_str)
+    payload = json.loads(path.read_text())
+    entries = payload.get("resident_set", [])
+    capacity = payload.get("selected_resident_capacity", payload.get("resident_capacity"))
+    if capacity is None:
+        capacity = len(entries)
+    selection_budget_bytes = payload.get("selection_budget_bytes")
+    if selection_budget_bytes is None:
+        raise SystemExit(f"Resident payload is missing selection_budget_bytes: {path}")
+    return {
+        "path": str(path),
+        "selection_budget_bytes": int(selection_budget_bytes),
+        "selection_budget_source": payload.get("selection_budget_source", ""),
+        "resident_capacity": int(capacity),
+        "resident_count": int(len(entries)),
+        "resident_payload": payload,
+    }
+
+
+native = load_meta(sys.argv[1])
+transfer = load_meta(sys.argv[2])
+
+if native["selection_budget_bytes"] != transfer["selection_budget_bytes"]:
+    raise SystemExit(
+        "Resident files disagree on selection_budget_bytes: "
+        f"{native['selection_budget_bytes']} vs {transfer['selection_budget_bytes']}"
+    )
+if native["resident_capacity"] != transfer["resident_capacity"]:
+    raise SystemExit(
+        "Resident files disagree on resident capacity: "
+        f"{native['resident_capacity']} vs {transfer['resident_capacity']}"
+    )
+
+meta = {
+    "validated": True,
+    "native": native,
+    "transfer": transfer,
+}
+Path(sys.argv[3]).write_text(json.dumps(meta, indent=2))
+print(json.dumps(meta, indent=2))
+PY
 
 plan_a_json="${plan_dir}/qwen_A_plan.json"
 rm -f "${plan_a_json}"
@@ -117,16 +169,17 @@ log_stage "measure_b_transfer:start output=${b_transfer_json}"
 run_eval "${b_transfer_json}" "${TRANSFER_RESIDENT_FILE}" "${fixed_budget_bytes}" "runtime_transfer_B_transfer"
 log_stage "measure_b_transfer:done output=${b_transfer_json}"
 
-python - "${a_json}" "${b_native_json}" "${b_transfer_json}" "${OUT_ROOT}/summary_transfer.json" <<'PY'
+python - "${a_json}" "${b_native_json}" "${b_transfer_json}" "${resident_meta_json}" "${OUT_ROOT}/summary_transfer.json" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-a_path, bn_path, bt_path, out_path = sys.argv[1:5]
+a_path, bn_path, bt_path, meta_path, out_path = sys.argv[1:6]
 with open(a_path) as fa, open(bn_path) as fbn, open(bt_path) as fbt:
     a = json.load(fa)
     bn = json.load(fbn)
     bt = json.load(fbt)
+resident_meta = json.loads(Path(meta_path).read_text())
 
 def tps(x):
     return x["generated_tokens_per_sec"]
@@ -147,6 +200,7 @@ summary = {
     "transfer_resident_count": bt.get("resident_count"),
     "native_resident_file": bn.get("resident_expert_ids_file"),
     "transfer_resident_file": bt.get("resident_expert_ids_file"),
+    "resident_meta_validation": resident_meta,
   }
 
 Path(out_path).write_text(json.dumps(summary, indent=2))
