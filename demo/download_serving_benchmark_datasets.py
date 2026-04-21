@@ -45,12 +45,6 @@ BENCHMARK_SPECS = {
         "split": "test",
         "extract_prompt": _mmlu_prompt,
     },
-    "bbh": {
-        "dataset_path": "lukaemon/bbh",
-        "config": None,
-        "split": "test",
-        "extract_prompt": _bbh_prompt,
-    },
 }
 
 LONGBENCH_DEFAULT_CONFIGS = [
@@ -59,6 +53,14 @@ LONGBENCH_DEFAULT_CONFIGS = [
     "musique",
     "qasper",
     "multifieldqa_en",
+]
+
+BBH_DEFAULT_CONFIGS = [
+    "boolean_expressions",
+    "causal_judgement",
+    "date_understanding",
+    "disambiguation_qa",
+    "formal_fallacies",
 ]
 
 
@@ -118,11 +120,7 @@ def _download_standard_benchmark(name: str, spec: dict, *, cache_dir: str | None
 
 
 def _download_longbench(*, cache_dir: str | None, output_dir: Path, sample_size: int, seed: int, configs=None):
-    available = set(get_dataset_config_names("THUDM/LongBench", cache_dir=cache_dir))
-    selected = [cfg for cfg in (configs or LONGBENCH_DEFAULT_CONFIGS) if cfg in available]
-    if not selected:
-        raise RuntimeError("No requested LongBench configs are available")
-
+    selected = list(configs or LONGBENCH_DEFAULT_CONFIGS)
     per_config = max(1, sample_size // len(selected))
     combined = []
     manifest = []
@@ -132,6 +130,7 @@ def _download_longbench(*, cache_dir: str | None, output_dir: Path, sample_size:
             cfg,
             split="test",
             cache_dir=cache_dir,
+            trust_remote_code=True,
         )
         records = _sample_records(
             dataset,
@@ -164,6 +163,62 @@ def _download_longbench(*, cache_dir: str | None, output_dir: Path, sample_size:
         {
             "name": "longbench_mixed",
             "dataset_path": "THUDM/LongBench",
+            "config": selected,
+            "split": "test",
+            "sample_size": len(combined),
+            "output_file": str(combined_path),
+        }
+    )
+    return manifest
+
+
+def _download_bbh(*, cache_dir: str | None, output_dir: Path, sample_size: int, seed: int, configs=None):
+    available = set(get_dataset_config_names("lukaemon/bbh", cache_dir=cache_dir))
+    selected = [cfg for cfg in (configs or BBH_DEFAULT_CONFIGS) if cfg in available]
+    if not selected:
+        raise RuntimeError("No requested BBH configs are available")
+
+    per_config = max(1, sample_size // len(selected))
+    combined = []
+    manifest = []
+    for cfg in selected:
+        dataset = load_dataset(
+            "lukaemon/bbh",
+            cfg,
+            split="test",
+            cache_dir=cache_dir,
+        )
+        records = _sample_records(
+            dataset,
+            _bbh_prompt,
+            per_config,
+            seed,
+            extra_fields=("input", "target"),
+        )
+        for item in records:
+            item["bbh_config"] = cfg
+        output_path = output_dir / f"bbh_{cfg}~eval_prompts.json"
+        _write_prompt_json(output_path, records)
+        manifest.append(
+            {
+                "name": f"bbh_{cfg}",
+                "dataset_path": "lukaemon/bbh",
+                "config": cfg,
+                "split": "test",
+                "sample_size": len(records),
+                "output_file": str(output_path),
+            }
+        )
+        combined.extend(records)
+
+    random.Random(seed).shuffle(combined)
+    combined = combined[:sample_size]
+    combined_path = output_dir / "bbh_mixed~eval_prompts.json"
+    _write_prompt_json(combined_path, combined)
+    manifest.append(
+        {
+            "name": "bbh_mixed",
+            "dataset_path": "lukaemon/bbh",
             "config": selected,
             "split": "test",
             "sample_size": len(combined),
@@ -226,6 +281,15 @@ def main():
             if name == "longbench":
                 manifest.extend(
                     _download_longbench(
+                        cache_dir=args.cache_dir,
+                        output_dir=output_dir,
+                        sample_size=args.sample_size,
+                        seed=args.seed,
+                    )
+                )
+            elif name == "bbh":
+                manifest.extend(
+                    _download_bbh(
                         cache_dir=args.cache_dir,
                         output_dir=output_dir,
                         sample_size=args.sample_size,
